@@ -9,6 +9,7 @@ rust_library(
         "//config",
         "//util:error",
         ":memory_store",
+        ":s3_store",
         ":traits",
         ":verify_store",
     ],
@@ -89,5 +90,47 @@ rust_test(
         ":memory_store",
         ":traits",
         ":verify_store",
+    ],
+)
+
+rust_library(
+    name = "s3_store",
+    srcs = ["s3_store.rs"],
+    deps = [
+        "//config",
+        "//third_party:futures",
+        "//third_party:http",
+        "//third_party:rand",
+        "//third_party:rusoto_core",
+        "//third_party:rusoto_s3",
+        "//third_party:tokio",
+        "//third_party:tokio_util",
+        "//third_party:fast_async_mutex",
+        "//util:common",
+        "//util:async_read_taker",
+        "//util:error",
+        "//util:retry",
+        ":traits",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+    visibility = ["//cas:__pkg__"]
+)
+
+rust_test(
+    name = "s3_store_test",
+    srcs = ["tests/s3_store_test.rs"],
+    deps = [
+        "//config",
+        "//third_party:futures",
+        "//third_party:http",
+        "//third_party:pretty_assertions",
+        "//third_party:rusoto_core",
+        "//third_party:rusoto_mock",
+        "//third_party:rusoto_s3",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":s3_store",
+        ":traits",
     ],
 )

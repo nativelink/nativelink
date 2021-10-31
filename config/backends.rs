@@ -8,6 +8,14 @@ pub enum StoreConfig {
     /// Memory store will store all data in a hashmap in memory.
     memory(MemoryStore),
 
+    /// S3 store will use Amazon's S3 service as a backend to store
+    /// the files. This configuration can be used to share files
+    /// across multiple instances.
+    ///
+    /// This configuration will never delete files, so you are
+    /// responsible for purging old files in other ways.
+    s3_store(S3Store),
+
     /// Verify store is used to apply verifications to an underlying
     /// store implementation. It is strongly encouraged to validate
     /// as much data as you can before accepting data from a client,
@@ -71,6 +79,25 @@ pub struct EvictionPolicy {
     /// Default: 0. Zero means never evict based on count.
     #[serde(default)]
     pub max_count: u64,
+}
+
+#[derive(Deserialize, Debug, Default)]
+pub struct S3Store {
+    /// S3 region. Usually us-east-1, us-west-2, af-south-1, exc...
+    #[serde(default)]
+    pub region: String,
+
+    /// Bucket name to use as the backend.
+    #[serde(default)]
+    pub bucket: String,
+
+    /// If you wish to prefix the location on s3. If None, no prefix will be used.
+    #[serde(default)]
+    pub key_prefix: Option<String>,
+
+    /// Retry configuration to use when a network request fails.
+    #[serde(default)]
+    pub retry: Retry,
 }
 
 /// Retry configuration. This configuration is exponential and each iteration
