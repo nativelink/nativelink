@@ -1,25 +1,11 @@
-// Copyright 2020 Leonhard LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use these files except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
-// This library is a heavily modified version of:
-// https://docs.rs/fixed-buffer-tokio/0.1.1/fixed_buffer_tokio/
+// Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 #![forbid(unsafe_code)]
 
+use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll, Waker};
 
 use fast_async_mutex::mutex::Mutex;
@@ -29,14 +15,30 @@ use pin_project_lite::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pin_project! {
+    /// This library was significantly inspired by:
+    /// https://docs.rs/fixed-buffer-tokio/0.1.1/fixed_buffer_tokio/
+    ///
+    /// This struct will buffer the data between an `AsyncRead` and `AsyncWrite`
+    /// with a fixed buffer as an intermediary. In addition it gives the ability
+    /// to call `get_closer()` which if awaited will close the writer stream.
+    /// Finally, this struct can also deal with EOF in a more natural manner.
     pub struct AsyncFixedBuf<T> {
         inner: FixedBuf<T>,
         waker: Arc<Mutex<Option<Waker>>>,
         did_shutdown: Arc<AtomicBool>,
-        write_amt: AtomicUsize,
-        read_amt: AtomicUsize,
         received_eof: AtomicBool,
     }
+}
+
+fn wake(waker: &mut Option<Waker>) {
+    waker.take().map(|w| {
+        w.wake();
+    });
+}
+
+fn park(waker: &mut Option<Waker>, cx: &Context<'_>) {
+    wake(waker);
+    *waker = Some(cx.waker().clone());
 }
 
 impl<T> AsyncFixedBuf<T> {
@@ -50,14 +52,12 @@ impl<T> AsyncFixedBuf<T> {
             inner: FixedBuf::new(mem),
             waker: Arc::new(Mutex::new(None)),
             did_shutdown: Arc::new(AtomicBool::new(false)),
-            write_amt: AtomicUsize::new(0),
-            read_amt: AtomicUsize::new(0),
             received_eof: AtomicBool::new(false),
         }
     }
 
-    // Utility method that can be used to get a lambda that will close the
-    // stream. This is useful for the reader to close the stream.
+    /// Utility method that can be used to get a lambda that will close the
+    /// stream. This is useful for the reader to close the stream.
     pub fn get_closer(&mut self) -> Pin<Box<dyn Future<Output = ()> + Sync + Send>> {
         let did_shutdown = self.did_shutdown.clone();
         let waker = self.waker.clone();
@@ -66,108 +66,114 @@ impl<T> AsyncFixedBuf<T> {
                 return;
             }
             did_shutdown.store(true, Ordering::Relaxed);
-            let mut waker = waker.lock().await;
-            if let Some(w) = waker.take() {
-                w.wake();
-            }
+            wake(waker.lock().await.deref_mut());
         })
-    }
-
-    fn park_poll(self: &Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let mut waker_lock = self.waker.lock();
-        let mut waker = ready!(Pin::new(&mut waker_lock).poll(cx));
-        assert!(waker.is_none(), "Can't park while waker is populated");
-        *waker = Some(cx.waker().clone());
-        Poll::Ready(())
-    }
-
-    fn wake_poll(self: &Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
-        let mut waker_lock = self.waker.lock();
-        let mut waker = ready!(Pin::new(&mut waker_lock).poll(cx));
-        if let Some(w) = waker.take() {
-            w.wake();
-        }
-        Poll::Ready(())
-    }
-}
-
-impl<T> std::ops::Deref for AsyncFixedBuf<T> {
-    type Target = FixedBuf<T>;
-    fn deref(&self) -> &Self::Target {
-        &self.inner
     }
 }
 
 impl<T: AsRef<[u8]> + Unpin> AsyncRead for AsyncFixedBuf<T> {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
-        let num_read = self.as_mut().inner.read_and_copy_bytes(buf.initialize_unfilled());
+        let me = self.project();
+        let mut waker_lock = me.waker.lock();
+        let mut waker = ready!(Pin::new(&mut waker_lock).poll(cx));
+
+        let num_read = me.inner.read_and_copy_bytes(buf.initialize_unfilled());
         buf.advance(num_read);
         if num_read <= 0 {
-            if self.received_eof.load(Ordering::Relaxed) {
-                self.received_eof.store(false, Ordering::Relaxed);
+            if me.received_eof.load(Ordering::Relaxed) {
+                wake(&mut waker);
                 return Poll::Ready(Ok(()));
-            } else if self.did_shutdown.load(Ordering::Relaxed) {
+            } else if me.did_shutdown.load(Ordering::Relaxed) {
+                wake(&mut waker);
                 return Poll::Ready(Err(std::io::Error::new(
                     std::io::ErrorKind::BrokenPipe,
                     "Sender disconnected",
                 )));
             }
         }
-        self.read_amt.fetch_add(num_read, Ordering::Relaxed);
+        // Have not yet reached EOF and have no data to read,
+        // so we need to try and wake our writer, replace the waker and wait.
         if num_read <= 0 {
-            ready!(self.park_poll(cx));
+            park(&mut waker, &cx);
             return Poll::Pending;
         }
-        ready!(self.wake_poll(cx));
+        wake(&mut waker);
         Poll::Ready(Ok(()))
     }
 }
 
-impl<T: AsMut<[u8]>> AsyncWrite for AsyncFixedBuf<T> {
-    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
-        if self.did_shutdown.load(Ordering::Relaxed) {
+impl<T: AsMut<[u8]> + AsRef<[u8]>> AsyncWrite for AsyncFixedBuf<T> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
+        let me = self.project();
+        let mut waker_lock = me.waker.lock();
+        let mut waker = ready!(Pin::new(&mut waker_lock).poll(cx));
+
+        if me.did_shutdown.load(Ordering::Relaxed) {
+            wake(&mut waker);
             return Poll::Ready(Err(std::io::Error::new(
                 std::io::ErrorKind::BrokenPipe,
                 "Receiver disconnected",
             )));
         }
-        match self.inner.writable() {
+        if buf.len() == 0 {
+            // EOF happens when a zero byte message is sent.
+            me.received_eof.store(true, Ordering::Relaxed);
+            wake(&mut waker);
+            return Poll::Ready(Ok(0));
+        }
+        match me.inner.writable() {
             Some(writable_slice) => {
                 let write_amt = buf.len().min(writable_slice.len());
                 if write_amt > 0 {
                     writable_slice[..write_amt].clone_from_slice(&buf[..write_amt]);
-                    self.inner.wrote(write_amt);
-                } else if buf.len() == 0 {
-                    // EOF happens when a zero byte message is sent.
-                    self.received_eof.store(true, Ordering::Relaxed);
+                    me.inner.wrote(write_amt);
                 }
-
-                ready!(self.wake_poll(cx));
-                self.write_amt.fetch_add(write_amt, Ordering::Relaxed);
+                wake(&mut waker);
                 Poll::Ready(Ok(write_amt))
             }
             None => {
-                ready!(self.park_poll(cx));
+                // Sometimes it is more efficient to recover some more space for the writer to use. Since
+                // this is not a ring buffer we need to re-arrange the data every once in a while.
+                // TODO(blaise.bruer) A ringbuffer implementation would likely be quite a lot more efficient.
+                if (me.inner.len() as f32) / (me.inner.capacity() as f32) < 0.25 {
+                    me.inner.shift();
+                    // After `shift()` is called there's a good chance that we can now write to this buffer.
+                    // So we call our waker immediately then return pending. This is a special case and
+                    // we don't need to let the reader know yet as the next call to write will do the proper
+                    // thing.
+                    // NOTE: There's an extremely small chance that the above logic could cause an infinite loop.
+                    cx.waker().wake_by_ref();
+                    return Poll::Pending;
+                }
+
+                park(&mut waker, &cx);
                 Poll::Pending
             }
         }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        let mut waker_lock = self.waker.lock();
+        let mut waker = ready!(Pin::new(&mut waker_lock).poll(cx));
+
         if self.inner.is_empty() {
+            wake(&mut waker);
             return Poll::Ready(Ok(()));
         }
-        ready!(self.park_poll(cx));
+        park(&mut waker, &cx);
         Poll::Pending
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        let mut waker_lock = self.waker.lock();
+        let mut waker = ready!(Pin::new(&mut waker_lock).poll(cx));
+
         self.did_shutdown.store(true, Ordering::Relaxed);
-        ready!(self.wake_poll(cx));
+        wake(&mut waker);
         Poll::Ready(Ok(()))
     }
 }
