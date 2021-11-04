@@ -42,6 +42,12 @@ impl Error {
         }
         Error { code, messages: msgs }
     }
+
+    pub fn merge<E: Into<Error>>(mut self, other: E) -> Self {
+        let mut other: Error = other.into();
+        self.messages.append(&mut other.messages);
+        self
+    }
 }
 
 impl std::error::Error for Error {}

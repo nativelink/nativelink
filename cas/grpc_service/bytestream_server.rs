@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_fixed_buffer::AsyncFixedBuf;
-use drop_guard::DropGuard;
 use futures::{stream::unfold, Future, Stream};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tonic::{Request, Response, Status, Streaming};
@@ -19,7 +18,7 @@ use proto::google::bytestream::{
 
 use common::{log, DigestInfo};
 use config::cas_server::ByteStreamConfig;
-use error::{error_if, make_input_err, Error, ResultExt};
+use error::{error_if, make_err, make_input_err, Code, Error, ResultExt};
 use store::{Store, StoreManager};
 
 pub struct ByteStreamServer {
@@ -34,29 +33,30 @@ pub struct ByteStreamServer {
 
 struct ReaderState {
     max_bytes_per_stream: usize,
-    was_shutdown: bool,
-    stream_closer_fut: Option<Pin<Box<dyn Future<Output = ()> + Sync + Send>>>,
+    maybe_stream_closer_fut: Option<Pin<Box<dyn Future<Output = ()> + Sync + Send>>>,
     rx: Box<dyn AsyncRead + Sync + Send + Unpin>,
-    reading_future: Box<tokio::task::JoinHandle<Result<(), Error>>>,
+    reading_future: Option<Box<tokio::task::JoinHandle<Result<(), Error>>>>,
 }
 
 impl ReaderState {
-    async fn shutdown(&mut self) -> Result<(), Error> {
-        self.was_shutdown = true;
-        // Close stream then wait for reader stream to finish.
-        if let Some(stream_closer) = self.stream_closer_fut.take() {
-            stream_closer.await;
-        }
-        let mut drainer = tokio::io::sink();
-        // Note: We ignore errors here or else we will get "Sender Disconnected" errors.
-        let _ = tokio::io::copy(&mut self.rx, &mut drainer).await;
+    /// Drops the state without running the stream_closer.
+    /// This is useful for cases when the tx already sent the EOF.
+    fn drop_without_closing_stream(mut self) {
+        drop(self.maybe_stream_closer_fut.take());
+    }
+}
 
-        let reading_future = Pin::new(&mut self.reading_future);
-        reading_future
-            .await
-            .err_tip(|| "Could not join result from store thread")
-            .and_then(|r| r)?; // Translates Result<Result<T, E>, E> -> Result<T, E>.
-        Ok(())
+impl Drop for ReaderState {
+    // Just in case this state gets unexpectedly dropped (which can happen if the
+    // owned future is dropped) we notify the writer that it can shutdown.
+    fn drop(&mut self) {
+        // Close stream then wait for reader stream to finish.
+        if let Some(stream_closer) = self.maybe_stream_closer_fut.take() {
+            tokio::spawn(async move {
+                // Ignoring errors because we don't have anywhere to publish them.
+                stream_closer.await;
+            });
+        }
     }
 }
 
@@ -93,7 +93,8 @@ impl ByteStreamServer {
         let digest = DigestInfo::try_new(&resource_info.hash, resource_info.expected_size)?;
 
         let mut raw_fixed_buffer = AsyncFixedBuf::new(vec![0u8; self.read_buffer_stream_size].into_boxed_slice());
-        let stream_closer_fut = Some(raw_fixed_buffer.get_closer());
+        let maybe_stream_closer_fut = Some(raw_fixed_buffer.get_closer());
+        let stream_closer_fut = raw_fixed_buffer.get_closer();
         let (rx, mut tx) = tokio::io::split(raw_fixed_buffer);
         let rx: Box<dyn tokio::io::AsyncRead + Sync + Send + Unpin> = if read_limit != 0 {
             Box::new(rx.take(u64::try_from(read_limit).err_tip(|| "read_limit has is not convertible to u64")?))
@@ -108,62 +109,58 @@ impl ByteStreamServer {
             .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?
             .clone();
 
-        let reading_future = Box::new(tokio::spawn(async move {
+        let reading_future = Some(Box::new(tokio::spawn(async move {
             let store = Pin::new(store_clone.as_ref());
             let read_limit = if read_limit != 0 { Some(read_limit) } else { None };
             let p = store
                 .get_part(digest, &mut tx, read_request.read_offset as usize, read_limit)
                 .await
                 .err_tip(|| "Error retrieving data from store");
+            stream_closer_fut.await;
             p
-        }));
+        })));
 
         // This allows us to call a destructor when the the object is dropped.
-        let state = Some(DropGuard::new(
-            ReaderState {
-                stream_closer_fut,
-                rx: rx,
-                max_bytes_per_stream: self.max_bytes_per_stream,
-                reading_future: reading_future,
-                was_shutdown: false,
-            },
-            |mut me| {
-                // This is the hot path. It is only under rare circumstances
-                // that we would not be shutdown already. This lambda should
-                // only be triggered in the event the stream abruptly closes.
-                if me.was_shutdown {
-                    return;
-                }
-                // Failing to launch it into it's own spawn would result in
-                // a thread being blocked.
-                tokio::spawn(async move {
-                    // Ignoring errors because we don't have anywhere to publish them.
-                    let _ = me.shutdown().await;
-                });
-            },
-        ));
+        let state = Some(ReaderState {
+            maybe_stream_closer_fut,
+            rx,
+            max_bytes_per_stream: self.max_bytes_per_stream,
+            reading_future,
+        });
 
         Ok(Response::new(Box::pin(unfold(state, move |state| async {
             let mut state = state?; // If state is None, we have already sent error if needed (None is Done).
             let mut response = ReadResponse {
-                data: vec![0u8; state.max_bytes_per_stream],
+                data: Vec::with_capacity(state.max_bytes_per_stream),
             };
+            unsafe { response.data.set_len(state.max_bytes_per_stream) };
             let read_result = state.rx.read(&mut response.data[..]).await;
             match read_result.err_tip(|| "Error reading data from underlying store") {
                 Ok(sz) => {
-                    response.data.resize(sz, 0u8);
-                    // Receiving zero bytes is an EOF.
-                    if sz == 0 {
-                        // We want to gracefully shutdown and in the event there
-                        // are any errors present them here.
-                        return state
-                            .shutdown()
-                            .await
-                            .map_or_else(|e| Some((Err(e.into()), None)), |_| None);
+                    if sz > state.max_bytes_per_stream {
+                        let err = make_err!(Code::Internal, "Returned store size was larger than read size");
+                        return Some((Err(err.into()), None));
                     }
-                    Some((Ok(response), Some(state)))
+                    unsafe { response.data.set_len(sz) };
+                    // Receiving zero bytes is an EOF.
+                    let new_state = if sz == 0 {
+                        state.drop_without_closing_stream();
+                        None
+                    } else {
+                        Some(state)
+                    };
+                    Some((Ok(response), new_state))
                 }
-                Err(e) => Some((Err(e.into()), None)),
+                Err(mut e) => {
+                    // We may need to propagate the error from reading the data through first.
+                    // For example, the NotFound error will come through `reading_future`, and
+                    // will not be present in `e`, but we need to ensure we pass NotFound error
+                    // code or client won't know why it failed.
+                    if let Ok(Err(err)) = state.reading_future.take().unwrap().await {
+                        e = err.merge(e);
+                    }
+                    Some((Err(e.into()), None))
+                }
             }
         }))))
     }

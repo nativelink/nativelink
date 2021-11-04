@@ -5,12 +5,14 @@ use std::io::Cursor;
 use std::pin::Pin;
 
 use bytestream_server::ByteStreamServer;
+use futures::{pin_mut, poll, task::Poll};
 use maplit::hashmap;
+use tokio::task::yield_now;
 use tonic::Request;
 
 use common::DigestInfo;
 use config;
-use error::Error;
+use error::{make_err, Code, Error, ResultExt};
 use store::StoreManager;
 
 const INSTANCE_NAME: &str = "foo_instance_name";
@@ -265,6 +267,59 @@ pub mod read_tests {
                 roundtrip_data.append(&mut result_read_response?.data);
             }
             assert_eq!(roundtrip_data, raw_data, "Expected response to match what is in store");
+        }
+        Ok(())
+    }
+
+    /// A bug was found in early development where we could deadlock when reading a stream if the
+    /// store backend resulted in an error. This was because we were not shutting down the stream
+    /// when on the backend store error which caused the AsyncReader to block forever because the
+    /// stream was never shutdown.
+    #[tokio::test]
+    pub async fn read_with_not_found_does_not_deadlock() -> Result<(), Error> {
+        let mut store_manager = make_store_manager().err_tip(|| "Couldn't get store manager")?;
+        let mut read_stream = {
+            let bs_server = make_bytestream_server(&mut store_manager).err_tip(|| "Couldn't make store")?;
+            let read_request = ReadRequest {
+                resource_name: format!(
+                    "{}/uploads/{}/blobs/{}/{}",
+                    INSTANCE_NAME,
+                    "4dcec57e-1389-4ab5-b188-4a59f22ceb4b", // Randomly generated.
+                    HASH1,
+                    55, // Dummy value
+                ),
+                read_offset: 0,
+                read_limit: 55,
+            };
+            // This should fail because there's no data in the store yet.
+            bs_server
+                .read(Request::new(read_request))
+                .await
+                .err_tip(|| "Couldn't send read")?
+                .into_inner()
+        };
+        // We need to give a chance for the other spawns to do some work before we poll.
+        yield_now().await;
+        {
+            let result_fut = read_stream.next();
+            pin_mut!(result_fut);
+
+            let result = if let Poll::Ready(r) = poll!(result_fut) {
+                r
+            } else {
+                None
+            };
+            let result = result.err_tip(|| "Expected result to be ready")?;
+            let expected_err_str = concat!(
+                "status: NotFound, message: \"Hash 0123456789abcdef000000000000000000000000000000000123456789abcdef ",
+                "not found : Error retrieving data from store : Sender disconnected : Error reading data from ",
+                "underlying store\", details: [], metadata: MetadataMap { headers: {} }",
+            );
+            assert_eq!(
+                Error::from(result.unwrap_err()),
+                make_err!(Code::NotFound, "{}", expected_err_str),
+                "Expected error data to match"
+            );
         }
         Ok(())
     }

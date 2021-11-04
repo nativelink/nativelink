@@ -493,16 +493,6 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
-        name = "raze__drop_guard__0_2_1",
-        url = "https://crates.io/api/v1/crates/drop_guard/0.2.1/download",
-        type = "tar.gz",
-        sha256 = "78bb5d73478dbcb7c404cd86336e90c67425497ca94b6f7352c8ea7deb9098e2",
-        strip_prefix = "drop_guard-0.2.1",
-        build_file = Label("//third_party/remote:BUILD.drop_guard-0.2.1.bazel"),
-    )
-
-    maybe(
-        http_archive,
         name = "raze__either__1_6_1",
         url = "https://crates.io/api/v1/crates/either/1.6.1/download",
         type = "tar.gz",

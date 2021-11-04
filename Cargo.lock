@@ -423,18 +423,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 
 [[package]]
-name = "drop_guard"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78bb5d73478dbcb7c404cd86336e90c67425497ca94b6f7352c8ea7deb9098e2"
-
-[[package]]
 name = "dummy_name_to_make_cargo_tooling_happy"
 version = "0.0.0"
 dependencies = [
  "async-trait",
  "clap",
- "drop_guard",
  "env_logger 0.9.0",
  "fast-async-mutex",
  "fixed-buffer",

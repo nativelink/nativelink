@@ -62,10 +62,9 @@ impl<T> AsyncFixedBuf<T> {
         let did_shutdown = self.did_shutdown.clone();
         let waker = self.waker.clone();
         Box::pin(async move {
-            if did_shutdown.load(Ordering::Relaxed) {
+            if did_shutdown.swap(true, Ordering::Relaxed) {
                 return;
             }
-            did_shutdown.store(true, Ordering::Relaxed);
             wake(waker.lock().await.deref_mut());
         })
     }

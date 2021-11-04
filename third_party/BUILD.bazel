@@ -31,15 +31,6 @@ alias(
 )
 
 alias(
-    name = "drop_guard",
-    actual = "@raze__drop_guard__0_2_1//:drop_guard",
-    tags = [
-        "cargo-raze",
-        "manual",
-    ],
-)
-
-alias(
     name = "env_logger",
     actual = "@raze__env_logger__0_9_0//:env_logger",
     tags = [
