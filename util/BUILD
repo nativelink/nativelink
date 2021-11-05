@@ -23,6 +23,7 @@ rust_library(
         "//third_party:hex",
         "//third_party:lazy_init",
         "//third_party:log",
+        "//third_party:tokio",
         ":error",
     ],
     visibility = ["//visibility:public"],

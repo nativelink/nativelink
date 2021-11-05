@@ -1506,7 +1506,7 @@ dependencies = [
 [[package]]
 name = "rusoto_core"
 version = "0.46.0"
-source = "git+https://github.com/allada/rusoto.git?branch=with_request_checker-owned-0.46.0#cc9acca00dbafa41a37d75faeaf2a4baba33d42e"
+source = "git+https://github.com/allada/rusoto.git?rev=cc9acca00dbafa41a37d75faeaf2a4baba33d42e#cc9acca00dbafa41a37d75faeaf2a4baba33d42e"
 dependencies = [
  "async-trait",
  "base64",
@@ -1530,7 +1530,7 @@ dependencies = [
 [[package]]
 name = "rusoto_credential"
 version = "0.46.0"
-source = "git+https://github.com/allada/rusoto.git?branch=with_request_checker-owned-0.46.0#cc9acca00dbafa41a37d75faeaf2a4baba33d42e"
+source = "git+https://github.com/allada/rusoto.git?rev=cc9acca00dbafa41a37d75faeaf2a4baba33d42e#cc9acca00dbafa41a37d75faeaf2a4baba33d42e"
 dependencies = [
  "async-trait",
  "chrono",
@@ -1547,13 +1547,13 @@ dependencies = [
 [[package]]
 name = "rusoto_mock"
 version = "0.46.0"
-source = "git+https://github.com/allada/rusoto.git?branch=with_request_checker-owned-0.46.0#cc9acca00dbafa41a37d75faeaf2a4baba33d42e"
+source = "git+https://github.com/allada/rusoto.git?rev=cc9acca00dbafa41a37d75faeaf2a4baba33d42e#cc9acca00dbafa41a37d75faeaf2a4baba33d42e"
 dependencies = [
  "async-trait",
  "chrono",
  "futures",
  "http",
- "rusoto_core 0.46.0 (git+https://github.com/allada/rusoto.git?branch=with_request_checker-owned-0.46.0)",
+ "rusoto_core 0.46.0 (git+https://github.com/allada/rusoto.git?rev=cc9acca00dbafa41a37d75faeaf2a4baba33d42e)",
  "serde",
  "serde_json",
 ]
@@ -1574,7 +1574,7 @@ dependencies = [
 [[package]]
 name = "rusoto_signature"
 version = "0.46.0"
-source = "git+https://github.com/allada/rusoto.git?branch=with_request_checker-owned-0.46.0#cc9acca00dbafa41a37d75faeaf2a4baba33d42e"
+source = "git+https://github.com/allada/rusoto.git?rev=cc9acca00dbafa41a37d75faeaf2a4baba33d42e#cc9acca00dbafa41a37d75faeaf2a4baba33d42e"
 dependencies = [
  "base64",
  "bytes",

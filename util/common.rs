@@ -1,14 +1,17 @@
 // Copyright 2020 Nathan (Blaise) Bruer.  All rights reserved.
 
-use std::convert::TryFrom;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
+use std::future::Future;
 use std::hash::{Hash, Hasher};
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 use hex::FromHex;
 use lazy_init::LazyTransform;
 pub use log;
 use proto::build::bazel::remote::execution::v2::Digest;
+use tokio::task::{JoinError, JoinHandle};
 
 use error::{make_input_err, Error, ResultExt};
 
@@ -105,5 +108,29 @@ impl Into<Digest> for DigestInfo {
             hash: hash,
             size_bytes: self.size_bytes,
         }
+    }
+}
+
+pub struct JoinHandleDropGuard<T> {
+    inner: JoinHandle<T>,
+}
+
+impl<T> JoinHandleDropGuard<T> {
+    pub fn new(inner: JoinHandle<T>) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T> Future for JoinHandleDropGuard<T> {
+    type Output = Result<T, JoinError>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.inner).poll(cx)
+    }
+}
+
+impl<T> Drop for JoinHandleDropGuard<T> {
+    fn drop(&mut self) {
+        self.inner.abort();
     }
 }

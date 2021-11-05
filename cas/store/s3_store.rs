@@ -8,7 +8,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use futures::stream::{unfold, FuturesUnordered, StreamExt};
+use futures::future::{try_join_all, FutureExt};
+use futures::stream::unfold;
 use http::status::StatusCode;
 use lease::{Lease, Pool as ObjectPool};
 use rand::{rngs::OsRng, Rng};
@@ -22,7 +23,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::time::sleep;
 use tokio_util::io::ReaderStream;
 
-use common::{log, DigestInfo};
+use common::{log, DigestInfo, JoinHandleDropGuard};
 use config;
 use error::{make_err, make_input_err, Code, Error, ResultExt};
 use retry::{ExponentialBackoff, Retrier, RetryResult};
@@ -238,7 +239,7 @@ impl StoreTrait for S3Store {
                 let mut part_number: i64 = 1;
 
                 // We might end up with +1 capacity units than needed, but that is the worst case.
-                let mut completed_part_futs = FuturesUnordered::new();
+                let mut completed_part_futs = Vec::with_capacity((max_size / bytes_per_upload_part) + 1);
                 loop {
                     let mut write_buf = self.get_large_vec().await;
                     let mut take = reader.take(bytes_per_upload_part as u64);
@@ -263,31 +264,30 @@ impl StoreTrait for S3Store {
                     };
 
                     let s3_client = self.s3_client.clone();
-                    completed_part_futs.push(tokio::spawn(async move {
-                        let part_number = request.part_number;
-                        let mut response = s3_client
-                            .upload_part(request)
-                            .await
-                            .map_err(|e| make_err!(Code::Unknown, "Failed to upload part: {:?}", e))?;
-                        let e_tag = response.e_tag.take();
-                        // Double down to ensure our Lease<Vec<u8>> is freed up and returned to pool.
-                        drop(response);
-                        Result::<CompletedPart, Error>::Ok(CompletedPart {
-                            e_tag,
-                            part_number: Some(part_number),
-                        })
-                    }));
+                    completed_part_futs.push(
+                        JoinHandleDropGuard::new(tokio::spawn(async move {
+                            let part_number = request.part_number;
+                            let mut response = s3_client
+                                .upload_part(request)
+                                .await
+                                .map_err(|e| make_err!(Code::Unknown, "Failed to upload part: {:?}", e))?;
+                            let e_tag = response.e_tag.take();
+                            // Double down to ensure our Lease<Vec<u8>> is freed up and returned to pool.
+                            drop(response);
+                            Result::<CompletedPart, Error>::Ok(CompletedPart {
+                                e_tag,
+                                part_number: Some(part_number),
+                            })
+                        }))
+                        .map(|r| match r.err_tip(|| "Failed to run s3 upload spawn") {
+                            Ok(r2) => r2.err_tip(|| "S3 upload chunk failure"),
+                            Err(e) => Err(e),
+                        }),
+                    );
                     part_number += 1;
                 }
 
-                let mut completed_parts = Vec::with_capacity(completed_part_futs.len());
-                while let Some(result) = completed_part_futs.next().await {
-                    completed_parts.push(
-                        result
-                            .err_tip(|| "Failed to join s3 chunk upload")?
-                            .err_tip(|| "Failed to upload chunk")?,
-                    );
-                }
+                let completed_parts = try_join_all(completed_part_futs).await?;
                 self.s3_client
                     .complete_multipart_upload(CompleteMultipartUploadRequest {
                         bucket: self.bucket.to_owned(),
@@ -346,7 +346,7 @@ impl StoreTrait for S3Store {
 
             let get_object_output = self.s3_client.get_object(get_req).await.map_err(|e| match e {
                 RusotoError::Service(GetObjectError::NoSuchKey(err)) => {
-                    return make_err!(Code::NotFound, "Error reading from S3: {:?}", err)
+                    return make_err!(Code::NotFound, "File not found in S3: {:?}", err)
                 }
                 _ => make_err!(Code::Unknown, "Error reading from S3: {:?}", e),
             })?;

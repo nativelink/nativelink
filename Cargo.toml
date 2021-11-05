@@ -43,12 +43,12 @@ pretty_assertions = "0.7.2"
 rustfmt-nightly =  { git = "https://github.com/rust-lang/rustfmt", tag = "v1.4.38" }
 maplit = "1.0.2"
 mock_instant = "0.2.1"
-rusoto_mock = "0.46.0"
+rusoto_mock = "=0.46.0"
 
 [patch.crates-io]
-rusoto_mock = { git = "https://github.com/allada/rusoto.git", branch = "with_request_checker-owned-0.46.0" }
-rusoto_credential = { git = "https://github.com/allada/rusoto.git", branch = "with_request_checker-owned-0.46.0" }
-rusoto_signature = { git = "https://github.com/allada/rusoto.git", branch = "with_request_checker-owned-0.46.0" }
+rusoto_mock = { git = "https://github.com/allada/rusoto.git", rev = "cc9acca00dbafa41a37d75faeaf2a4baba33d42e" }
+rusoto_credential = { git = "https://github.com/allada/rusoto.git", rev = "cc9acca00dbafa41a37d75faeaf2a4baba33d42e" }
+rusoto_signature = { git = "https://github.com/allada/rusoto.git", rev = "cc9acca00dbafa41a37d75faeaf2a4baba33d42e" }
 
 [package.metadata.raze.crates.json5.'*']
 data_attr = "['src/json5.pest']"
