@@ -20,7 +20,7 @@ use config;
 use error::Error;
 use error::ResultExt;
 use s3_store::S3Store;
-use traits::StoreTrait;
+use traits::{StoreTrait, UploadSizeInfo};
 
 // Should match constant in s3_store.
 const MIN_MULTIPART_SIZE: usize = 5 * 1024 * 1024; // 5mb.
@@ -176,7 +176,7 @@ mod s3_store_tests {
                 .update(
                     DigestInfo::try_new(&VALID_HASH1, 199)?,
                     Box::new(Cursor::new(send_data.clone())),
-                    199,
+                    UploadSizeInfo::ExactSize(199),
                 )
                 .await?;
         }
@@ -340,7 +340,7 @@ mod s3_store_tests {
                 Box::new(move |_delay| Duration::from_secs(0)),
             )?;
             let store_pin = Pin::new(&store);
-            let data_len = send_data.len();
+            let data_len = UploadSizeInfo::ExactSize(send_data.len());
             store_pin
                 .update(digest, Box::new(Cursor::new(send_data.clone())), data_len)
                 .await?;
@@ -401,6 +401,7 @@ mod s3_store_tests {
                 rt_data,
                 "Expected data to match"
             );
+
             assert_eq!(
                 from_utf8(&request.headers["content-length"][0]).unwrap(),
                 format!("{}", rt_data.len())

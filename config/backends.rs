@@ -25,6 +25,14 @@ pub enum StoreConfig {
     /// The suggested configuration is to have the CAS validate the
     /// hash and size and the AC validate nothing.
     verify(Box<VerifyStore>),
+
+    /// A compression store that will compress the data inbound and
+    /// outbound. There will be a non-trivial cost to compress and
+    /// decompress the data, but in many cases if the final store is
+    /// a store that requires network transport and/or storage space
+    /// is a concern it is often faster and more efficient to use this
+    /// store before those stores.
+    compression(Box<CompressionStore>),
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -57,6 +65,31 @@ pub struct VerifyStore {
     /// This should be set to false for AC, but true for CAS stores.
     #[serde(default)]
     pub verify_hash: bool,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+pub enum CompressionAlgorithm {
+    /// LZ4 compression algorithm is extremely fast for compression and
+    /// decompression, however does not perform very well in compression
+    /// ratio. In most cases build artifacts are highly compressible, however
+    /// lz4 is quite good at aborting early if the data is not deemed very
+    /// compressible.
+    ///
+    /// see: https://lz4.github.io/lz4/
+    LZ4,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CompressionStore {
+    /// The underlying store wrap around. All content will first flow
+    /// through self before forwarding to backend. In the event there
+    /// is an error detected in self, the connection to the backend
+    /// will be terminated, and early termination should always cause
+    /// updates to fail on the backend.
+    pub backend: StoreConfig,
+
+    /// The compression algorithm to use.
+    pub compression_algorithm: CompressionAlgorithm,
 }
 
 /// Eviction policy always works on LRU (Least Recently Used). Any time an entry
@@ -98,6 +131,19 @@ pub struct S3Store {
     /// Retry configuration to use when a network request fails.
     #[serde(default)]
     pub retry: Retry,
+
+    /// The number of buffer objects available to this store. The default value is 5MB
+    /// for each entry. Due to the way S3Store buffers it's data and can process multiple
+    /// uploads and downloads at a time (even for the same request), it might be possible
+    /// for localhost to send data much faster than S3 can receive the data. If we do not
+    /// use a pool of buffer objects we might end up with a significant amount of data
+    /// queued up for upload in memory. This value will help curb this event from happening
+    /// by throttling a request from being able to read/write more data until a previous
+    /// pooled object is released.
+    ///
+    /// Default: 50 - This is arbitrary and no research was performed to choose this number.
+    #[serde(default)]
+    pub buffer_pool_size: usize,
 }
 
 /// Retry configuration. This configuration is exponential and each iteration

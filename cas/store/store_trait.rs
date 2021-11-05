@@ -16,6 +16,19 @@ pub enum StoreType {
 
 pub type ResultFuture<'a, Res> = Pin<Box<dyn Future<Output = Result<Res, Error>> + 'a + Send>>;
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum UploadSizeInfo {
+    /// When the data transfer amount is known to be exact size, this enum should be used.
+    /// The receiver store can use this to better optimize the way the data is sent or stored.
+    ExactSize(usize),
+
+    /// When the data transfer amount is not known to be exact, the caller should use this enum
+    /// to provide the maximum size that could possibly be sent. This will bypass the exact size
+    /// checks, but still provide useful information to the underlying store about the data being
+    /// sent that it can then use to optimize the upload process.
+    MaxSize(usize),
+}
+
 #[async_trait]
 pub trait StoreTrait: Sync + Send + Unpin {
     fn has<'a>(self: Pin<&'a Self>, digest: DigestInfo) -> ResultFuture<'a, bool>;
@@ -24,7 +37,7 @@ pub trait StoreTrait: Sync + Send + Unpin {
         self: Pin<&'a Self>,
         digest: DigestInfo,
         reader: Box<dyn AsyncRead + Send + Unpin + Sync + 'static>,
-        upload_size: usize,
+        upload_size: UploadSizeInfo,
     ) -> ResultFuture<'a, ()>;
 
     fn get_part<'a>(

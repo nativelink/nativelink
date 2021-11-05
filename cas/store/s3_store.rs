@@ -1,14 +1,16 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::cmp;
+use std::io::Cursor;
 use std::marker::Send;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use fast_async_mutex::mutex::Mutex;
-use futures::stream::unfold;
+// use fast_async_mutex::mutex::Mutex;
+// use futures::future::join_all;
+use futures::stream::{unfold, FuturesUnordered, StreamExt};
 use http::status::StatusCode;
 use rand::{rngs::OsRng, Rng};
 use rusoto_core::{region::Region, ByteStream, RusotoError};
@@ -17,7 +19,9 @@ use rusoto_s3::{
     CreateMultipartUploadRequest, GetObjectError, GetObjectRequest, HeadObjectError, HeadObjectRequest,
     PutObjectRequest, S3Client, UploadPartRequest, S3,
 };
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+// use tokio::pin;
+use lease::{Lease, Pool as ObjectPool};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::time::sleep;
 use tokio_util::io::ReaderStream;
 
@@ -25,21 +29,22 @@ use common::{log, DigestInfo};
 use config;
 use error::{make_err, make_input_err, Code, Error, ResultExt};
 use retry::{ExponentialBackoff, Retrier, RetryResult};
-use traits::{ResultFuture, StoreTrait};
+use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
 
-use async_read_taker::AsyncReadTaker;
+// use async_read_taker::AsyncReadTaker;
 
 // S3 parts cannot be smaller than this number. See:
 // https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
 const MIN_MULTIPART_SIZE: usize = 5 * 1024 * 1024; // 5mb.
 
 pub struct S3Store {
-    s3_client: S3Client,
+    s3_client: Arc<S3Client>,
     bucket: String,
     key_prefix: String,
     jitter_fn: Box<dyn Fn(Duration) -> Duration + Send + Sync>,
     retry: config::backends::Retry,
     retrier: Retrier,
+    large_vec_pool: ObjectPool<Vec<u8>>,
 }
 
 impl S3Store {
@@ -66,14 +71,26 @@ impl S3Store {
         s3_client: S3Client,
         jitter_fn: Box<dyn Fn(Duration) -> Duration + Send + Sync>,
     ) -> Result<Self, Error> {
+        let mut buffer_pool_size = config.buffer_pool_size;
+        if buffer_pool_size == 0 {
+            buffer_pool_size = 50;
+        }
         Ok(S3Store {
-            s3_client: s3_client,
+            s3_client: Arc::new(s3_client),
             bucket: config.bucket.to_owned(),
             key_prefix: config.key_prefix.as_ref().unwrap_or(&"".to_string()).to_owned(),
             jitter_fn: jitter_fn,
             retry: config.retry.to_owned(),
             retrier: Retrier::new(Box::new(|duration| Box::pin(sleep(duration)))),
+            large_vec_pool: ObjectPool::new(buffer_pool_size, || Vec::with_capacity(MIN_MULTIPART_SIZE)),
         })
+    }
+
+    async fn get_large_vec(self: Pin<&Self>) -> Lease<Vec<u8>> {
+        let mut write_data = self.large_vec_pool.get_async().await;
+        write_data.clear();
+        write_data.shrink_to(MIN_MULTIPART_SIZE);
+        return write_data;
     }
 
     fn make_s3_path(&self, digest: &DigestInfo) -> String {
@@ -153,22 +170,41 @@ impl StoreTrait for S3Store {
     fn update<'a>(
         self: Pin<&'a Self>,
         digest: DigestInfo,
-        reader: Box<dyn AsyncRead + Send + Unpin + Sync + 'static>,
-        expected_size: usize,
+        mut reader: Box<dyn AsyncRead + Send + Unpin + Sync + 'static>,
+        upload_size: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
             let s3_path = &self.make_s3_path(&digest);
 
+            let max_size = match upload_size {
+                UploadSizeInfo::ExactSize(sz) => sz,
+                UploadSizeInfo::MaxSize(sz) => sz,
+            };
+            // TODO(CHECK COMMENT!!!!)
             // We make a major assumption here... If we cannot trust the size we assume it's an action cache.
             // in this case it is extremely unlikely the payload will be greater than 5gb. If it is a CAS item
             // it should be `trust_size = true` which we can upload in one chunk if small enough (and more efficient)
             // but only if the size is small enough. We could use MAX_UPLOAD_PART_SIZE (5gb), but I think it's fine
             // to use 5mb as a limit too.
-            if expected_size < MIN_MULTIPART_SIZE {
+            if max_size < MIN_MULTIPART_SIZE {
+                let (reader, content_length) = if let UploadSizeInfo::ExactSize(sz) = upload_size {
+                    (reader, Some(sz as i64))
+                } else {
+                    let mut write_data = self.get_large_vec().await;
+                    reader
+                        .take(max_size as u64)
+                        .read_to_end(&mut write_data)
+                        .await
+                        .err_tip(|| "Failed to read file in upload to s3 in single chunk")?;
+                    let content_length = write_data.len();
+                    let b: Box<dyn AsyncRead + Send + Unpin + Sync + 'static> = Box::new(Cursor::new(write_data));
+                    (b, Some(content_length as i64))
+                };
+
                 let put_object_request = PutObjectRequest {
                     bucket: self.bucket.to_owned(),
                     key: s3_path.to_owned(),
-                    content_length: Some(expected_size as i64),
+                    content_length,
                     body: Some(ByteStream::new(ReaderStream::new(reader))),
                     ..Default::default()
                 };
@@ -182,7 +218,7 @@ impl StoreTrait for S3Store {
 
             // S3 requires us to upload in parts if the size is greater than 5GB. The part size must be at least
             // 5mb and can have up to 10,000 parts.
-            let bytes_per_upload_part = cmp::max(MIN_MULTIPART_SIZE, expected_size / (MIN_MULTIPART_SIZE - 1));
+            let bytes_per_upload_part = cmp::max(MIN_MULTIPART_SIZE, max_size / (MIN_MULTIPART_SIZE - 1));
 
             let response = self
                 .s3_client
@@ -201,45 +237,59 @@ impl StoreTrait for S3Store {
             let complete_result = {
                 let mut part_number: i64 = 1;
 
-                let reader = Arc::new(Mutex::new(reader));
+                // let reader = Arc::new(Mutex::new(reader));
                 // We might end up with +1 capacity units than needed, but that is the worst case.
-                let mut completed_parts = Vec::with_capacity((expected_size / bytes_per_upload_part) + 1);
+                let mut completed_part_futs = FuturesUnordered::new();
                 loop {
-                    let possible_last_chunk_size = expected_size - bytes_per_upload_part * ((part_number as usize) - 1);
-                    let content_length = cmp::min(possible_last_chunk_size, bytes_per_upload_part);
-                    let is_last_chunk = bytes_per_upload_part * (part_number as usize) >= expected_size;
-                    // Wrap `AsyncRead` so we can hold a copy of it in this scope between iterations.
-                    // This is quite difficult because we need to give full ownership of an AsyncRead
-                    // to `ByteStream` which has an unknown lifetime.
-                    // This wrapper will also ensure we only send `bytes_per_upload_part` then close the
-                    // stream.
-                    let taker = AsyncReadTaker::new(reader.clone(), content_length);
-                    {
-                        let body = Some(ByteStream::new(ReaderStream::new(taker)));
-                        let response = self
-                            .s3_client
-                            .upload_part(UploadPartRequest {
-                                bucket: self.bucket.to_owned(),
-                                key: s3_path.to_owned(),
-                                content_length: Some(content_length as i64),
-                                body,
-                                part_number,
-                                upload_id: upload_id.clone(),
-                                ..Default::default()
-                            })
-                            .await
-                            .map_err(|e| make_err!(Code::Unknown, "Failed to upload part: {:?}", e))?;
-                        completed_parts.push(CompletedPart {
-                            e_tag: response.e_tag,
-                            part_number: Some(part_number),
-                        });
-                    }
-                    if is_last_chunk {
+                    let mut write_data = self.get_large_vec().await;
+                    let mut take = reader.take(bytes_per_upload_part as u64);
+                    take.read_to_end(&mut write_data)
+                        .await
+                        .err_tip(|| "Failed to read chunk in s3_store")?;
+                    reader = take.into_inner();
+                    if write_data.len() == 0 {
+                        // Reached EOF.
                         break;
                     }
+
+                    let content_length = Some(write_data.len() as i64);
+                    let body = Some(ByteStream::new(ReaderStream::new(Cursor::new(write_data))));
+                    let request = UploadPartRequest {
+                        bucket: self.bucket.to_owned(),
+                        key: s3_path.to_owned(),
+                        content_length,
+                        body,
+                        part_number,
+                        upload_id: upload_id.clone(),
+                        ..Default::default()
+                    };
+
+                    let s3_client = self.s3_client.clone();
+                    completed_part_futs.push(tokio::spawn(async move {
+                        let part_number: i64 = request.part_number;
+                        let mut response = s3_client
+                            .upload_part(request)
+                            .await
+                            .map_err(|e| make_err!(Code::Unknown, "Failed to upload part: {:?}", e))?;
+                        let e_tag = response.e_tag.take();
+                        // Double down to ensure our Lease<Vec<u8>> is freed up and returned to pool.
+                        drop(response);
+                        Result::<CompletedPart, Error>::Ok(CompletedPart {
+                            e_tag,
+                            part_number: Some(part_number),
+                        })
+                    }));
                     part_number += 1;
                 }
 
+                let mut completed_parts = Vec::with_capacity(completed_part_futs.len());
+                while let Some(result) = completed_part_futs.next().await {
+                    completed_parts.push(
+                        result
+                            .err_tip(|| "Failed to join s3 chunk upload")?
+                            .err_tip(|| "Failed to upload chunk")?,
+                    );
+                }
                 self.s3_client
                     .complete_multipart_upload(CompleteMultipartUploadRequest {
                         bucket: self.bucket.to_owned(),

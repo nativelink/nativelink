@@ -103,6 +103,15 @@ alias(
 )
 
 alias(
+    name = "lease",
+    actual = "@raze__lease__0_2_3//:lease",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
     name = "log",
     actual = "@raze__log__0_4_14//:log",
     tags = [

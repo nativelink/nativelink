@@ -31,6 +31,7 @@ rusoto_core = "0.46.0"
 http = "^0.2"
 pin-project-lite = "0.2.7"
 fast-async-mutex = "0.6.7"
+lease = "0.2.3"
 
 [dev-dependencies]
 clap = "2.33.3"
