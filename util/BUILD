@@ -63,18 +63,6 @@ rust_library(
     visibility = ["//visibility:public"],
 )
 
-rust_library(
-    name = "async_read_taker",
-    srcs = ["async_read_taker.rs"],
-    deps = [
-        "//third_party:fast_async_mutex",
-        "//third_party:futures",
-        "//third_party:pin_project_lite",
-        "//third_party:tokio",
-    ],
-    visibility = ["//visibility:public"],
-)
-
 rust_test(
     name = "async_fixed_buffer_test",
     srcs = ["tests/async_fixed_buffer_test.rs"],
@@ -110,19 +98,5 @@ rust_test(
         "//third_party:tokio",
         ":error",
         ":retry",
-    ],
-)
-
-rust_test(
-    name = "async_read_taker_test",
-    srcs = ["tests/async_read_taker_test.rs"],
-    deps = [
-        "//third_party:fast_async_mutex",
-        "//third_party:futures",
-        "//third_party:pretty_assertions",
-        "//third_party:tokio",
-        ":async_fixed_buffer",
-        ":async_read_taker",
-        ":error",
     ],
 )

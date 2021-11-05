@@ -26,17 +26,17 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # Apache-2.0 from expression "Apache-2.0 OR MIT"
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
 ])
 
 # Generated Targets
 
+# Unsupported target "bench" with type "bench" omitted
+
 rust_library(
-    name = "zeroize",
+    name = "smallvec",
     srcs = glob(["**/*.rs"]),
     crate_features = [
-        "alloc",
-        "default",
     ],
     crate_root = "src/lib.rs",
     data = [],
@@ -48,10 +48,10 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "1.4.2",
+    version = "1.7.0",
     # buildifier: leave-alone
     deps = [
     ],
 )
 
-# Unsupported target "zeroize_derive" with type "test" omitted
+# Unsupported target "macro" with type "test" omitted

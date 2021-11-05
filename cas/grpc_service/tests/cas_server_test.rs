@@ -14,7 +14,7 @@ use cas_server::CasServer;
 use common::DigestInfo;
 use config;
 use error::Error;
-use store::StoreManager;
+use store::{StoreManager, UploadSizeInfo};
 
 const INSTANCE_NAME: &str = "foo_instance_name";
 const HASH1: &str = "0123456789abcdef000000000000000000000000000000000123456789abcdef";
@@ -84,7 +84,7 @@ mod find_missing_blobs {
             .update(
                 DigestInfo::try_new(HASH1, VALUE.len())?,
                 Box::new(Cursor::new(VALUE)),
-                VALUE.len(),
+                UploadSizeInfo::ExactSize(VALUE.len()),
             )
             .await?;
         let raw_response = cas_server
@@ -115,7 +115,7 @@ mod find_missing_blobs {
             .update(
                 DigestInfo::try_new(HASH1, VALUE.len())?,
                 Box::new(Cursor::new(VALUE)),
-                VALUE.len(),
+                UploadSizeInfo::ExactSize(VALUE.len()),
             )
             .await?;
         let raw_response = cas_server
@@ -177,7 +177,7 @@ mod batch_update_blobs {
             .update(
                 DigestInfo::try_new(&HASH1, VALUE1.len())?,
                 Box::new(Cursor::new(VALUE1)),
-                VALUE1.len(),
+                UploadSizeInfo::ExactSize(VALUE1.len()),
             )
             .await
             .expect("Update should have succeeded");
@@ -258,7 +258,7 @@ mod batch_read_blobs {
                 .update(
                     DigestInfo::try_new(&HASH1, VALUE1.len())?,
                     Box::new(Cursor::new(VALUE1)),
-                    VALUE1.len(),
+                    UploadSizeInfo::ExactSize(VALUE1.len()),
                 )
                 .await
                 .expect("Update should have succeeded");
@@ -266,7 +266,7 @@ mod batch_read_blobs {
                 .update(
                     DigestInfo::try_new(&HASH2, VALUE2.len())?,
                     Box::new(Cursor::new(VALUE2)),
-                    VALUE2.len(),
+                    UploadSizeInfo::ExactSize(VALUE2.len()),
                 )
                 .await
                 .expect("Update should have succeeded");

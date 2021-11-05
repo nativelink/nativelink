@@ -98,6 +98,19 @@ pub struct S3Store {
     /// Retry configuration to use when a network request fails.
     #[serde(default)]
     pub retry: Retry,
+
+    /// The number of buffer objects available to this store. The default value is 5MB
+    /// for each entry. Due to the way S3Store buffers it's data and can process multiple
+    /// uploads and downloads at a time (even for the same request), it might be possible
+    /// for localhost to send data much faster than S3 can receive the data. If we do not
+    /// use a pool of buffer objects we might end up with a significant amount of data
+    /// queued up for upload in memory. This value will help curb this event from happening
+    /// by throttling a request from being able to read/write more data until a previous
+    /// pooled object is released.
+    ///
+    /// Default: 50 - This is arbitrary and no research was performed to choose this number.
+    #[serde(default)]
+    pub buffer_pool_size: usize,
 }
 
 /// Retry configuration. This configuration is exponential and each iteration

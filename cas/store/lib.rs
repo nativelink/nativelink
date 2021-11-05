@@ -9,7 +9,7 @@ use memory_store::MemoryStore;
 use s3_store::S3Store;
 use verify_store::VerifyStore;
 
-pub use traits::{StoreTrait as Store, StoreType};
+pub use traits::{StoreTrait as Store, StoreType, UploadSizeInfo};
 
 pub struct StoreManager {
     stores: HashMap<String, Arc<dyn Store>>,

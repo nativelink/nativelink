@@ -13,7 +13,7 @@ use tonic::Request;
 use common::DigestInfo;
 use config;
 use error::{make_err, Code, Error, ResultExt};
-use store::StoreManager;
+use store::{StoreManager, UploadSizeInfo};
 
 const INSTANCE_NAME: &str = "foo_instance_name";
 const HASH1: &str = "0123456789abcdef000000000000000000000000000000000123456789abcdef";
@@ -197,7 +197,11 @@ pub mod read_tests {
 
         let digest = DigestInfo::try_new(&HASH1, VALUE1.len())?;
         store
-            .update(digest, Box::new(Cursor::new(VALUE1)), VALUE1.len())
+            .update(
+                digest,
+                Box::new(Cursor::new(VALUE1)),
+                UploadSizeInfo::ExactSize(VALUE1.len()),
+            )
             .await?;
 
         let read_request = ReadRequest {
@@ -245,7 +249,11 @@ pub mod read_tests {
         let data_len = raw_data.len();
         let digest = DigestInfo::try_new(&HASH1, data_len)?;
         store
-            .update(digest, Box::new(Cursor::new(raw_data.clone())), data_len)
+            .update(
+                digest,
+                Box::new(Cursor::new(raw_data.clone())),
+                UploadSizeInfo::ExactSize(data_len),
+            )
             .await?;
 
         let read_request = ReadRequest {
