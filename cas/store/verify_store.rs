@@ -13,7 +13,7 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, WriteHalf};
 use async_fixed_buffer::AsyncFixedBuf;
 use common::DigestInfo;
 use error::{error_if, Error, ResultExt};
-use traits::{ResultFuture, StoreTrait};
+use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
 
 pub struct VerifyStore {
     inner_store: Arc<dyn StoreTrait>,
@@ -38,7 +38,7 @@ impl VerifyStore {
 async fn inner_check_update<'a>(
     mut tx: WriteHalf<AsyncFixedBuf<Box<[u8]>>>,
     mut reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'a>,
-    expected_size: usize,
+    size_info: &UploadSizeInfo,
     mut maybe_hasher: Option<([u8; 32], Sha256)>,
 ) -> Result<(), Error> {
     let mut buffer = vec![0u8; 1024 * 4];
@@ -58,12 +58,14 @@ async fn inner_check_update<'a>(
         if sz != 0 {
             continue;
         }
-        error_if!(
-            sum_size != expected_size,
-            "Expected size {} but got size {} on insert",
-            expected_size,
-            sum_size
-        );
+        if let UploadSizeInfo::ExactSize(expected_size) = size_info {
+            error_if!(
+                sum_size != *expected_size,
+                "Expected size {} but got size {} on insert",
+                expected_size,
+                sum_size
+            );
+        }
         if let Some((original_hash, hasher)) = maybe_hasher {
             let hash_result: [u8; 32] = hasher.finalize().into();
             error_if!(
@@ -93,17 +95,19 @@ impl StoreTrait for VerifyStore {
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
         reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
-        expected_size: usize,
+        size_info: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
             let digest_size =
                 usize::try_from(digest.size_bytes).err_tip(|| "Digest size_bytes was not convertible to usize")?;
-            error_if!(
-                self.verify_size && expected_size != digest_size,
-                "Expected size to match. Got {} but digest says {} on update",
-                expected_size,
-                digest.size_bytes
-            );
+            if let UploadSizeInfo::ExactSize(ref expected_size) = size_info {
+                error_if!(
+                    self.verify_size && *expected_size != digest_size,
+                    "Expected size to match. Got {} but digest says {} on update",
+                    expected_size,
+                    digest.size_bytes
+                );
+            }
             let mut raw_fixed_buffer = AsyncFixedBuf::new(vec![0u8; 1024 * 4].into_boxed_slice());
             let stream_closer_fut = raw_fixed_buffer.get_closer();
             let (rx, tx) = tokio::io::split(raw_fixed_buffer);
@@ -112,14 +116,14 @@ impl StoreTrait for VerifyStore {
             let inner_store_clone = self.inner_store.clone();
             let spawn_future = tokio::spawn(async move {
                 Pin::new(inner_store_clone.as_ref())
-                    .update(digest, Box::new(rx), expected_size)
+                    .update(digest, Box::new(rx), size_info)
                     .await
             });
             let mut hasher = None;
             if self.verify_hash {
                 hasher = Some((hash_copy, Sha256::new()));
             }
-            let result = inner_check_update(tx, reader, expected_size, hasher).await;
+            let result = inner_check_update(tx, reader, &size_info, hasher).await;
             stream_closer_fut.await;
             result.merge(
                 spawn_future

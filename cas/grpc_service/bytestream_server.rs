@@ -19,7 +19,7 @@ use proto::google::bytestream::{
 use common::{log, DigestInfo};
 use config::cas_server::ByteStreamConfig;
 use error::{error_if, make_err, make_input_err, Code, Error, ResultExt};
-use store::{Store, StoreManager};
+use store::{Store, StoreManager, UploadSizeInfo};
 
 pub struct ByteStreamServer {
     stores: HashMap<String, Arc<dyn Store>>,
@@ -182,7 +182,11 @@ impl ByteStreamServer {
                 let rx = Box::new(rx.take(expected_size as u64));
                 let store = Pin::new(store_clone.as_ref());
                 store
-                    .update(DigestInfo::try_new(&hash, expected_size)?, rx, expected_size)
+                    .update(
+                        DigestInfo::try_new(&hash, expected_size)?,
+                        rx,
+                        UploadSizeInfo::ExactSize(expected_size),
+                    )
                     .await
             })
         };

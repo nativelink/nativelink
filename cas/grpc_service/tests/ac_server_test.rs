@@ -13,7 +13,7 @@ use ac_server::AcServer;
 use common::DigestInfo;
 use config;
 use error::Error;
-use store::{Store, StoreManager};
+use store::{Store, StoreManager, UploadSizeInfo};
 
 const INSTANCE_NAME: &str = "foo_instance_name";
 const HASH1: &str = "0123456789abcdef000000000000000000000000000000000123456789abcdef";
@@ -28,7 +28,11 @@ async fn insert_into_store<T: Message>(
     let data_len = store_data.len();
     let digest = DigestInfo::try_new(&hash, data_len as i64)?;
     store
-        .update(digest.clone(), Box::new(Cursor::new(store_data)), data_len)
+        .update(
+            digest.clone(),
+            Box::new(Cursor::new(store_data)),
+            UploadSizeInfo::ExactSize(data_len),
+        )
         .await?;
     Ok(digest.size_bytes)
 }

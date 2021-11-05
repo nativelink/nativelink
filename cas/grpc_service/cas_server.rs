@@ -23,7 +23,7 @@ use proto::google::rpc::Status as GrpcStatus;
 use common::{log, DigestInfo};
 use config::cas_server::{CasStoreConfig, InstanceName};
 use error::{error_if, make_input_err, Error, ResultExt};
-use store::{Store, StoreManager};
+use store::{Store, StoreManager, UploadSizeInfo};
 
 pub struct CasServer {
     stores: HashMap<String, Arc<dyn Store>>,
@@ -109,7 +109,7 @@ impl CasServer {
                     let cursor = Box::new(Cursor::new(request_data));
                     let store = Pin::new(store_owned.as_ref());
                     store
-                        .update(digest_copy, cursor, size_bytes)
+                        .update(digest_copy, cursor, UploadSizeInfo::ExactSize(size_bytes))
                         .await
                         .err_tip(|| "Error writing to store")
                 }

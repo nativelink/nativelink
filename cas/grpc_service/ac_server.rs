@@ -18,7 +18,7 @@ use proto::build::bazel::remote::execution::v2::{
 use common::{log, DigestInfo};
 use config::cas_server::{AcStoreConfig, InstanceName};
 use error::{make_input_err, Code, Error, ResultExt};
-use store::{Store, StoreManager};
+use store::{Store, StoreManager, UploadSizeInfo};
 
 // NOTE(blaise.bruer) From some local testing it looks like action cache items are rarely greater than
 // 1.2k. Giving a bit more just in case to reduce allocs.
@@ -103,9 +103,9 @@ impl AcServer {
                 .err_tip(|| format!("'instance_name' not configured for '{}'", &instance_name))?
                 .as_ref(),
         );
-        let expected_size = store_data.len();
+        let size_info = UploadSizeInfo::ExactSize(store_data.len());
         store
-            .update(digest, Box::new(Cursor::new(store_data)), expected_size)
+            .update(digest, Box::new(Cursor::new(store_data)), size_info)
             .await?;
         Ok(Response::new(action_result))
     }

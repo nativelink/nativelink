@@ -12,7 +12,7 @@ use common::DigestInfo;
 use config;
 use error::{Code, ResultExt};
 use evicting_map::EvictingMap;
-use traits::{ResultFuture, StoreTrait};
+use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
 
 pub struct MemoryStore {
     map: Mutex<EvictingMap<Instant>>,
@@ -41,11 +41,16 @@ impl StoreTrait for MemoryStore {
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
         mut reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
-        expected_size: usize,
+        size_info: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
-            let mut buffer = Vec::with_capacity(expected_size);
+            let max_size = match size_info {
+                UploadSizeInfo::ExactSize(sz) => sz,
+                UploadSizeInfo::MaxSize(sz) => sz,
+            };
+            let mut buffer = Vec::with_capacity(max_size);
             reader.read_to_end(&mut buffer).await?;
+            buffer.shrink_to_fit();
             let mut map = self.map.lock().await;
             map.insert(digest, Arc::new(buffer));
             Ok(())
