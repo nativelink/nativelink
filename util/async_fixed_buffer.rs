@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+use std::convert::AsRef;
 use std::ops::DerefMut;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,7 +13,7 @@ use fast_async_mutex::mutex::Mutex;
 use fixed_buffer::FixedBuf;
 use futures::{ready, Future};
 use pin_project_lite::pin_project;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::{self, AsyncRead, AsyncWrite, ReadBuf, ReadHalf, WriteHalf};
 
 pin_project! {
     /// This library was significantly inspired by:
@@ -70,6 +71,28 @@ impl<T> AsyncFixedBuf<T> {
     }
 }
 
+impl<T: AsMut<[u8]> + AsRef<[u8]> + Unpin> AsyncFixedBuf<T> {
+    pub fn split_into_reader_writer(mut self) -> (DropCloserReadHalf<T>, DropCloserWriteHalf<T>) {
+        let did_shutdown_r = self.did_shutdown.clone();
+        let did_shutdown_w = self.did_shutdown.clone();
+        let closer_r = self.get_closer();
+        let closer_w = self.get_closer();
+        let (rx, tx) = io::split(self);
+        (
+            DropCloserReadHalf {
+                inner: rx,
+                did_shutdown: did_shutdown_r,
+                close_fut: Some(closer_r),
+            },
+            DropCloserWriteHalf {
+                inner: tx,
+                did_shutdown: did_shutdown_w,
+                close_fut: Some(closer_w),
+            },
+        )
+    }
+}
+
 impl<T: AsRef<[u8]> + Unpin> AsyncRead for AsyncFixedBuf<T> {
     fn poll_read(
         self: Pin<&mut Self>,
@@ -121,6 +144,7 @@ impl<T: AsMut<[u8]> + AsRef<[u8]>> AsyncWrite for AsyncFixedBuf<T> {
         if buf.len() == 0 {
             // EOF happens when a zero byte message is sent.
             me.received_eof.store(true, Ordering::Relaxed);
+            me.did_shutdown.store(true, Ordering::Relaxed);
             wake(&mut waker);
             return Poll::Ready(Ok(0));
         }
@@ -174,5 +198,69 @@ impl<T: AsMut<[u8]> + AsRef<[u8]>> AsyncWrite for AsyncFixedBuf<T> {
         self.did_shutdown.store(true, Ordering::Relaxed);
         wake(&mut waker);
         Poll::Ready(Ok(()))
+    }
+}
+
+pin_project! {
+    pub struct DropCloserReadHalf<T> {
+        #[pin]
+        inner: ReadHalf<AsyncFixedBuf<T>>,
+        did_shutdown: Arc<AtomicBool>,
+        close_fut: Option<Pin<Box<dyn Future<Output = ()> + Sync + Send>>>,
+    }
+
+    impl<T> PinnedDrop for DropCloserReadHalf<T> {
+        fn drop(mut this: Pin<&mut Self>) {
+            if !this.did_shutdown.load(Ordering::Relaxed) {
+                let close_fut = this.close_fut.take().unwrap();
+                tokio::spawn(close_fut);
+            }
+        }
+    }
+}
+
+impl<T: AsRef<[u8]> + Unpin> AsyncRead for DropCloserReadHalf<T> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<Result<(), std::io::Error>> {
+        let me = self.project();
+        me.inner.poll_read(cx, buf)
+    }
+}
+
+pin_project! {
+    pub struct DropCloserWriteHalf<T> {
+        #[pin]
+        inner: WriteHalf<AsyncFixedBuf<T>>,
+        did_shutdown: Arc<AtomicBool>,
+        close_fut: Option<Pin<Box<dyn Future<Output = ()> + Sync + Send>>>,
+    }
+
+    impl<T> PinnedDrop for DropCloserWriteHalf<T> {
+        fn drop(mut this: Pin<&mut Self>) {
+            if !this.did_shutdown.load(Ordering::Relaxed) {
+                let close_fut = this.close_fut.take().unwrap();
+                tokio::spawn(async move { close_fut.await });
+            }
+        }
+    }
+}
+
+impl<T: AsMut<[u8]> + AsRef<[u8]>> AsyncWrite for DropCloserWriteHalf<T> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, std::io::Error>> {
+        let me = self.project();
+        me.inner.poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        let me = self.project();
+        me.inner.poll_flush(cx)
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
+        let me = self.project();
+        me.inner.poll_shutdown(cx)
     }
 }

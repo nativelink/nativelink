@@ -1,10 +1,11 @@
-// Copyright 2020 Nathan (Blaise) Bruer.  All rights reserved.
+// Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::marker::Send;
 use std::pin::Pin;
 
 use async_trait::async_trait;
 use futures::Future;
+use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use common::DigestInfo;
@@ -16,7 +17,7 @@ pub enum StoreType {
 
 pub type ResultFuture<'a, Res> = Pin<Box<dyn Future<Output = Result<Res, Error>> + 'a + Send>>;
 
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize)]
 pub enum UploadSizeInfo {
     /// When the data transfer amount is known to be exact size, this enum should be used.
     /// The receiver store can use this to better optimize the way the data is sent or stored.

@@ -31,17 +31,16 @@ licenses([
 
 # Generated Targets
 
-rust_library(
-    name = "rusoto_credential",
+rust_binary(
+    # Prefix bin name to disambiguate from (probable) collision with lib name
+    # N.B.: The exact form of this is subject to change.
+    name = "cargo_bin_hash_file",
     srcs = glob(["**/*.rs"]),
     crate_features = [
     ],
-    crate_root = "rusoto/credential/src/lib.rs",
+    crate_root = "src/bin/hash_file.rs",
     data = [],
     edition = "2018",
-    proc_macro_deps = [
-        "@raze__async_trait__0_1_51//:async_trait",
-    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -49,19 +48,34 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.46.0",
+    version = "1.6.1",
     # buildifier: leave-alone
     deps = [
-        "@raze__chrono__0_4_19//:chrono",
-        "@raze__dirs_next__2_0_0//:dirs_next",
-        "@raze__futures__0_3_17//:futures",
-        "@raze__hyper__0_14_14//:hyper",
-        "@raze__serde__1_0_130//:serde",
-        "@raze__serde_json__1_0_69//:serde_json",
-        "@raze__shlex__0_1_1//:shlex",
-        "@raze__tokio__1_13_0//:tokio",
-        "@raze__zeroize__1_4_3//:zeroize",
+        ":twox_hash",
+        "@raze__cfg_if__1_0_0//:cfg_if",
+        "@raze__static_assertions__1_1_0//:static_assertions",
     ],
 )
 
-# Unsupported target "instance-profile-test" with type "test" omitted
+rust_library(
+    name = "twox_hash",
+    srcs = glob(["**/*.rs"]),
+    crate_features = [
+    ],
+    crate_root = "src/lib.rs",
+    data = [],
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+    version = "1.6.1",
+    # buildifier: leave-alone
+    deps = [
+        "@raze__cfg_if__1_0_0//:cfg_if",
+        "@raze__static_assertions__1_1_0//:static_assertions",
+    ],
+)

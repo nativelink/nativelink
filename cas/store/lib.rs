@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use compression_store::CompressionStore;
 use config::{self, backends::StoreConfig};
 use error::Error;
 use memory_store::MemoryStore;
@@ -23,6 +24,10 @@ fn private_make_store(backend: &StoreConfig) -> Result<Arc<dyn Store>, Error> {
             &config,
             private_make_store(&config.backend)?,
         ))),
+        StoreConfig::compression(config) => Ok(Arc::new(CompressionStore::new(
+            *config.clone(),
+            private_make_store(&config.backend)?,
+        )?)),
     }
 }
 

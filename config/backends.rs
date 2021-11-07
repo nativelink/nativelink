@@ -1,9 +1,9 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[allow(non_camel_case_types)]
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StoreConfig {
     /// Memory store will store all data in a hashmap in memory.
     memory(MemoryStore),
@@ -25,9 +25,17 @@ pub enum StoreConfig {
     /// The suggested configuration is to have the CAS validate the
     /// hash and size and the AC validate nothing.
     verify(Box<VerifyStore>),
+
+    /// A compression store that will compress the data inbound and
+    /// outbound. There will be a non-trivial cost to compress and
+    /// decompress the data, but in many cases if the final store is
+    /// a store that requires network transport and/or storage space
+    /// is a concern it is often faster and more efficient to use this
+    /// store before those stores.
+    compression(Box<CompressionStore>),
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct MemoryStore {
     /// Policy used to evict items out of the store. Failure to set this
     /// value will cause items to never be removed from the store causing
@@ -35,7 +43,7 @@ pub struct MemoryStore {
     pub eviction_policy: Option<EvictionPolicy>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct VerifyStore {
     /// The underlying store wrap around. All content will first flow
     /// through self before forwarding to backend. In the event there
@@ -59,11 +67,58 @@ pub struct VerifyStore {
     pub verify_hash: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Copy)]
+pub struct Lz4Config {
+    /// Size of the blocks to compress.
+    /// Higher values require more ram, but might yield slightly better
+    /// compression ratios.
+    ///
+    /// Default: 65536 (64k).
+    #[serde(default)]
+    pub block_size: u32,
+
+    /// Maximum size allowed to attempt to deserialize data into.
+    /// This is needed because the block_size is embedded into the data
+    /// so if there was a bad actor, they could upload an extremely large
+    /// block_size'ed entry and we'd allocate a large amount of memory
+    /// when retrieving the data. To prevent this from happening, we
+    /// allow you to specify the maximum that we'll attempt deserialize.
+    ///
+    /// Default: value in `block_size`.
+    #[serde(default)]
+    pub max_decode_block_size: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub enum CompressionAlgorithm {
+    /// LZ4 compression algorithm is extremely fast for compression and
+    /// decompression, however does not perform very well in compression
+    /// ratio. In most cases build artifacts are highly compressible, however
+    /// lz4 is quite good at aborting early if the data is not deemed very
+    /// compressible.
+    ///
+    /// see: https://lz4.github.io/lz4/
+    LZ4(Lz4Config),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CompressionStore {
+    /// The underlying store wrap around. All content will first flow
+    /// through self before forwarding to backend. In the event there
+    /// is an error detected in self, the connection to the backend
+    /// will be terminated, and early termination should always cause
+    /// updates to fail on the backend.
+    pub backend: StoreConfig,
+
+    /// The compression algorithm to use.
+    pub compression_algorithm: CompressionAlgorithm,
+}
+
 /// Eviction policy always works on LRU (Least Recently Used). Any time an entry
 /// is touched it updates the timestamp. Inserts and updates will execute the
 /// eviction policy removing any expired entries and/or the oldest entries
 /// until the store size becomes smaller than max_bytes.
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct EvictionPolicy {
     /// Maximum number of bytes before eviction takes place.
     /// Default: 0. Zero means never evict based on size.
@@ -81,7 +136,7 @@ pub struct EvictionPolicy {
     pub max_count: u64,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct S3Store {
     /// S3 region. Usually us-east-1, us-west-2, af-south-1, exc...
     #[serde(default)]
@@ -134,7 +189,7 @@ pub struct S3Store {
 /// 8         4.8s - 8s
 /// Remember that to get total results is additive, meaning the above results
 /// would mean a single request would have a total delay of 9.525s - 15.875s.
-#[derive(Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Retry {
     /// Maximum number of retries until retrying stops.
     /// Setting this to zero will always attempt 1 time, but not retry.
