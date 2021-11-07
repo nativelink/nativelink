@@ -99,7 +99,7 @@ rust_library(
         "@raze__rusoto_credential__0_46_0//:rusoto_credential",
         "@raze__rusoto_signature__0_46_0//:rusoto_signature",
         "@raze__serde__1_0_130//:serde",
-        "@raze__serde_json__1_0_68//:serde_json",
+        "@raze__serde_json__1_0_69//:serde_json",
         "@raze__tokio__1_13_0//:tokio",
         "@raze__xml_rs__0_8_4//:xml_rs",
     ],

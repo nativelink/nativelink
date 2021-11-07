@@ -22,6 +22,7 @@ rust_library(
     deps = [
         "//third_party:futures",
         "//third_party:tokio",
+        "//third_party:serde",
         "//util:common",
         "//util:error",
     ],
@@ -54,6 +55,29 @@ rust_library(
         "//third_party:hex",
         "//third_party:sha2",
         "//third_party:tokio",
+        "//util:async_fixed_buffer",
+        "//util:common",
+        "//util:error",
+        ":traits",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+    visibility = ["//cas:__pkg__"]
+)
+
+rust_library(
+    name = "compression_store",
+    srcs = ["compression_store.rs"],
+    deps = [
+        "//config",
+        "//third_party:bincode",
+        "//third_party:fast_async_mutex",
+        "//third_party:futures",
+        "//third_party:hex",
+        "//third_party:lz4_flex",
+        "//third_party:serde",
+        "//third_party:sha2",
+        "//third_party:tokio",
+        "//third_party:tokio_util",
         "//util:async_fixed_buffer",
         "//util:common",
         "//util:error",
@@ -131,5 +155,24 @@ rust_test(
         "//util:error",
         ":s3_store",
         ":traits",
+    ],
+)
+
+rust_test(
+    name = "compression_store_test",
+    srcs = ["tests/compression_store_test.rs"],
+    deps = [
+        "//config",
+        # "//third_party:futures",
+        # "//third_party:http",
+        "//third_party:bincode",
+        "//third_party:rand",
+        "//third_party:pretty_assertions",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":compression_store",
+        ":traits",
+        ":memory_store",
     ],
 )

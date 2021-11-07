@@ -16,7 +16,7 @@ fixed-buffer = "0.2.3"
 futures = "0.3.17"
 tokio = { version = "1.13.0", features = ["macros", "io-util", "fs", "rt-multi-thread"] }
 tokio-stream = "0.1.8"
-tokio-util = { version = "0.6.9", features = ["io"] }
+tokio-util = { version = "0.6.9", features = ["io", "io-util"] }
 tonic = "0.6.1"
 lazy-init = "0.5.0"
 log = "0.4.14"
@@ -32,6 +32,8 @@ http = "^0.2"
 pin-project-lite = "0.2.7"
 fast-async-mutex = "0.6.7"
 lease = "0.2.3"
+lz4_flex = "0.9.0"
+bincode = "1.3.3"
 
 [dev-dependencies]
 clap = "2.33.3"

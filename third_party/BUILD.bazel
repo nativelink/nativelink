@@ -22,6 +22,15 @@ alias(
 )
 
 alias(
+    name = "bincode",
+    actual = "@raze__bincode__1_3_3//:bincode",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
     name = "clap",
     actual = "@raze__clap__2_33_3//:clap",
     tags = [
@@ -123,6 +132,15 @@ alias(
 alias(
     name = "lru",
     actual = "@raze__lru__0_6_6//:lru",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "lz4_flex",
+    actual = "@raze__lz4_flex__0_9_0//:lz4_flex",
     tags = [
         "cargo-raze",
         "manual",
