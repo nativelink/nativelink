@@ -23,6 +23,7 @@ fn private_make_store(backend: &StoreConfig) -> Result<Arc<dyn Store>, Error> {
             &config,
             private_make_store(&config.backend)?,
         ))),
+        StoreConfig::compression(_) => unreachable!(),
     }
 }
 

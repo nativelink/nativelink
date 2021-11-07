@@ -94,7 +94,6 @@ impl ByteStreamServer {
 
         let mut raw_fixed_buffer = AsyncFixedBuf::new(vec![0u8; self.read_buffer_stream_size].into_boxed_slice());
         let maybe_stream_closer_fut = Some(raw_fixed_buffer.get_closer());
-        let stream_closer_fut = raw_fixed_buffer.get_closer();
         let (rx, mut tx) = tokio::io::split(raw_fixed_buffer);
         let rx: Box<dyn tokio::io::AsyncRead + Sync + Send + Unpin> = if read_limit != 0 {
             Box::new(rx.take(u64::try_from(read_limit).err_tip(|| "read_limit has is not convertible to u64")?))
@@ -116,7 +115,9 @@ impl ByteStreamServer {
                 .get_part(digest, &mut tx, read_request.read_offset as usize, read_limit)
                 .await
                 .err_tip(|| "Error retrieving data from store");
-            stream_closer_fut.await;
+            tx.shutdown()
+                .await
+                .err_tip(|| "Error shutting down tx stream in bytestrem server")?;
             p
         });
 

@@ -38,6 +38,7 @@ rust_library(
         "codec",
         "default",
         "io",
+        "io-util",
     ],
     crate_root = "src/lib.rs",
     data = [],
