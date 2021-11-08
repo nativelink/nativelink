@@ -573,6 +573,16 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
+        name = "raze__fmt_extra__0_2_1",
+        url = "https://crates.io/api/v1/crates/fmt-extra/0.2.1/download",
+        type = "tar.gz",
+        sha256 = "07f11f71b1f9be830047fbb1899d90601c3b21a471dc99fe1057303eee37f2b9",
+        strip_prefix = "fmt-extra-0.2.1",
+        build_file = Label("//third_party/remote:BUILD.fmt-extra-0.2.1.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "raze__fnv__1_0_7",
         url = "https://crates.io/api/v1/crates/fnv/1.0.7/download",
         type = "tar.gz",
@@ -749,6 +759,16 @@ def raze_fetch_remote_crates():
         sha256 = "7fd819562fcebdac5afc5c113c3ec36f902840b70fd4fc458799c8ce4607ae55",
         strip_prefix = "h2-0.3.7",
         build_file = Label("//third_party/remote:BUILD.h2-0.3.7.bazel"),
+    )
+
+    maybe(
+        http_archive,
+        name = "raze__hash_roll__0_3_0",
+        url = "https://crates.io/api/v1/crates/hash-roll/0.3.0/download",
+        type = "tar.gz",
+        sha256 = "a9e27803a4b526df90ed2a3f60523eeec6b5ace6ba7530f9920fbee82027fa11",
+        strip_prefix = "hash-roll-0.3.0",
+        build_file = Label("//third_party/remote:BUILD.hash-roll-0.3.0.bazel"),
     )
 
     maybe(
@@ -983,12 +1003,12 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
-        name = "raze__libc__0_2_106",
-        url = "https://crates.io/api/v1/crates/libc/0.2.106/download",
+        name = "raze__libc__0_2_107",
+        url = "https://crates.io/api/v1/crates/libc/0.2.107/download",
         type = "tar.gz",
-        sha256 = "a60553f9a9e039a333b4e9b20573b9e9b9c0bb3a11e201ccc48ef4283456d673",
-        strip_prefix = "libc-0.2.106",
-        build_file = Label("//third_party/remote:BUILD.libc-0.2.106.bazel"),
+        sha256 = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219",
+        strip_prefix = "libc-0.2.107",
+        build_file = Label("//third_party/remote:BUILD.libc-0.2.107.bazel"),
     )
 
     maybe(

@@ -26,20 +26,30 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT OR Apache-2.0"
+    "restricted",  # AGPL-3.0 from expression "AGPL-3.0"
 ])
 
 # Generated Targets
 
-# Unsupported target "mod" with type "bench" omitted
+# Unsupported target "compare" with type "bench" omitted
+
+# Unsupported target "generate-test-data" with type "example" omitted
 
 rust_library(
-    name = "getrandom",
+    name = "hash_roll",
     srcs = glob(["**/*.rs"]),
-    aliases = {
-    },
     crate_features = [
-        "std",
+        "bup",
+        "buzhash",
+        "default",
+        "fastcdc",
+        "gear",
+        "gzip",
+        "mii",
+        "pigz",
+        "ram",
+        "zpaq",
+        "zstd",
     ],
     crate_root = "src/lib.rs",
     data = [],
@@ -51,23 +61,23 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.2.3",
+    version = "0.3.0",
     # buildifier: leave-alone
     deps = [
-        "@raze__cfg_if__1_0_0//:cfg_if",
-    ] + selects.with_or({
-        # cfg(unix)
-        (
-            "@rules_rust//rust/platform:x86_64-unknown-linux-gnu",
-        ): [
-            "@raze__libc__0_2_107//:libc",
-        ],
-        "//conditions:default": [],
-    }),
+        "@raze__fmt_extra__0_2_1//:fmt_extra",
+    ],
 )
 
-# Unsupported target "custom" with type "test" omitted
+# Unsupported target "cuts" with type "test" omitted
 
-# Unsupported target "normal" with type "test" omitted
+# Unsupported target "cuts_qc" with type "test" omitted
 
-# Unsupported target "rdrand" with type "test" omitted
+# Unsupported target "fastcdc" with type "test" omitted
+
+# Unsupported target "oracle_zpaq" with type "test" omitted
+
+# Unsupported target "qc_bh" with type "test" omitted
+
+# Unsupported target "qc_bup" with type "test" omitted
+
+# Unsupported target "rsyncable" with type "test" omitted

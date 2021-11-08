@@ -437,11 +437,13 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "bincode",
+ "bytes",
  "clap",
  "env_logger 0.9.0",
  "fast-async-mutex",
  "fixed-buffer",
  "futures",
+ "hash-roll",
  "hex",
  "http",
  "json5",
@@ -527,6 +529,12 @@ name = "fixedbitset"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "398ea4fabe40b9b0d885340a2a991a44c8a645624075ad966d21f88688e2b69e"
+
+[[package]]
+name = "fmt-extra"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07f11f71b1f9be830047fbb1899d90601c3b21a471dc99fe1057303eee37f2b9"
 
 [[package]]
 name = "fnv"
@@ -712,6 +720,15 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "hash-roll"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9e27803a4b526df90ed2a3f60523eeec6b5ace6ba7530f9920fbee82027fa11"
+dependencies = [
+ "fmt-extra",
 ]
 
 [[package]]
@@ -943,9 +960,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.106"
+version = "0.2.107"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a60553f9a9e039a333b4e9b20573b9e9b9c0bb3a11e201ccc48ef4283456d673"
+checksum = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219"
 
 [[package]]
 name = "lock_api"

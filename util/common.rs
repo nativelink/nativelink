@@ -28,6 +28,14 @@ pub struct DigestInfo {
 }
 
 impl DigestInfo {
+    pub fn new(packed_hash: [u8; 32], size_bytes: i64) -> Self {
+        DigestInfo {
+            size_bytes,
+            packed_hash,
+            str_hash: LazyTransform::new(None),
+        }
+    }
+
     pub fn try_new<T>(hash: &str, size_bytes: T) -> Result<Self, Error>
     where
         T: TryInto<i64> + std::fmt::Display + Copy,

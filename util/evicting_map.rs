@@ -101,4 +101,8 @@ impl<T: InstantWrapper> EvictingMap<T> {
         self.sum_store_size += new_item_size;
         self.evict_items();
     }
+
+    pub fn remove(&mut self, hash: &DigestInfo) -> bool {
+        self.lru.pop(hash).is_some()
+    }
 }
