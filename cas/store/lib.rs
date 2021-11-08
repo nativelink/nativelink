@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use compression_store::CompressionStore;
 use config::{self, backends::StoreConfig};
+use dedup_store::DedupStore;
 use error::Error;
 use memory_store::MemoryStore;
 use s3_store::S3Store;
@@ -28,6 +29,11 @@ fn private_make_store(backend: &StoreConfig) -> Result<Arc<dyn Store>, Error> {
             *config.clone(),
             private_make_store(&config.backend)?,
         )?)),
+        StoreConfig::dedup(config) => Ok(Arc::new(DedupStore::new(
+            &config,
+            private_make_store(&config.index_store)?,
+            private_make_store(&config.content_store)?,
+        ))),
     }
 }
 

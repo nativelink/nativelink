@@ -9,6 +9,7 @@ rust_library(
         "//config",
         "//util:error",
         ":compression_store",
+        ":dedup_store",
         ":memory_store",
         ":s3_store",
         ":traits",
@@ -57,6 +58,26 @@ rust_library(
         "//third_party:sha2",
         "//third_party:tokio",
         "//util:async_fixed_buffer",
+        "//util:common",
+        "//util:error",
+        ":traits",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+    visibility = ["//cas:__pkg__"]
+)
+
+rust_library(
+    name = "dedup_store",
+    srcs = ["dedup_store.rs"],
+    deps = [
+        "//config",
+        "//third_party:sha2",
+        "//third_party:tokio",
+        "//third_party:serde",
+        "//third_party:bincode",
+        "//util:fastcdc",
+        "//third_party:tokio_util",
+        "//third_party:futures",
         "//util:common",
         "//util:error",
         ":traits",
@@ -170,6 +191,22 @@ rust_test(
         "//util:common",
         "//util:error",
         ":compression_store",
+        ":memory_store",
+        ":traits",
+    ],
+)
+
+rust_test(
+    name = "dedup_store_test",
+    srcs = ["tests/dedup_store_test.rs"],
+    deps = [
+        "//config",
+        ":dedup_store",
+        "//third_party:pretty_assertions",
+        "//third_party:tokio",
+        "//third_party:rand",
+        "//util:common",
+        "//util:error",
         ":memory_store",
         ":traits",
     ],
