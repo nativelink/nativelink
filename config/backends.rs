@@ -33,6 +33,32 @@ pub enum StoreConfig {
     /// is a concern it is often faster and more efficient to use this
     /// store before those stores.
     compression(Box<CompressionStore>),
+
+    /// A dedup store will take the inputs and run a rolling hash
+    /// algorithm on them to slice the input into smaller parts then
+    /// run a sha256 algorithm on the slice and if the object doesn't
+    /// already exist, upload the slice to the `content_store` using
+    /// a new digest of just the slice. Once all parts exist, an
+    /// Action-Cache-like digest will be built and uploaded to the
+    /// `index_store` which will contain a reference to each
+    /// chunk/digest of the uploaded file. Downloading a request will
+    /// first grab the index from the `index_store`, and forward the
+    /// download content of each chunk as if it were one file.
+    ///
+    /// This store is exceptionally good when the following conditions
+    /// are met:
+    /// * Content is mostly the same (inserts, updates, deletes are ok)
+    /// * Content is not compressed or encrypted
+    /// * Uploading or downloading from `content_store` is the bottleneck.
+    ///
+    /// Note: This store pairs well when used with CompressionStore as
+    /// the `content_store`, but never put DedupStore as the backend of
+    /// CompressionStore as it will negate all the gains.
+    ///
+    /// Note: When running `.has()` on this store, it will only check
+    /// to see if the entry exists in the `index_store` and not check
+    /// if the individual chunks exist in the `content_store`.
+    dedup(Box<DedupStore>),
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -41,6 +67,54 @@ pub struct MemoryStore {
     /// value will cause items to never be removed from the store causing
     /// infinite memory usage.
     pub eviction_policy: Option<EvictionPolicy>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DedupStore {
+    /// Store used to store the index of each dedup slice. This store
+    /// should generally be fast and small.
+    pub index_store: StoreConfig,
+
+    /// The store where the individual chunks will be uploaded. This
+    /// store should generally be the slower & larger store.
+    pub content_store: StoreConfig,
+
+    /// Minimum size that a chunk will be when slicing up the content.
+    /// Note: This setting can be increased to improve performance
+    /// because it will actually not check this number of bytes when
+    /// deciding where to partition the data.
+    ///
+    /// Default: 4096 (4k)
+    #[serde(default)]
+    pub min_size: u32,
+
+    /// A best-effort attempt will be made to keep the average size
+    /// of the chunks to this number. It is not a guarantee, but a
+    /// slight attempt will be made.
+    ///
+    /// Default: 16384 (16k)
+    #[serde(default)]
+    pub normal_size: u32,
+
+    /// Maximum size a chunk is allowed to be.
+    ///
+    /// Default: 65536 (64k)
+    #[serde(default)]
+    pub max_size: u32,
+
+    /// Due to implementation detail, we want to prefer to download
+    /// the first chunks of the file so we can stream the content
+    /// out and free up some of our buffers. This configuration
+    /// will be used to to restrict the number of concurrent chunk
+    /// downloads at a time per `get()` request.
+    ///
+    /// This setting will also affect how much memory might be used
+    /// per `get()` request. Estimated worst case memory per `get()`
+    /// request is: `max_concurrent_fetch_per_get * max_size`.
+    ///
+    /// Default: 10
+    #[serde(default)]
+    pub max_concurrent_fetch_per_get: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
