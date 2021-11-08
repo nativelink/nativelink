@@ -26,6 +26,11 @@ impl MemoryStore {
             map: Mutex::new(EvictingMap::new(eviction_policy, Instant::now())),
         }
     }
+
+    pub async fn remove_entry(&self, digest: &DigestInfo) -> bool {
+        let mut map = self.map.lock().await;
+        map.remove(digest)
+    }
 }
 
 #[async_trait]

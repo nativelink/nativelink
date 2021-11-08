@@ -983,12 +983,12 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
-        name = "raze__libc__0_2_106",
-        url = "https://crates.io/api/v1/crates/libc/0.2.106/download",
+        name = "raze__libc__0_2_107",
+        url = "https://crates.io/api/v1/crates/libc/0.2.107/download",
         type = "tar.gz",
-        sha256 = "a60553f9a9e039a333b4e9b20573b9e9b9c0bb3a11e201ccc48ef4283456d673",
-        strip_prefix = "libc-0.2.106",
-        build_file = Label("//third_party/remote:BUILD.libc-0.2.106.bazel"),
+        sha256 = "fbe5e23404da5b4f555ef85ebed98fb4083e55a00c317800bc2a50ede9f3d219",
+        strip_prefix = "libc-0.2.107",
+        build_file = Label("//third_party/remote:BUILD.libc-0.2.107.bazel"),
     )
 
     maybe(

@@ -74,6 +74,33 @@ rust_library(
     visibility = ["//visibility:public"],
 )
 
+rust_library(
+    name = "fastcdc",
+    srcs = ["fastcdc.rs"],
+    deps = [
+        "//third_party:tokio_util",
+        "//third_party:bytes",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+rust_test(
+    name = "fastcdc_test",
+    srcs = ["tests/fastcdc_test.rs"],
+    data = ["tests/data/SekienAkashita.jpg"],
+    deps = [
+        "//third_party:tokio",
+        "//third_party:rand",
+        "//third_party:tokio_util",
+        "//third_party:sha2",
+        "//third_party:hex",
+        "//third_party:bytes",
+        "//third_party:futures",
+        "//third_party:pretty_assertions",
+        ":fastcdc",
+    ],
+)
+
 rust_test(
     name = "async_fixed_buffer_test",
     srcs = ["tests/async_fixed_buffer_test.rs"],
