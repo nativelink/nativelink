@@ -47,8 +47,8 @@ mod dedup_store_tests {
         );
         let store = Pin::new(&store_owned);
 
-        let original_data = make_random_data(1 * MEGABYTE_SZ);
-        let digest = DigestInfo::try_new(&VALID_HASH1, 100).unwrap();
+        let original_data = make_random_data(MEGABYTE_SZ);
+        let digest = DigestInfo::try_new(&VALID_HASH1, MEGABYTE_SZ).unwrap();
 
         store
             .update(
@@ -79,8 +79,8 @@ mod dedup_store_tests {
         );
         let store = Pin::new(&store_owned);
 
-        let original_data = make_random_data(1 * MEGABYTE_SZ);
-        let digest = DigestInfo::try_new(&VALID_HASH1, 100).unwrap();
+        let original_data = make_random_data(MEGABYTE_SZ);
+        let digest = DigestInfo::try_new(&VALID_HASH1, MEGABYTE_SZ).unwrap();
 
         store
             .update(
@@ -95,9 +95,11 @@ mod dedup_store_tests {
         const LAST_CHUNK_HASH: &str = "9220cc441e3860a0a8f5ed984d5b2da69c09ca800dcfd7a93c755acf8561e7a5";
         const LAST_CHUNK_SIZE: usize = 25779;
 
-        content_store
+        let did_delete = content_store
             .remove_entry(&DigestInfo::try_new(LAST_CHUNK_HASH, LAST_CHUNK_SIZE).unwrap())
             .await;
+
+        assert_eq!(did_delete, true, "Expected item to exist in store");
 
         let result = store.get_part(digest.clone(), &mut vec![], 0, None).await;
         assert!(result.is_err(), "Expected result to be an error");
@@ -123,7 +125,7 @@ mod dedup_store_tests {
 
         const DATA_SIZE: usize = MEGABYTE_SZ / 4;
         let original_data = make_random_data(DATA_SIZE);
-        let digest = DigestInfo::try_new(&VALID_HASH1, 100).unwrap();
+        let digest = DigestInfo::try_new(&VALID_HASH1, DATA_SIZE).unwrap();
 
         store
             .update(

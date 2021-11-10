@@ -84,7 +84,7 @@ pub struct DedupStore {
     /// because it will actually not check this number of bytes when
     /// deciding where to partition the data.
     ///
-    /// Default: 4096 (4k)
+    /// Default: 65536 (64k)
     #[serde(default)]
     pub min_size: u32,
 
@@ -92,13 +92,19 @@ pub struct DedupStore {
     /// of the chunks to this number. It is not a guarantee, but a
     /// slight attempt will be made.
     ///
-    /// Default: 16384 (16k)
+    /// This value will also be about the threshold used to determine
+    /// if we should even attempt to dedup the entry or just forward
+    /// it directly to the content_store without an index. The actual
+    /// value will be about `normal_size * 1.3` due to implementation
+    /// details.
+    ///
+    /// Default: 262144 (256k)
     #[serde(default)]
     pub normal_size: u32,
 
     /// Maximum size a chunk is allowed to be.
     ///
-    /// Default: 65536 (64k)
+    /// Default: 524288 (512k)
     #[serde(default)]
     pub max_size: u32,
 

@@ -3,19 +3,35 @@
     "CAS_MAIN_STORE": {
       "verify": {
         "backend": {
-          "compression": {
-            "compression_algorithm": {
-              "LZ4": {}
-            },
-            "backend": {
+          "dedup": {
+            "index_store": {
               "s3_store": {
                 "region": "us-west-1",
                 "bucket": "blaisebruer-cas-store",
-                "key_prefix": "test-prefix-cas/",
+                "key_prefix": "test-prefix-index/",
                 "retry": {
                   "max_retries": 6,
                   "delay": 0.3,
                   "jitter": 0.5,
+                }
+              }
+            },
+            "content_store": {
+              "compression": {
+                "compression_algorithm": {
+                  "LZ4": {}
+                },
+                "backend": {
+                  "s3_store": {
+                    "region": "us-west-1",
+                    "bucket": "blaisebruer-cas-store",
+                    "key_prefix": "test-prefix-dedup-cas/",
+                    "retry": {
+                      "max_retries": 6,
+                      "delay": 0.3,
+                      "jitter": 0.5,
+                    }
+                  }
                 }
               }
             }

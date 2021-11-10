@@ -28,10 +28,10 @@ use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
 
 // NOTE: If these change update the comments in `backends.rs` to reflect
 // the new defaults.
-const DEFAULT_MIN_SIZE: usize = 4096;
-const DEFAULT_NORM_SIZE: usize = 16384;
-const DEFAULT_MAX_SIZE: usize = 65536;
-const DEFAULT_MAX_CONCURRENT_FETCH_PER_GET: usize = 10;
+const DEFAULT_MIN_SIZE: usize = 64 * 1024;
+const DEFAULT_NORM_SIZE: usize = 256 * 1024;
+const DEFAULT_MAX_SIZE: usize = 512 * 1024;
+const DEFAULT_MAX_CONCURRENT_FETCH_PER_GET: usize = 60;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default, Clone)]
 #[repr(C)]
@@ -92,6 +92,10 @@ impl DedupStore {
         }
     }
 
+    fn is_small_object(&self, digest: &DigestInfo) -> bool {
+        return digest.size_bytes as usize <= self.upload_normal_size;
+    }
+
     fn pin_index_store<'a>(&'a self) -> std::pin::Pin<&'a dyn StoreTrait> {
         Pin::new(self.index_store.as_ref())
     }
@@ -110,6 +114,12 @@ impl StoreTrait for DedupStore {
         size_info: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
+            if self.is_small_object(&digest) {
+                return Pin::new(self.content_store.as_ref())
+                    .update(digest, reader, size_info)
+                    .await
+                    .err_tip(|| "Failed to insert small object in dedup store");
+            }
             let input_max_size = match size_info {
                 UploadSizeInfo::ExactSize(sz) => sz,
                 UploadSizeInfo::MaxSize(sz) => sz,
@@ -186,6 +196,12 @@ impl StoreTrait for DedupStore {
         length: Option<usize>,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
+            if self.is_small_object(&digest) {
+                return Pin::new(self.content_store.as_ref())
+                    .get_part(digest, writer, offset, length)
+                    .await
+                    .err_tip(|| "Failed to get_part small object in dedup store");
+            }
             // First we need to download the index that contains where the individual parts actually
             // can be fetched from.
             let index_entries = {
@@ -222,7 +238,7 @@ impl StoreTrait for DedupStore {
                             continue;
                         }
                         // Filter any items who's start byte is after the last requested byte.
-                        if first_byte > offset + length.unwrap() {
+                        if length.is_some() && first_byte > offset + length.unwrap() {
                             continue;
                         }
                         entries.push(entry);
