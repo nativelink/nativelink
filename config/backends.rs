@@ -59,6 +59,41 @@ pub enum StoreConfig {
     /// to see if the entry exists in the `index_store` and not check
     /// if the individual chunks exist in the `content_store`.
     dedup(Box<DedupStore>),
+
+    /// FastSlow store will first try to fetch the data from the `fast`
+    /// store and then if it does not exist try the `slow` store.
+    /// When the object does exist in the `slow` store, it will copy
+    /// the data to the `fast` store while returning the data.
+    /// This store should be thought of as a store that "buffers"
+    /// the data to the `fast` store.
+    /// On uploads it will mirror data to both `fast` and `slow` stores.
+    ///
+    /// WARNING: If you need data to always exist in the `slow` store
+    /// for something like remote execution, be careful because this
+    /// store will never check to see if the objects exist in the
+    /// `slow` store if it exists in the `fast` store (ie: it assumes
+    /// that if an object exists `fast` store it will exist in `slow`
+    /// store).
+    fast_slow(Box<FastSlowStore>),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FastSlowStore {
+    /// Fast store that will be attempted to be contacted before reaching
+    /// out to the `slow` store.
+    pub fast: StoreConfig,
+
+    /// If the object does not exist in the `fast` store it will try to
+    /// get it from this store.
+    pub slow: StoreConfig,
+
+    /// Buffer size used to shuttle data between the different stores.
+    /// The amount of memory used per request will be apx 3-5x this
+    /// value per `get()` request.
+    ///
+    /// Default: 8192 (8k)
+    #[serde(default)]
+    pub buffer_size: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

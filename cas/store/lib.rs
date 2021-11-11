@@ -7,6 +7,7 @@ use compression_store::CompressionStore;
 use config::{self, backends::StoreConfig};
 use dedup_store::DedupStore;
 use error::Error;
+use fast_slow_store::FastSlowStore;
 use memory_store::MemoryStore;
 use s3_store::S3Store;
 use verify_store::VerifyStore;
@@ -33,6 +34,11 @@ fn private_make_store(backend: &StoreConfig) -> Result<Arc<dyn Store>, Error> {
             &config,
             private_make_store(&config.index_store)?,
             private_make_store(&config.content_store)?,
+        ))),
+        StoreConfig::fast_slow(config) => Ok(Arc::new(FastSlowStore::new(
+            &config,
+            private_make_store(&config.fast)?,
+            private_make_store(&config.slow)?,
         ))),
     }
 }
