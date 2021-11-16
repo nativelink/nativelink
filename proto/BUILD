@@ -20,9 +20,10 @@ rust_binary(
     name = "gen_protos_tool",
     srcs = ["gen_protos_tool.rs"],
     deps = [
-        "//third_party:tonic_build",
         "//third_party:clap",
+        "//third_party:prost_build",
         "//third_party:rustfmt_nightly",
+        "//third_party:tonic_build",
     ]
 )
 

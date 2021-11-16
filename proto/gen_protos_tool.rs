@@ -1,4 +1,5 @@
 use clap::{App, Arg};
+use prost_build::Config;
 use std::path::PathBuf;
 use std::vec::Vec;
 use tonic_build;
@@ -27,9 +28,12 @@ fn main() -> std::io::Result<()> {
     let paths = matches.values_of("input").unwrap().collect::<Vec<&str>>();
     let output_dir = PathBuf::from(matches.value_of("output_dir").unwrap());
 
+    let mut config = Config::new();
+    config.bytes(&["."]);
     tonic_build::configure()
         .out_dir(&output_dir)
+        // .field_attribute("bytes_type", "bytes")
         .format(true) // don't run `rustfmt`; shouldn't be needed to build
-        .compile(&paths, &["proto"])?;
+        .compile_with_config(config, &paths, &["proto"])?;
     Ok(())
 }

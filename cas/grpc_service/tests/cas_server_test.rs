@@ -14,7 +14,7 @@ use cas_server::CasServer;
 use common::DigestInfo;
 use config;
 use error::Error;
-use store::{StoreManager, UploadSizeInfo};
+use store::StoreManager;
 
 const INSTANCE_NAME: &str = "foo_instance_name";
 const HASH1: &str = "0123456789abcdef000000000000000000000000000000000123456789abcdef";
@@ -46,8 +46,6 @@ fn make_cas_server(store_manager: &mut StoreManager) -> Result<CasServer, Error>
 mod find_missing_blobs {
     use super::*;
     use pretty_assertions::assert_eq; // Must be declared in every module.
-
-    use std::io::Cursor;
 
     use proto::build::bazel::remote::execution::v2::FindMissingBlobsRequest;
 
@@ -81,11 +79,7 @@ mod find_missing_blobs {
 
         let store = Pin::new(store_owned.as_ref());
         store
-            .update(
-                DigestInfo::try_new(HASH1, VALUE.len())?,
-                Box::new(Cursor::new(VALUE)),
-                UploadSizeInfo::ExactSize(VALUE.len()),
-            )
+            .update_oneshot(DigestInfo::try_new(HASH1, VALUE.len())?, VALUE.into())
             .await?;
         let raw_response = cas_server
             .find_missing_blobs(Request::new(FindMissingBlobsRequest {
@@ -112,11 +106,7 @@ mod find_missing_blobs {
 
         let store = Pin::new(store_owned.as_ref());
         store
-            .update(
-                DigestInfo::try_new(HASH1, VALUE.len())?,
-                Box::new(Cursor::new(VALUE)),
-                UploadSizeInfo::ExactSize(VALUE.len()),
-            )
+            .update_oneshot(DigestInfo::try_new(HASH1, VALUE.len())?, VALUE.into())
             .await?;
         let raw_response = cas_server
             .find_missing_blobs(Request::new(FindMissingBlobsRequest {
@@ -152,8 +142,6 @@ mod batch_update_blobs {
     use super::*;
     use pretty_assertions::assert_eq; // Must be declared in every module.
 
-    use std::io::Cursor;
-
     use proto::build::bazel::remote::execution::v2::{
         batch_update_blobs_request, batch_update_blobs_response, BatchUpdateBlobsRequest, BatchUpdateBlobsResponse,
     };
@@ -174,11 +162,7 @@ mod batch_update_blobs {
 
         let store = Pin::new(store_owned.as_ref());
         store
-            .update(
-                DigestInfo::try_new(&HASH1, VALUE1.len())?,
-                Box::new(Cursor::new(VALUE1)),
-                UploadSizeInfo::ExactSize(VALUE1.len()),
-            )
+            .update_oneshot(DigestInfo::try_new(&HASH1, VALUE1.len())?, VALUE1.into())
             .await
             .expect("Update should have succeeded");
 
@@ -205,12 +189,8 @@ mod batch_update_blobs {
                 },],
             }
         );
-        let mut new_data = Vec::new();
-        store
-            .get(
-                DigestInfo::try_new(&HASH1, VALUE1.len())?,
-                &mut Cursor::new(&mut new_data),
-            )
+        let new_data = store
+            .get_part_unchunked(DigestInfo::try_new(&HASH1, VALUE1.len())?, 0, None, None)
             .await
             .expect("Get should have succeeded");
         assert_eq!(
@@ -226,8 +206,6 @@ mod batch_update_blobs {
 mod batch_read_blobs {
     use super::*;
     use pretty_assertions::assert_eq; // Must be declared in every module.
-
-    use std::io::Cursor;
 
     use proto::build::bazel::remote::execution::v2::{
         batch_read_blobs_response, BatchReadBlobsRequest, BatchReadBlobsResponse,
@@ -255,19 +233,11 @@ mod batch_read_blobs {
             // Insert dummy data.
             let store = Pin::new(store_owned.as_ref());
             store
-                .update(
-                    DigestInfo::try_new(&HASH1, VALUE1.len())?,
-                    Box::new(Cursor::new(VALUE1)),
-                    UploadSizeInfo::ExactSize(VALUE1.len()),
-                )
+                .update_oneshot(DigestInfo::try_new(&HASH1, VALUE1.len())?, VALUE1.into())
                 .await
                 .expect("Update should have succeeded");
             store
-                .update(
-                    DigestInfo::try_new(&HASH2, VALUE2.len())?,
-                    Box::new(Cursor::new(VALUE2)),
-                    UploadSizeInfo::ExactSize(VALUE2.len()),
-                )
+                .update_oneshot(DigestInfo::try_new(&HASH2, VALUE2.len())?, VALUE2.into())
                 .await
                 .expect("Update should have succeeded");
         }
@@ -290,7 +260,7 @@ mod batch_read_blobs {
                     responses: vec![
                         batch_read_blobs_response::Response {
                             digest: Some(digest1),
-                            data: VALUE1.as_bytes().to_vec(),
+                            data: VALUE1.into(),
                             status: Some(GrpcStatus {
                                 code: 0, // Status Ok.
                                 message: "".to_string(),
@@ -299,7 +269,7 @@ mod batch_read_blobs {
                         },
                         batch_read_blobs_response::Response {
                             digest: Some(digest2),
-                            data: VALUE2.as_bytes().to_vec(),
+                            data: VALUE2.into(),
                             status: Some(GrpcStatus {
                                 code: 0, // Status Ok.
                                 message: "".to_string(),
@@ -308,10 +278,13 @@ mod batch_read_blobs {
                         },
                         batch_read_blobs_response::Response {
                             digest: Some(digest3.clone()),
-                            data: vec![],
+                            data: vec![].into(),
                             status: Some(GrpcStatus {
                                 code: Code::NotFound as i32,
-                                message: format!("Error: Error {{ code: NotFound, messages: [\"Hash {} not found\", \"Error reading from store\"] }}", digest3.hash),
+                                message: format!(
+                                    "Error: Error {{ code: NotFound, messages: [\"Hash {} not found\"] }}",
+                                    digest3.hash
+                                ),
                                 details: vec![],
                             }),
                         }

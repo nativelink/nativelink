@@ -5,17 +5,18 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::future::FutureExt;
-use lz4_flex::block::{compress_into, decompress_into, get_maximum_output_size};
-use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-
-use async_fixed_buffer::AsyncFixedBuf;
 use bincode::{
     self,
     config::{FixintEncoding, WithOtherIntEncoding},
     DefaultOptions, Options,
 };
+use byteorder::{ByteOrder, LittleEndian};
+use bytes::{Buf, BufMut, BytesMut};
+use futures::future::FutureExt;
+use lz4_flex::block::{compress_into, decompress_into, get_maximum_output_size};
+use serde::{Deserialize, Serialize};
+
+use buf_channel::{make_buf_channel_pair, DropCloserReadHalf, DropCloserWriteHalf};
 use common::{DigestInfo, JoinHandleDropGuard};
 use error::{error_if, make_err, Code, Error, ResultExt};
 use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
@@ -227,21 +228,20 @@ impl StoreTrait for CompressionStore {
     fn update<'a>(
         self: Pin<&'a Self>,
         digest: DigestInfo,
-        mut reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
+        mut reader: DropCloserReadHalf,
         upload_size: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
             let mut output_state = UploadState::new(&self, upload_size);
 
-            let fixed_buffer = AsyncFixedBuf::new(vec![0u8; 4096]);
-            let (rx, mut tx) = fixed_buffer.split_into_reader_writer();
+            let (mut tx, rx) = make_buf_channel_pair();
 
             let inner_store = self.inner_store.clone();
             let update_fut = JoinHandleDropGuard::new(tokio::spawn(async move {
                 Pin::new(inner_store.as_ref())
                     .update(
                         digest,
-                        Box::new(rx),
+                        rx,
                         UploadSizeInfo::MaxSize(output_state.max_output_size as usize),
                     )
                     .await
@@ -261,48 +261,56 @@ impl StoreTrait for CompressionStore {
                         .bincode_options
                         .serialize(&output_state.header)
                         .map_err(|e| make_err!(Code::Internal, "Failed to serialize header : {:?}", e))?;
-                    tx.write_all(&serialized_header)
+                    tx.send(serialized_header.into())
                         .await
                         .err_tip(|| "Failed to write compression header on upload")?;
                 }
 
-                let mut rx_data_buf = Vec::with_capacity(self.config.block_size as usize);
-                let mut compressed_data_buf = vec![0u8; get_maximum_output_size(self.config.block_size as usize)];
                 let mut received_amt = 0;
                 let mut index_count = 0;
                 for index in &mut output_state.footer.indexes {
-                    rx_data_buf.clear();
-                    let mut taker = reader.take(self.config.block_size as u64);
-                    let len = taker
-                        .read_to_end(&mut rx_data_buf)
+                    let chunk = reader
+                        .take(self.config.block_size as usize)
                         .await
-                        .err_tip(|| "Failed to read in compression update")?;
-                    if len == 0 {
-                        break; // Received EOF.
+                        .err_tip(|| "Failed to read take in update in compression store");
+                    let chunk = chunk?;
+                    if chunk.len() == 0 {
+                        break; // EOF.
                     }
 
-                    received_amt = received_amt + len;
+                    received_amt = received_amt + chunk.len();
                     error_if!(
                         received_amt > output_state.input_max_size,
                         "Got more data than stated in compression store upload request"
                     );
 
-                    let compressed_data_sz = compress_into(&rx_data_buf, &mut compressed_data_buf)
-                        .map_err(|e| make_err!(Code::Internal, "Compression error {:?}", e))?;
+                    let max_output_size = get_maximum_output_size(self.config.block_size as usize);
+                    let mut compressed_data_buf = BytesMut::with_capacity(max_output_size);
+                    compressed_data_buf.put_u8(CHUNK_FRAME_TYPE);
+                    compressed_data_buf.put_u32_le(0); // Filled later.
 
-                    tx.write_u8(CHUNK_FRAME_TYPE)
-                        .await
-                        .err_tip(|| "Failed to write type chunk to inner store in compression store")?;
-                    tx.write_u32_le(compressed_data_sz as u32)
-                        .await
-                        .err_tip(|| "Failed to write size chunk to inner store in compression store")?;
-                    tx.write_all(&compressed_data_buf[..compressed_data_sz])
+                    // For efficiency reasons we do some raw slice manipulation so we can write directly
+                    // into our buffer instead of having to do another allocation.
+                    let mut raw_compressed_data = unsafe {
+                        std::slice::from_raw_parts_mut(compressed_data_buf.chunk_mut().as_mut_ptr(), max_output_size)
+                    };
+
+                    let compressed_data_sz = compress_into(&chunk, &mut raw_compressed_data)
+                        .map_err(|e| make_err!(Code::Internal, "Compression error {:?}", e))?;
+                    unsafe {
+                        compressed_data_buf.advance_mut(compressed_data_sz);
+                    }
+
+                    // Now fill the size in our slice.
+                    LittleEndian::write_u32(&mut compressed_data_buf[1..5], compressed_data_sz as u32);
+
+                    // Now send our chunk.
+                    tx.send(compressed_data_buf.freeze())
                         .await
                         .err_tip(|| "Failed to write chunk to inner store in compression store")?;
 
                     index.position_from_prev_index = compressed_data_sz as u32;
 
-                    reader = taker.into_inner();
                     index_count += 1;
                 }
                 // Index 0 is actually a pointer to the second chunk. This is because we don't need
@@ -327,56 +335,42 @@ impl StoreTrait for CompressionStore {
                         .bincode_options
                         .serialize(&output_state.footer)
                         .map_err(|e| make_err!(Code::Internal, "Failed to serialize header : {:?}", e))?;
-                    tx.write_u8(FOOTER_FRAME_TYPE)
+
+                    let mut footer = BytesMut::with_capacity(1 + 4 + serialized_footer.len());
+                    footer.put_u8(FOOTER_FRAME_TYPE);
+                    footer.put_u32_le(serialized_footer.len() as u32);
+                    footer.extend_from_slice(&serialized_footer);
+
+                    tx.send(footer.freeze())
                         .await
-                        .err_tip(|| "Failed to write type footer to inner store in compression store")?;
-                    tx.write_u32_le(serialized_footer.len() as u32)
-                        .await
-                        .err_tip(|| "Failed to write size footer to inner store in compression store")?;
-                    tx.write_all(&serialized_footer)
-                        .await
-                        .err_tip(|| "Failed writing compression header on upload")?;
-                }
-                {
-                    // Close writer.
-                    tx.write(&[])
+                        .err_tip(|| "Failed to write footer to inner store in compression store")?;
+                    tx.send_eof()
                         .await
                         .err_tip(|| "Failed writing EOF in compression store update")?;
-                    tx.shutdown()
-                        .await
-                        .err_tip(|| "Failed shutting down write stream in compression store update")?;
                 }
 
-                Ok(())
+                Result::<(), Error>::Ok(())
             };
             let (write_result, update_result) = tokio::join!(write_fut, update_fut);
-            if let Err(mut e) = write_result {
-                // We may need to propagate the error from reading the data through first.
-                if let Err(err) = update_result {
-                    e = err.merge(e);
-                }
-                return Err(e);
-            }
-            Ok(())
+            write_result.merge(update_result)
         })
     }
 
     fn get_part<'a>(
         self: Pin<&'a Self>,
         digest: DigestInfo,
-        writer: &'a mut (dyn AsyncWrite + Send + Unpin + Sync),
+        mut writer: DropCloserWriteHalf,
         offset: usize,
         length: Option<usize>,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
             let offset = offset as u64;
-            let fixed_buffer = AsyncFixedBuf::new(vec![0u8; 4096]);
-            let (mut rx, mut tx) = fixed_buffer.split_into_reader_writer();
+            let (tx, mut rx) = make_buf_channel_pair();
 
             let inner_store = self.inner_store.clone();
             let get_part_fut = JoinHandleDropGuard::new(tokio::spawn(async move {
                 Pin::new(inner_store.as_ref())
-                    .get_part(digest, &mut tx, 0, None)
+                    .get_part(digest, tx, 0, None)
                     .await
                     .err_tip(|| "Inner store get in compression store failed")
             }))
@@ -387,35 +381,28 @@ impl StoreTrait for CompressionStore {
                 },
             );
             let read_fut = async move {
-                let mut rx_data_buf = Vec::with_capacity(get_maximum_output_size(self.config.block_size as usize));
-
                 let header = {
                     // Read header.
-                    let header_size = self
-                        .bincode_options
-                        .serialized_size(&Header {
-                            version: CURRENT_STREAM_FORMAT_VERSION,
-                            config: Default::default(),
-                            upload_size: UploadSizeInfo::ExactSize(0),
-                        })
-                        .unwrap() as u64;
-                    let mut taker = rx.take(header_size);
-                    let len = taker
-                        .read_to_end(&mut rx_data_buf)
+                    static EMPTY_HEADER: Header = Header {
+                        version: CURRENT_STREAM_FORMAT_VERSION,
+                        config: Lz4Config { block_size: 0 },
+                        upload_size: UploadSizeInfo::ExactSize(0),
+                    };
+                    let header_size = self.bincode_options.serialized_size(&EMPTY_HEADER).unwrap() as u64;
+                    let chunk = rx
+                        .take(header_size as usize)
                         .await
-                        .err_tip(|| "Failed to read in compression get header")?;
+                        .err_tip(|| "Failed to read header in get_part compression store")?;
                     error_if!(
-                        len as u64 != header_size,
-                        "Expected inner store to return the proper amount of data in compression store"
+                        chunk.len() as u64 != header_size,
+                        "Expected inner store to return the proper amount of data in compression store {} != {}",
+                        chunk.len(),
+                        header_size,
                     );
 
-                    let header = self
-                        .bincode_options
-                        .deserialize::<Header>(&rx_data_buf)
-                        .map_err(|e| make_err!(Code::Internal, "Failed to deserialize header : {:?}", e))?;
-
-                    rx = taker.into_inner();
-                    header
+                    self.bincode_options
+                        .deserialize::<Header>(&chunk)
+                        .map_err(|e| make_err!(Code::Internal, "Failed to deserialize header : {:?}", e))?
                 };
 
                 error_if!(
@@ -431,16 +418,18 @@ impl StoreTrait for CompressionStore {
                     self.config.max_decode_block_size
                 );
 
-                let mut frame_type = rx
-                    .read_u8()
+                let mut chunk = rx
+                    .take(1 + 4)
                     .await
-                    .err_tip(|| "Failed to read init frame type in compression store")?;
-                let mut frame_sz = rx
-                    .read_u32_le()
-                    .await
-                    .err_tip(|| "Failed to read init chunk size in compression store")?;
+                    .err_tip(|| "Failed to read init frame info in compression store")?;
+                error_if!(
+                    chunk.len() < 1 + 4,
+                    "Received EOF too early while reading init frame info in compression store"
+                );
 
-                let mut uncompressed_data = vec![0u8; get_maximum_output_size(header.config.block_size as usize)];
+                let mut frame_type = chunk.get_u8();
+                let mut frame_sz = chunk.get_u32_le();
+
                 let mut uncompressed_data_sz: u64 = 0;
                 let mut remaining_bytes_to_send: u64 = length.unwrap_or(usize::MAX) as u64;
                 let mut chunks_count = 0;
@@ -451,22 +440,30 @@ impl StoreTrait for CompressionStore {
                         frame_type,
                         chunks_count
                     );
-                    rx_data_buf.clear();
-                    let mut taker = rx.take(frame_sz as u64);
-                    let len = taker
-                        .read_to_end(&mut rx_data_buf)
-                        .await
-                        .err_tip(|| "Failed to read chunk in compression store")? as u32;
 
-                    if len < frame_sz {
+                    let chunk = rx
+                        .take(frame_sz as usize)
+                        .await
+                        .err_tip(|| "Failed to read chunk in get_part compression store")?;
+                    if chunk.len() < frame_sz as usize {
                         return Err(make_err!(
                             Code::Internal,
                             "Got EOF earlier than expected. Maybe the data is not compressed or different format?"
                         ));
                     }
                     {
-                        let uncompressed_chunk_sz = decompress_into(&rx_data_buf, &mut uncompressed_data)
+                        let max_output_size = get_maximum_output_size(header.config.block_size as usize);
+                        let mut uncompressed_data = BytesMut::with_capacity(max_output_size);
+
+                        // For efficiency reasons we do some raw slice manipulation so we can write directly
+                        // into our buffer instead of having to do another allocation.
+                        let mut raw_decompressed_data = unsafe {
+                            std::slice::from_raw_parts_mut(uncompressed_data.chunk_mut().as_mut_ptr(), max_output_size)
+                        };
+
+                        let uncompressed_chunk_sz = decompress_into(&chunk, &mut raw_decompressed_data)
                             .map_err(|e| make_err!(Code::Internal, "Decompression error {:?}", e))?;
+                        unsafe { uncompressed_data.advance_mut(uncompressed_chunk_sz) };
                         let new_uncompressed_data_sz = uncompressed_data_sz + uncompressed_chunk_sz as u64;
                         if new_uncompressed_data_sz >= offset && remaining_bytes_to_send > 0 {
                             let start_pos = if offset <= uncompressed_data_sz {
@@ -475,26 +472,30 @@ impl StoreTrait for CompressionStore {
                                 offset - uncompressed_data_sz
                             } as usize;
                             let end_pos = cmp::min(start_pos + remaining_bytes_to_send as usize, uncompressed_chunk_sz);
-                            writer
-                                .write_all(&uncompressed_data[start_pos..end_pos])
-                                .await
-                                .err_tip(|| "Failed writing chunk in compression store")?;
+                            if end_pos != start_pos {
+                                // Make sure we don't send an EOF by accident.
+                                writer
+                                    .send(uncompressed_data.freeze().slice(start_pos..end_pos))
+                                    .await
+                                    .err_tip(|| "Failed sending chunk in compression store")?;
+                            }
                             remaining_bytes_to_send -= (end_pos - start_pos) as u64;
                         }
                         uncompressed_data_sz = new_uncompressed_data_sz;
                     }
                     chunks_count += 1;
 
-                    rx = taker.into_inner();
+                    let mut chunk = rx
+                        .take(1 + 4)
+                        .await
+                        .err_tip(|| "Failed to read frame info in compression store")?;
+                    error_if!(
+                        chunk.len() < 1 + 4,
+                        "Received EOF too early while reading frame info in compression store"
+                    );
 
-                    frame_type = rx
-                        .read_u8()
-                        .await
-                        .err_tip(|| "Failed to read frame type in compression store")?;
-                    frame_sz = rx
-                        .read_u32_le()
-                        .await
-                        .err_tip(|| "Failed to read frame size in compression store")?;
+                    frame_type = chunk.get_u8();
+                    frame_sz = chunk.get_u32_le();
                 }
                 // Index count will always be +1 (unless it is zero bytes long).
                 if chunks_count > 0 {
@@ -502,20 +503,18 @@ impl StoreTrait for CompressionStore {
                 }
                 {
                     // Read and validate footer.
-                    rx_data_buf.clear();
-                    let mut taker = rx.take(frame_sz as u64);
-                    let len = taker
-                        .read_to_end(&mut rx_data_buf)
+                    let chunk = rx
+                        .take(frame_sz as usize)
                         .await
-                        .err_tip(|| "Failed to read chunk in compression store")? as u32;
+                        .err_tip(|| "Failed to read chunk in get_part compression store")?;
                     error_if!(
-                        len < frame_sz,
+                        chunk.len() < frame_sz as usize,
                         "Unexpected EOF when reading footer in compression store get_part"
                     );
 
                     let footer = self
                         .bincode_options
-                        .deserialize::<Footer>(&rx_data_buf)
+                        .deserialize::<Footer>(&chunk)
                         .map_err(|e| make_err!(Code::Internal, "Failed to deserialize footer : {:?}", e))?;
 
                     error_if!(
@@ -548,13 +547,9 @@ impl StoreTrait for CompressionStore {
                 }
 
                 writer
-                    .write(&[])
+                    .send_eof()
                     .await
-                    .err_tip(|| "Failed writing EOF in compression store in get_part")?;
-                writer
-                    .shutdown()
-                    .await
-                    .err_tip(|| "Failed shutting down write stream in compression store get_part")?;
+                    .err_tip(|| "Failed to send eof in compression store write")?;
                 Ok(())
             };
 

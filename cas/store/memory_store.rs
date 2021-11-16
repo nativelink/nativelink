@@ -1,11 +1,11 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
-use std::marker::Send;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
+use buf_channel::{DropCloserReadHalf, DropCloserWriteHalf};
+use bytes::{Bytes, BytesMut};
 use common::DigestInfo;
 use config;
 use error::{Code, ResultExt};
@@ -13,7 +13,7 @@ use evicting_map::EvictingMap;
 use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
 
 pub struct MemoryStore {
-    map: EvictingMap<Vec<u8>, SystemTime>,
+    map: EvictingMap<Bytes, SystemTime>,
 }
 
 impl MemoryStore {
@@ -39,7 +39,7 @@ impl StoreTrait for MemoryStore {
     fn update<'a>(
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
-        mut reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
+        reader: DropCloserReadHalf,
         size_info: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
@@ -47,9 +47,21 @@ impl StoreTrait for MemoryStore {
                 UploadSizeInfo::ExactSize(sz) => sz,
                 UploadSizeInfo::MaxSize(sz) => sz,
             };
-            let mut buffer = Vec::with_capacity(max_size);
-            reader.read_to_end(&mut buffer).await?;
-            buffer.shrink_to_fit();
+            let buffer = reader
+                .collect_all_with_size_hint(max_size)
+                .await
+                .err_tip(|| "Failed to collect all bytes from reader in memory_store::update")?;
+
+            // Resize our buffer if our max_size was not accurate.
+            // The buffer might have reserved much more than the amount of data transferred.
+            // This will ensure we use less memory for the long term stored data.
+            let buffer = if buffer.len() != max_size {
+                let mut new_buffer = BytesMut::with_capacity(buffer.len());
+                new_buffer.extend_from_slice(&buffer[..]);
+                new_buffer.freeze()
+            } else {
+                buffer
+            };
             self.map.insert(digest, buffer).await;
             Ok(())
         })
@@ -58,7 +70,7 @@ impl StoreTrait for MemoryStore {
     fn get_part<'a>(
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
-        writer: &'a mut (dyn AsyncWrite + Send + Unpin + Sync),
+        mut writer: DropCloserWriteHalf,
         offset: usize,
         length: Option<usize>,
     ) -> ResultFuture<'a, ()> {
@@ -68,14 +80,17 @@ impl StoreTrait for MemoryStore {
                 .get(&digest)
                 .await
                 .err_tip_with_code(|_| (Code::NotFound, format!("Hash {} not found", digest.str())))?;
+
             let default_len = value.len() - offset;
             let length = length.unwrap_or(default_len).min(default_len);
             writer
-                .write_all(&value[offset..(offset + length)])
+                .send(value.slice(offset..(offset + length)))
                 .await
-                .err_tip(|| "Error writing all data to writer")?;
-            writer.write(&[]).await.err_tip(|| "Error writing EOF to writer")?;
-            writer.shutdown().await.err_tip(|| "Error shutting down writer")?;
+                .err_tip(|| "Failed to write data in memory store")?;
+            writer
+                .send_eof()
+                .await
+                .err_tip(|| "Failed to write EOF in memory store get_part")?;
             Ok(())
         })
     }

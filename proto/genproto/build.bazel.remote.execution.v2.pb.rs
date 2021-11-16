@@ -64,8 +64,8 @@ pub struct Action {
     /// specific to sources such as repo and service configuration,
     /// and allows disowning an entire set of ActionResults that might have been
     /// poisoned by buggy software or tool failures.
-    #[prost(bytes = "vec", tag = "9")]
-    pub salt: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "bytes", tag = "9")]
+    pub salt: ::prost::bytes::Bytes,
     /// The optional platform requirements for the execution environment. The
     /// server MAY choose to execute the action on any worker satisfying the
     /// requirements, so the client SHOULD ensure that running the action on any
@@ -680,8 +680,8 @@ pub struct ActionResult {
     /// \[GetActionResultRequest][build.bazel.remote.execution.v2.GetActionResultRequest\]
     /// message. The server MAY omit inlining, even if requested, and MUST do so if inlining
     /// would cause the response to exceed message size limits.
-    #[prost(bytes = "vec", tag = "5")]
-    pub stdout_raw: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "bytes", tag = "5")]
+    pub stdout_raw: ::prost::bytes::Bytes,
     /// The digest for a blob containing the standard output of the action, which
     /// can be retrieved from the
     /// \[ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage\].
@@ -692,8 +692,8 @@ pub struct ActionResult {
     /// \[GetActionResultRequest][build.bazel.remote.execution.v2.GetActionResultRequest\]
     /// message. The server MAY omit inlining, even if requested, and MUST do so if inlining
     /// would cause the response to exceed message size limits.
-    #[prost(bytes = "vec", tag = "7")]
-    pub stderr_raw: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "bytes", tag = "7")]
+    pub stderr_raw: ::prost::bytes::Bytes,
     /// The digest for a blob containing the standard error of the action, which
     /// can be retrieved from the
     /// \[ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage\].
@@ -725,8 +725,8 @@ pub struct OutputFile {
     /// \[GetActionResultRequest][build.bazel.remote.execution.v2.GetActionResultRequest\]
     /// message. The server MAY omit inlining, even if requested, and MUST do so if inlining
     /// would cause the response to exceed message size limits.
-    #[prost(bytes = "vec", tag = "5")]
-    pub contents: ::prost::alloc::vec::Vec<u8>,
+    #[prost(bytes = "bytes", tag = "5")]
+    pub contents: ::prost::bytes::Bytes,
     #[prost(message, optional, tag = "7")]
     pub node_properties: ::core::option::Option<NodeProperties>,
 }
@@ -1062,8 +1062,8 @@ pub mod batch_update_blobs_request {
         #[prost(message, optional, tag = "1")]
         pub digest: ::core::option::Option<super::Digest>,
         /// The raw binary data.
-        #[prost(bytes = "vec", tag = "2")]
-        pub data: ::prost::alloc::vec::Vec<u8>,
+        #[prost(bytes = "bytes", tag = "2")]
+        pub data: ::prost::bytes::Bytes,
     }
 }
 /// A response message for
@@ -1120,8 +1120,8 @@ pub mod batch_read_blobs_response {
         #[prost(message, optional, tag = "1")]
         pub digest: ::core::option::Option<super::Digest>,
         /// The raw binary data.
-        #[prost(bytes = "vec", tag = "2")]
-        pub data: ::prost::alloc::vec::Vec<u8>,
+        #[prost(bytes = "bytes", tag = "2")]
+        pub data: ::prost::bytes::Bytes,
         /// The result of attempting to download that blob.
         #[prost(message, optional, tag = "3")]
         pub status:

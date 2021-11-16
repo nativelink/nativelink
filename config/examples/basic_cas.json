@@ -103,9 +103,6 @@
         "cas_stores": {
           "main": "CAS_MAIN_STORE",
         },
-        // This value was chosen only because it is a common mem page size.
-        "write_buffer_stream_size": 2e6, // 2mb.
-        "read_buffer_stream_size": 2e6, // 2mb.
         // According to https://github.com/grpc/grpc.github.io/issues/371 16KiB - 64KiB is optimal.
         "max_bytes_per_stream": 64000, // 64kb.
       }

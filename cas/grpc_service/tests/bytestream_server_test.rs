@@ -1,7 +1,6 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::convert::TryFrom;
-use std::io::Cursor;
 use std::pin::Pin;
 
 use bytestream_server::ByteStreamServer;
@@ -13,7 +12,7 @@ use tonic::Request;
 use common::DigestInfo;
 use config;
 use error::{make_err, Code, Error, ResultExt};
-use store::{StoreManager, UploadSizeInfo};
+use store::StoreManager;
 
 const INSTANCE_NAME: &str = "foo_instance_name";
 const HASH1: &str = "0123456789abcdef000000000000000000000000000000000123456789abcdef";
@@ -34,8 +33,6 @@ fn make_bytestream_server(store_manager: &mut StoreManager) -> Result<ByteStream
                 "foo_instance_name".to_string() => "main_cas".to_string(),
             },
             max_bytes_per_stream: 1024,
-            read_buffer_stream_size: 1024,
-            write_buffer_stream_size: 1024,
         },
         &store_manager,
     )
@@ -126,21 +123,21 @@ pub mod write_tests {
                 resource_name: resource_name,
                 write_offset: 0,
                 finish_write: false,
-                data: vec![],
+                data: vec![].into(),
             };
             // Write first chunk of data.
             write_request.write_offset = 0;
-            write_request.data = raw_data[..BYTE_SPLIT_OFFSET].to_vec();
+            write_request.data = raw_data[..BYTE_SPLIT_OFFSET].into();
             tx.send_data(encode(&write_request)?).await?;
 
             // Write empty set of data (clients are allowed to do this.
             write_request.write_offset = BYTE_SPLIT_OFFSET as i64;
-            write_request.data = vec![];
+            write_request.data = vec![].into();
             tx.send_data(encode(&write_request)?).await?;
 
             // Write final bit of data.
             write_request.write_offset = BYTE_SPLIT_OFFSET as i64;
-            write_request.data = raw_data[BYTE_SPLIT_OFFSET..].to_vec();
+            write_request.data = raw_data[BYTE_SPLIT_OFFSET..].into();
             write_request.finish_write = true;
             tx.send_data(encode(&write_request)?).await?;
 
@@ -156,12 +153,8 @@ pub mod write_tests {
 
             // Now lets check our store to ensure it was written with proper data.
             store.has(DigestInfo::try_new(&HASH1, raw_data.len())?).await?;
-            let mut store_data = Vec::new();
-            store
-                .get(
-                    DigestInfo::try_new(&HASH1, raw_data.len())?,
-                    &mut Cursor::new(&mut store_data),
-                )
+            let store_data = store
+                .get_part_unchunked(DigestInfo::try_new(&HASH1, raw_data.len())?, 0, None, None)
                 .await?;
             assert_eq!(
                 std::str::from_utf8(&store_data),
@@ -196,13 +189,7 @@ pub mod read_tests {
         const VALUE1: &str = "12456789abcdefghijk";
 
         let digest = DigestInfo::try_new(&HASH1, VALUE1.len())?;
-        store
-            .update(
-                digest,
-                Box::new(Cursor::new(VALUE1)),
-                UploadSizeInfo::ExactSize(VALUE1.len()),
-            )
-            .await?;
+        store.update_oneshot(digest, VALUE1.into()).await?;
 
         let read_request = ReadRequest {
             resource_name: format!(
@@ -220,7 +207,7 @@ pub mod read_tests {
             let mut roundtrip_data = Vec::with_capacity(VALUE1.len());
             assert!(VALUE1.len() > 0, "Expected at least one byte to be sent");
             while let Some(result_read_response) = read_stream.next().await {
-                roundtrip_data.append(&mut result_read_response?.data);
+                roundtrip_data.append(&mut result_read_response?.data.to_vec());
             }
             assert_eq!(
                 roundtrip_data,
@@ -248,13 +235,7 @@ pub mod read_tests {
 
         let data_len = raw_data.len();
         let digest = DigestInfo::try_new(&HASH1, data_len)?;
-        store
-            .update(
-                digest,
-                Box::new(Cursor::new(raw_data.clone())),
-                UploadSizeInfo::ExactSize(data_len),
-            )
-            .await?;
+        store.update_oneshot(digest, raw_data.clone().into()).await?;
 
         let read_request = ReadRequest {
             resource_name: format!(
@@ -272,7 +253,7 @@ pub mod read_tests {
             let mut roundtrip_data = Vec::with_capacity(raw_data.len());
             assert!(raw_data.len() > 0, "Expected at least one byte to be sent");
             while let Some(result_read_response) = read_stream.next().await {
-                roundtrip_data.append(&mut result_read_response?.data);
+                roundtrip_data.append(&mut result_read_response?.data.to_vec());
             }
             assert_eq!(roundtrip_data, raw_data, "Expected response to match what is in store");
         }
@@ -320,8 +301,7 @@ pub mod read_tests {
             let result = result.err_tip(|| "Expected result to be ready")?;
             let expected_err_str = concat!(
                 "status: NotFound, message: \"Hash 0123456789abcdef000000000000000000000000000000000123456789abcdef ",
-                "not found : Error retrieving data from store : --- : Sender disconnected : Error reading data from ",
-                "underlying store\", details: [], metadata: MetadataMap { headers: {} }",
+                "not found\", details: [], metadata: MetadataMap { headers: {} }",
             );
             assert_eq!(
                 Error::from(result.unwrap_err()),

@@ -1,9 +1,6 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::cmp;
-use std::io::Cursor;
-use std::marker::Send;
-use std::mem::size_of;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -17,12 +14,12 @@ use futures::stream::{self, StreamExt};
 use futures::{future::try_join_all, FutureExt};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio_util::codec::FramedRead;
 
+use buf_channel::{DropCloserReadHalf, DropCloserWriteHalf, StreamReader};
 use common::{DigestInfo, JoinHandleDropGuard, SerializableDigestInfo};
 use config;
-use error::{make_err, Code, Error, ResultExt};
+use error::{make_err, Code, ResultExt};
 use fastcdc::FastCDC;
 use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
 
@@ -103,23 +100,24 @@ impl StoreTrait for DedupStore {
     fn update<'a>(
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
-        mut reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
+        reader: DropCloserReadHalf,
         size_info: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
+            let input_max_size = match size_info {
+                UploadSizeInfo::ExactSize(sz) => sz,
+                UploadSizeInfo::MaxSize(sz) => sz,
+            };
             if self.is_small_object(&digest) {
                 return Pin::new(self.content_store.as_ref())
                     .update(digest, reader, size_info)
                     .await
                     .err_tip(|| "Failed to insert small object in dedup store");
             }
-            let input_max_size = match size_info {
-                UploadSizeInfo::ExactSize(sz) => sz,
-                UploadSizeInfo::MaxSize(sz) => sz,
-            };
             let est_spawns = (input_max_size / self.upload_normal_size) + 1;
             let mut spawns = Vec::with_capacity(est_spawns);
-            let mut frame_reader = FramedRead::new(&mut reader, self.fast_cdc_decoder.clone());
+            let mut bytes_reader = StreamReader::new(reader);
+            let mut frame_reader = FramedRead::new(&mut bytes_reader, self.fast_cdc_decoder.clone());
             while let Some(frame) = frame_reader.next().await {
                 let frame = frame.err_tip(|| "Failed to decode frame from fast_cdc")?;
                 let content_store = self.content_store.clone();
@@ -141,11 +139,7 @@ impl StoreTrait for DedupStore {
                             return Ok(index_entry);
                         }
                         content_store_pin
-                            .update(
-                                digest,
-                                Box::new(Cursor::new(frame)),
-                                UploadSizeInfo::ExactSize(frame_len),
-                            )
+                            .update_oneshot(digest, frame)
                             .await
                             .err_tip(|| "Failed to update content store in dedup_store")?;
                         Ok(index_entry)
@@ -165,15 +159,8 @@ impl StoreTrait for DedupStore {
                 .serialize(&DedupIndex { entries: index_entries })
                 .map_err(|e| make_err!(Code::Internal, "Failed to serialize index in dedup_store : {:?}", e))?;
 
-            // Now that our data is in our content_store, lets add our index entry to
-            // our index_store.
-            let serialized_index_len = serialized_index.len();
             self.pin_index_store()
-                .update(
-                    digest,
-                    Box::new(Cursor::new(serialized_index)),
-                    UploadSizeInfo::ExactSize(serialized_index_len),
-                )
+                .update_oneshot(digest, serialized_index.into())
                 .await
                 .err_tip(|| "Failed to insert our index entry to index_store in dedup_store")?;
 
@@ -184,7 +171,7 @@ impl StoreTrait for DedupStore {
     fn get_part<'a>(
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
-        writer: &'a mut (dyn AsyncWrite + Send + Unpin + Sync),
+        mut writer: DropCloserWriteHalf,
         offset: usize,
         length: Option<usize>,
     ) -> ResultFuture<'a, ()> {
@@ -198,13 +185,11 @@ impl StoreTrait for DedupStore {
             // First we need to download the index that contains where the individual parts actually
             // can be fetched from.
             let index_entries = {
-                // First we need to read from our index_store to get a list of all the files and locations.
-                let est_parts = (digest.size_bytes as usize / self.upload_normal_size) + 1;
-                let mut data = Vec::with_capacity(est_parts * size_of::<SerializableDigestInfo>());
-                self.pin_index_store()
-                    .get_part(digest, &mut data, 0, None)
+                let data = self
+                    .pin_index_store()
+                    .get_part_unchunked(digest, 0, None, Some(self.upload_normal_size))
                     .await
-                    .err_tip(|| "Failed to get our index entry to index_store in dedup_store")?;
+                    .err_tip(|| "Failed to read index store in dedup store")?;
 
                 self.bincode_options.deserialize::<DedupIndex>(&data).map_err(|e| {
                     make_err!(
@@ -253,15 +238,14 @@ impl StoreTrait for DedupStore {
                     let content_store = self.content_store.clone();
 
                     async move {
-                        let mut data = vec![0u8; index_entry.size_bytes as usize];
-
                         let digest = DigestInfo::new(index_entry.hash, index_entry.size_bytes as i64);
-                        Pin::new(content_store.as_ref())
-                            .get_part(digest, &mut Cursor::new(&mut data), 0, None)
+
+                        let data = Pin::new(content_store.as_ref())
+                            .get_part_unchunked(digest, 0, None, Some(index_entry.size_bytes as usize))
                             .await
                             .err_tip(|| "Failed to get_part in content_store in dedup_store")?;
 
-                        Result::<Vec<u8>, Error>::Ok(data)
+                        Ok(data)
                     }
                 })
                 .buffered(self.max_concurrent_fetch_per_get);
@@ -275,12 +259,21 @@ impl StoreTrait for DedupStore {
             while let Some(result) = entries_stream.next().await {
                 match result {
                     Err(err) => return Err(err),
-                    Ok(data) => {
+                    Ok(mut data) => {
+                        assert!(
+                            bytes_to_skip <= data.len(),
+                            "Formula above must be wrong, {} > {}",
+                            bytes_to_skip,
+                            data.len()
+                        );
                         let end_pos = cmp::min(data.len(), bytes_to_send + bytes_to_skip);
+                        if bytes_to_skip != 0 || data.len() > bytes_to_send {
+                            data = data.slice(bytes_to_skip..end_pos);
+                        }
                         writer
-                            .write_all(&data[bytes_to_skip..end_pos])
+                            .send(data)
                             .await
-                            .err_tip(|| "Failed to write data out from get_part dedup")?;
+                            .err_tip(|| "Failed to write data to get_part dedup")?;
                         bytes_to_send -= end_pos - bytes_to_skip;
                         bytes_to_skip -= bytes_to_skip;
                     }
@@ -289,14 +282,9 @@ impl StoreTrait for DedupStore {
 
             // Finish our stream by writing our EOF and shutdown the stream.
             writer
-                .write(&[])
+                .send_eof()
                 .await
                 .err_tip(|| "Failed to write EOF out from get_part dedup")?;
-            writer
-                .shutdown()
-                .await
-                .err_tip(|| "Failed to shutdown output stream in get_part dedup")?;
-
             Ok(())
         })
     }
