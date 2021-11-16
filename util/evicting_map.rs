@@ -1,7 +1,6 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::ops::DerefMut;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use fast_async_mutex::mutex::Mutex;
@@ -43,7 +42,7 @@ impl InstantWrapper for SystemTime {
 
 struct EvictionItem<T: LenEntry> {
     seconds_since_anchor: u32,
-    data: Arc<T>,
+    data: T,
 }
 
 pub trait LenEntry {
@@ -62,18 +61,18 @@ pub trait LenEntry {
     fn unref(&self) {}
 }
 
-impl LenEntry for Vec<u8> {
+impl<T: AsRef<[u8]>> LenEntry for T {
     fn len(&self) -> usize {
-        <Vec<u8>>::len(self)
+        <[u8]>::len(self.as_ref())
     }
 }
 
-struct State<T: LenEntry> {
+struct State<T: LenEntry + Clone> {
     lru: LruCache<DigestInfo, EvictionItem<T>>,
     sum_store_size: u64,
 }
 
-pub struct EvictingMap<T: LenEntry, I: InstantWrapper> {
+pub struct EvictingMap<T: LenEntry + Clone, I: InstantWrapper> {
     state: Mutex<State<T>>,
     anchor_time: I,
     max_bytes: u64,
@@ -81,7 +80,7 @@ pub struct EvictingMap<T: LenEntry, I: InstantWrapper> {
     max_count: u64,
 }
 
-impl<T: LenEntry, I: InstantWrapper> EvictingMap<T, I> {
+impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
     pub fn new(config: &EvictionPolicy, anchor_time: I) -> Self {
         EvictingMap {
             // We use unbounded because if we use the bounded version we can't call the delete
@@ -115,7 +114,7 @@ impl<T: LenEntry, I: InstantWrapper> EvictingMap<T, I> {
         serialized_lru
     }
 
-    pub async fn restore_lru(&mut self, seiralized_lru: SerializedLRU, entry_builder: impl Fn(&DigestInfo) -> Arc<T>) {
+    pub async fn restore_lru(&mut self, seiralized_lru: SerializedLRU, entry_builder: impl Fn(&DigestInfo) -> T) {
         let mut state = self.state.lock().await;
         self.anchor_time = I::from_secs(seiralized_lru.anchor_time);
         state.lru.clear();
@@ -177,7 +176,7 @@ impl<T: LenEntry, I: InstantWrapper> EvictingMap<T, I> {
         None
     }
 
-    pub async fn get(&self, digest: &DigestInfo) -> Option<Arc<T>> {
+    pub async fn get(&self, digest: &DigestInfo) -> Option<T> {
         let mut state = self.state.lock().await;
         if let Some(mut entry) = state.lru.get_mut(digest) {
             entry.seconds_since_anchor = self.anchor_time.elapsed().as_secs() as u32;
@@ -186,7 +185,7 @@ impl<T: LenEntry, I: InstantWrapper> EvictingMap<T, I> {
         None
     }
 
-    pub async fn insert(&self, digest: DigestInfo, data: Arc<T>) {
+    pub async fn insert(&self, digest: DigestInfo, data: T) {
         let new_item_size = data.len() as u64;
         let eviction_item = EvictionItem {
             seconds_since_anchor: self.anchor_time.elapsed().as_secs() as u32,

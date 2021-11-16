@@ -39,6 +39,8 @@ rust_library(
     deps = [
         "//config",
         "//third_party:tokio",
+        "//third_party:bytes",
+        "//third_party:futures",
         "//util:common",
         "//util:error",
         "//util:evicting_map",
@@ -168,6 +170,7 @@ rust_test(
         "//config",
         "//third_party:pretty_assertions",
         "//third_party:tokio",
+        "//third_party:bytes",
         "//util:common",
         "//util:error",
         ":memory_store",
