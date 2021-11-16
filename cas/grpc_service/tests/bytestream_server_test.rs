@@ -320,7 +320,7 @@ pub mod read_tests {
             let result = result.err_tip(|| "Expected result to be ready")?;
             let expected_err_str = concat!(
                 "status: NotFound, message: \"Hash 0123456789abcdef000000000000000000000000000000000123456789abcdef ",
-                "not found : Error retrieving data from store : Sender disconnected : Error reading data from ",
+                "not found : Error retrieving data from store : --- : Sender disconnected : Error reading data from ",
                 "underlying store\", details: [], metadata: MetadataMap { headers: {} }",
             );
             assert_eq!(
