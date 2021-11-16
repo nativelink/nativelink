@@ -1,7 +1,6 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::marker::Send;
-use std::sync::Arc;
 use std::time::SystemTime;
 
 use async_trait::async_trait;
@@ -51,7 +50,7 @@ impl StoreTrait for MemoryStore {
             let mut buffer = Vec::with_capacity(max_size);
             reader.read_to_end(&mut buffer).await?;
             buffer.shrink_to_fit();
-            self.map.insert(digest, Arc::new(buffer)).await;
+            self.map.insert(digest, buffer).await;
             Ok(())
         })
     }

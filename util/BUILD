@@ -121,6 +121,7 @@ rust_test(
     srcs = ["tests/evicting_map_test.rs"],
     deps = [
         "//config",
+        "//third_party:bytes",
         "//third_party:hex",
         "//third_party:mock_instant",
         "//third_party:tokio",
