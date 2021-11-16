@@ -1,6 +1,5 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
-use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -10,7 +9,7 @@ use dedup_store::DedupStore;
 use error::{Code, Error, ResultExt};
 use memory_store::MemoryStore;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
-use traits::{StoreTrait, UploadSizeInfo};
+use traits::StoreTrait;
 
 fn make_default_config() -> config::backends::DedupStore {
     config::backends::DedupStore {
@@ -51,17 +50,12 @@ mod dedup_store_tests {
         let digest = DigestInfo::try_new(&VALID_HASH1, MEGABYTE_SZ).unwrap();
 
         store
-            .update(
-                digest.clone(),
-                Box::new(Cursor::new(original_data.clone())),
-                UploadSizeInfo::ExactSize(original_data.len()),
-            )
+            .update_oneshot(digest.clone(), original_data.clone().into())
             .await
             .err_tip(|| "Failed to write data to dedup store")?;
 
-        let mut rt_data = Vec::with_capacity(original_data.len());
-        store
-            .get_part(digest.clone(), &mut rt_data, 0, None)
+        let rt_data = store
+            .get_part_unchunked(digest.clone(), 0, None, Some(original_data.len()))
             .await
             .err_tip(|| "Failed to get_part from dedup store")?;
 
@@ -83,11 +77,7 @@ mod dedup_store_tests {
         let digest = DigestInfo::try_new(&VALID_HASH1, MEGABYTE_SZ).unwrap();
 
         store
-            .update(
-                digest.clone(),
-                Box::new(Cursor::new(original_data.clone())),
-                UploadSizeInfo::ExactSize(original_data.len()),
-            )
+            .update_oneshot(digest.clone(), original_data.into())
             .await
             .err_tip(|| "Failed to write data to dedup store")?;
 
@@ -101,7 +91,7 @@ mod dedup_store_tests {
 
         assert_eq!(did_delete, true, "Expected item to exist in store");
 
-        let result = store.get_part(digest.clone(), &mut vec![], 0, None).await;
+        let result = store.get_part_unchunked(digest.clone(), 0, None, None).await;
         assert!(result.is_err(), "Expected result to be an error");
         assert_eq!(
             result.unwrap_err().code,
@@ -128,18 +118,13 @@ mod dedup_store_tests {
         let digest = DigestInfo::try_new(&VALID_HASH1, DATA_SIZE).unwrap();
 
         store
-            .update(
-                digest.clone(),
-                Box::new(Cursor::new(original_data.clone())),
-                UploadSizeInfo::ExactSize(original_data.len()),
-            )
+            .update_oneshot(digest.clone(), original_data.clone().into())
             .await
             .err_tip(|| "Failed to write data to dedup store")?;
 
-        let mut rt_data = Vec::with_capacity(original_data.len());
         const ONE_THIRD_SZ: usize = DATA_SIZE / 3;
-        store
-            .get_part(digest.clone(), &mut rt_data, ONE_THIRD_SZ, Some(ONE_THIRD_SZ))
+        let rt_data = store
+            .get_part_unchunked(digest.clone(), ONE_THIRD_SZ, Some(ONE_THIRD_SZ), None)
             .await
             .err_tip(|| "Failed to get_part from dedup store")?;
 

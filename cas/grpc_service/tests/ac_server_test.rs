@@ -1,8 +1,8 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
-use std::io::Cursor;
 use std::pin::Pin;
 
+use bytes::BytesMut;
 use maplit::hashmap;
 use tonic::{Code, Request, Response, Status};
 
@@ -13,7 +13,7 @@ use ac_server::AcServer;
 use common::DigestInfo;
 use config;
 use error::Error;
-use store::{Store, StoreManager, UploadSizeInfo};
+use store::{Store, StoreManager};
 
 const INSTANCE_NAME: &str = "foo_instance_name";
 const HASH1: &str = "0123456789abcdef000000000000000000000000000000000123456789abcdef";
@@ -23,17 +23,11 @@ async fn insert_into_store<T: Message>(
     hash: &str,
     action_result: &T,
 ) -> Result<i64, Box<dyn std::error::Error>> {
-    let mut store_data = Vec::new();
+    let mut store_data = BytesMut::new();
     action_result.encode(&mut store_data)?;
     let data_len = store_data.len();
     let digest = DigestInfo::try_new(&hash, data_len as i64)?;
-    store
-        .update(
-            digest.clone(),
-            Box::new(Cursor::new(store_data)),
-            UploadSizeInfo::ExactSize(data_len),
-        )
-        .await?;
+    store.update_oneshot(digest.clone(), store_data.freeze()).await?;
     Ok(digest.size_bytes)
 }
 
@@ -193,12 +187,11 @@ mod update_action_result {
         assert!(raw_response.is_ok(), "Expected success, got error {:?}", raw_response);
         assert_eq!(raw_response.unwrap().into_inner(), action_result);
 
-        let mut raw_data = Vec::new();
         let digest = DigestInfo::try_new(&HASH1, size_bytes)?;
         let ac_store = Pin::new(ac_store_owned.as_ref());
-        ac_store.get(digest, &mut Cursor::new(&mut raw_data)).await?;
+        let raw_data = ac_store.get_part_unchunked(digest, 0, None, None).await?;
 
-        let decoded_action_result = ActionResult::decode(Cursor::new(&raw_data))?;
+        let decoded_action_result = ActionResult::decode(raw_data)?;
         assert_eq!(decoded_action_result, action_result);
         Ok(())
     }

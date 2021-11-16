@@ -45,8 +45,14 @@ impl Error {
 
     pub fn merge<E: Into<Error>>(mut self, other: E) -> Self {
         let mut other: Error = other.into();
+        // This will help with knowing which messages are tied to different errors.
+        self.messages.push("---".to_string());
         self.messages.append(&mut other.messages);
         self
+    }
+
+    pub fn to_std_err(self) -> std::io::Error {
+        std::io::Error::new(self.code.into(), self.messages.join(" : "))
     }
 }
 
@@ -147,6 +153,7 @@ pub trait ResultExt<T> {
         S: std::string::ToString,
         F: (std::ops::FnOnce(&Error) -> (Code, S)) + Sized;
 
+    #[inline]
     fn err_tip<F, S>(self, tip_fn: F) -> Result<T, Error>
     where
         Self: Sized,
@@ -165,6 +172,7 @@ pub trait ResultExt<T> {
 }
 
 impl<T, E: Into<Error>> ResultExt<T> for Result<T, E> {
+    #[inline]
     fn err_tip_with_code<F, S>(self, tip_fn: F) -> Result<T, Error>
     where
         Self: Sized,
@@ -188,6 +196,8 @@ impl<T, E: Into<Error>> ResultExt<T> for Result<T, E> {
             let mut e: Error = e.into();
             if let Err(other_err) = other {
                 let mut other_err: Error = other_err.into();
+                // This will help with knowing which messages are tied to different errors.
+                e.messages.push("---".to_string());
                 e.messages.append(&mut other_err.messages);
             }
             return Err(e);
@@ -197,6 +207,7 @@ impl<T, E: Into<Error>> ResultExt<T> for Result<T, E> {
 }
 
 impl<T> ResultExt<T> for Option<T> {
+    #[inline]
     fn err_tip_with_code<F, S>(self, tip_fn: F) -> Result<T, Error>
     where
         Self: Sized,
@@ -312,6 +323,22 @@ impl From<std::io::ErrorKind> for Code {
             std::io::ErrorKind::Other => Code::Internal,
             std::io::ErrorKind::UnexpectedEof => Code::Internal,
             _ => Code::Unknown,
+        }
+    }
+}
+
+impl From<Code> for std::io::ErrorKind {
+    fn from(kind: Code) -> Self {
+        match kind {
+            Code::Aborted => std::io::ErrorKind::Interrupted,
+            Code::AlreadyExists => std::io::ErrorKind::AlreadyExists,
+            Code::DeadlineExceeded => std::io::ErrorKind::TimedOut,
+            Code::Internal => std::io::ErrorKind::Other,
+            Code::InvalidArgument => std::io::ErrorKind::InvalidInput,
+            Code::NotFound => std::io::ErrorKind::NotFound,
+            Code::PermissionDenied => std::io::ErrorKind::PermissionDenied,
+            Code::Unavailable => std::io::ErrorKind::ConnectionRefused,
+            _ => std::io::ErrorKind::Other,
         }
     }
 }

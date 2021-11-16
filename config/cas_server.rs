@@ -40,12 +40,6 @@ pub struct ByteStreamConfig {
     /// Name of the store in the "stores" configuration.
     pub cas_stores: HashMap<InstanceName, StoreRefName>,
 
-    // Buffer size for transferring data between grpc endpoint and store.
-    pub write_buffer_stream_size: usize,
-
-    // Buffer size for transferring data between store and grpc endpoint.
-    pub read_buffer_stream_size: usize,
-
     // Max number of bytes to send on each grpc stream chunk.
     pub max_bytes_per_stream: usize,
 }

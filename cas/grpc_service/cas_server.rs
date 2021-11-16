@@ -3,14 +3,12 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::convert::TryInto;
-use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 
+use bytes::Bytes;
 use futures::{stream::Stream, FutureExt, StreamExt};
-use tonic::{Request, Response, Status};
-
 use proto::build::bazel::remote::execution::v2::{
     batch_read_blobs_response, batch_update_blobs_response,
     content_addressable_storage_server::ContentAddressableStorage,
@@ -19,11 +17,12 @@ use proto::build::bazel::remote::execution::v2::{
     FindMissingBlobsResponse, GetTreeRequest, GetTreeResponse,
 };
 use proto::google::rpc::Status as GrpcStatus;
+use tonic::{Request, Response, Status};
 
 use common::{log, DigestInfo};
 use config::cas_server::{CasStoreConfig, InstanceName};
-use error::{error_if, make_input_err, Error, ResultExt};
-use store::{Store, StoreManager, UploadSizeInfo};
+use error::{error_if, make_input_err, Code, Error, ResultExt};
+use store::{Store, StoreManager};
 
 pub struct CasServer {
     stores: HashMap<String, Arc<dyn Store>>,
@@ -106,10 +105,8 @@ impl CasServer {
                         size_bytes,
                         request_data.len()
                     );
-                    let cursor = Box::new(Cursor::new(request_data));
-                    let store = Pin::new(store_owned.as_ref());
-                    store
-                        .update(digest_copy, cursor, UploadSizeInfo::ExactSize(size_bytes))
+                    Pin::new(store_owned.as_ref())
+                        .update_oneshot(digest_copy, request_data)
                         .await
                         .err_tip(|| "Error writing to store")
                 }
@@ -147,20 +144,29 @@ impl CasServer {
                     let size_bytes = usize::try_from(digest_copy.size_bytes)
                         .err_tip(|| "Digest size_bytes was not convertible to usize")?;
                     // TODO(allada) There is a security risk here of someone taking all the memory on the instance.
-                    let mut store_data = Vec::with_capacity(size_bytes);
-                    let store = Pin::new(store_owned.as_ref());
-                    store
-                        .get(digest_copy, &mut Cursor::new(&mut store_data))
+                    let store_data = Pin::new(store_owned.as_ref())
+                        .get_part_unchunked(digest_copy, 0, None, Some(size_bytes))
                         .await
                         .err_tip(|| "Error reading from store")?;
                     Ok(store_data)
                 }
-                .map(|result: Result<Vec<u8>, Error>| {
-                    let (status, data) = result.map_or_else(|e| (e.into(), vec![]), |v| (GrpcStatus::default(), v));
+                .map(|result: Result<Bytes, Error>| {
+                    let (status, data) = result.map_or_else(
+                        |mut e| {
+                            if e.code == Code::NotFound {
+                                // Trim the error code. Not Found is quite common and we don't want to send a large
+                                // error (debug) message for something that is common. We resize to just the last
+                                // message as it will be the most relevant.
+                                e.messages.resize_with(1, || "".to_string());
+                            }
+                            (e.into(), Bytes::new())
+                        },
+                        |v| (GrpcStatus::default(), v),
+                    );
                     batch_read_blobs_response::Response {
                         status: Some(status),
                         digest: Some(digest.into()),
-                        data: data,
+                        data,
                     }
                 }),
             ));

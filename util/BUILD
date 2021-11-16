@@ -6,11 +6,11 @@ rust_library(
     name = "error",
     srcs = ["error.rs"],
     deps = [
+        "//proto",
         "//third_party:hex",
         "//third_party:prost",
         "//third_party:tokio",
         "//third_party:tonic",
-        "//proto",
     ],
     visibility = ["//visibility:public"],
 )
@@ -78,6 +78,19 @@ rust_library(
 )
 
 rust_library(
+    name = "buf_channel",
+    srcs = ["buf_channel.rs"],
+    deps = [
+        "//third_party:bytes",
+        "//third_party:futures",
+        "//third_party:tokio",
+        "//third_party:tokio_util",
+        ":error",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+rust_library(
     name = "fastcdc",
     srcs = ["fastcdc.rs"],
     deps = [
@@ -140,5 +153,18 @@ rust_test(
         "//third_party:tokio",
         ":error",
         ":retry",
+    ],
+)
+
+rust_test(
+    name = "buf_channel_test",
+    srcs = ["tests/buf_channel_test.rs"],
+    deps = [
+        "//third_party:bytes",
+        "//third_party:futures",
+        "//third_party:pretty_assertions",
+        "//third_party:tokio",
+        ":buf_channel",
+        ":error",
     ],
 )

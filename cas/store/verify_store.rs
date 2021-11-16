@@ -1,16 +1,14 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::convert::TryFrom;
-use std::marker::Send;
 use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use hex;
 use sha2::{Digest, Sha256};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, WriteHalf};
 
-use async_fixed_buffer::AsyncFixedBuf;
+use buf_channel::{make_buf_channel_pair, DropCloserReadHalf, DropCloserWriteHalf};
 use common::DigestInfo;
 use error::{error_if, Error, ResultExt};
 use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
@@ -35,54 +33,55 @@ impl VerifyStore {
     }
 }
 
-async fn inner_check_update<'a>(
-    mut tx: WriteHalf<AsyncFixedBuf<Box<[u8]>>>,
-    mut reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'a>,
+async fn inner_check_update(
+    mut tx: DropCloserWriteHalf,
+    mut rx: DropCloserReadHalf,
     size_info: UploadSizeInfo,
     mut maybe_hasher: Option<([u8; 32], Sha256)>,
 ) -> Result<(), Error> {
-    let mut buffer = vec![0u8; 1024 * 4];
-    let mut sum_size: usize = 0;
+    let mut sum_size: u64 = 0;
     loop {
-        let sz = reader
-            .read(&mut buffer[..])
+        let chunk = rx
+            .recv()
             .await
-            .err_tip(|| "Stream read terminated early")?;
-        sum_size += sz;
-        let write_future = tx.write_all(&buffer[0..sz]);
-        // This will allows us to hash while sending data to another thread.
-        if let Some((_, hasher)) = maybe_hasher.as_mut() {
-            hasher.update(&buffer[0..sz]);
-        }
-        write_future.await.err_tip(|| "Failed to write to underlying store")?;
-        if sz != 0 {
-            continue;
-        }
-        if let UploadSizeInfo::ExactSize(expected_size) = size_info {
-            error_if!(
-                sum_size != expected_size,
-                "Expected size {} but got size {} on insert",
-                expected_size,
-                sum_size
-            );
-        }
-        if let Some((original_hash, hasher)) = maybe_hasher {
-            let hash_result: [u8; 32] = hasher.finalize().into();
-            error_if!(
-                original_hash != hash_result,
-                "Hashes do not match, got: {} but digest hash was {}",
-                hex::encode(original_hash),
-                hex::encode(hash_result),
-            );
+            .err_tip(|| "Failed to reach chunk in check_update in verify store")?;
+        sum_size += chunk.len() as u64;
+
+        if chunk.len() == 0 {
+            // Is EOF.
+            if let UploadSizeInfo::ExactSize(expected_size) = size_info {
+                error_if!(
+                    sum_size != expected_size as u64,
+                    "Expected size {} but got size {} on insert",
+                    expected_size,
+                    sum_size
+                );
+            }
+            if let Some((original_hash, hasher)) = maybe_hasher {
+                let hash_result: [u8; 32] = hasher.finalize().into();
+                error_if!(
+                    original_hash != hash_result,
+                    "Hashes do not match, got: {} but digest hash was {}",
+                    hex::encode(original_hash),
+                    hex::encode(hash_result),
+                );
+            }
+            tx.send_eof().await.err_tip(|| "In verify_store::check_update")?;
+            break;
         }
 
-        // Note: EOF is not sent from write_all() only sent in write().
-        tx.write(&vec![]).await.err_tip(|| "Failed to write EOF byte")?;
-        tx.shutdown()
+        // This will allows us to hash while sending data to another thread.
+        let write_future = tx.send(chunk.clone());
+
+        if let Some((_, hasher)) = maybe_hasher.as_mut() {
+            hasher.update(chunk.as_ref());
+        }
+
+        write_future
             .await
-            .err_tip(|| "Failed to shutdown underlying verify_size stream")?;
-        return Ok(());
+            .err_tip(|| "Failed to write chunk to inner store in verify store")?;
     }
+    Ok(())
 }
 
 #[async_trait]
@@ -94,7 +93,7 @@ impl StoreTrait for VerifyStore {
     fn update<'a>(
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
-        reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
+        reader: DropCloserReadHalf,
         size_info: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
@@ -108,36 +107,27 @@ impl StoreTrait for VerifyStore {
                     digest.size_bytes
                 );
             }
-            let mut raw_fixed_buffer = AsyncFixedBuf::new(vec![0u8; 1024 * 4].into_boxed_slice());
-            let stream_closer_fut = raw_fixed_buffer.get_closer();
-            let (rx, tx) = tokio::io::split(raw_fixed_buffer);
 
-            let hash_copy = digest.packed_hash;
-            let inner_store_clone = self.inner_store.clone();
-            let spawn_future = tokio::spawn(async move {
-                Pin::new(inner_store_clone.as_ref())
-                    .update(digest, Box::new(rx), size_info)
-                    .await
-            });
             let mut hasher = None;
             if self.verify_hash {
-                hasher = Some((hash_copy, Sha256::new()));
+                hasher = Some((digest.packed_hash, Sha256::new()));
             }
-            let result = inner_check_update(tx, reader, size_info, hasher).await;
-            stream_closer_fut.await;
-            result.merge(
-                spawn_future
-                    .await
-                    .err_tip(|| "Failed to join verify size spawn")
-                    .and_then(|v| v),
-            )
+
+            let (tx, rx) = make_buf_channel_pair();
+
+            let update_fut = self.pin_inner().update(digest, rx, size_info);
+            let check_fut = inner_check_update(tx, reader, size_info, hasher);
+
+            let (update_res, check_res) = tokio::join!(update_fut, check_fut);
+
+            update_res.merge(check_res)
         })
     }
 
     fn get_part<'a>(
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
-        writer: &'a mut (dyn AsyncWrite + Send + Unpin + Sync),
+        writer: DropCloserWriteHalf,
         offset: usize,
         length: Option<usize>,
     ) -> ResultFuture<'a, ()> {
