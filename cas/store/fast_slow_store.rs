@@ -1,23 +1,16 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
-use std::marker::Send;
 use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::BytesMut;
-use futures::future::{join, try_join3};
-use futures::FutureExt;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use futures::{join, FutureExt};
 
-use async_fixed_buffer::AsyncFixedBuf;
+use buf_channel::{make_buf_channel_pair, DropCloserReadHalf, DropCloserWriteHalf};
 use common::DigestInfo;
 use config;
-use error::{make_err, Code, ResultExt};
+use error::{make_err, Code, Error, ResultExt};
 use traits::{ResultFuture, StoreTrait, UploadSizeInfo};
-
-// Note: If this value is updated, you must also update documentation in backends.rs.
-const DEFAULT_BUFFER_SIZE: usize = 8 * 1024;
 
 // TODO(blaise.bruer) This store needs to be evaluated for more efficient memory usage,
 // there are many copies happening internally.
@@ -29,24 +22,15 @@ const DEFAULT_BUFFER_SIZE: usize = 8 * 1024;
 pub struct FastSlowStore {
     fast_store: Arc<dyn StoreTrait>,
     slow_store: Arc<dyn StoreTrait>,
-    buffer_size: usize,
 }
 
 impl FastSlowStore {
     pub fn new(
-        config: &config::backends::FastSlowStore,
+        _config: &config::backends::FastSlowStore,
         fast_store: Arc<dyn StoreTrait>,
         slow_store: Arc<dyn StoreTrait>,
     ) -> Self {
-        let mut buffer_size = config.buffer_size as usize;
-        if buffer_size == 0 {
-            buffer_size = DEFAULT_BUFFER_SIZE;
-        }
-        Self {
-            fast_store,
-            slow_store,
-            buffer_size,
-        }
+        Self { fast_store, slow_store }
     }
 
     fn pin_fast_store<'a>(&'a self) -> std::pin::Pin<&'a dyn StoreTrait> {
@@ -74,63 +58,56 @@ impl StoreTrait for FastSlowStore {
     fn update<'a>(
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
-        mut reader: Box<dyn AsyncRead + Send + Sync + Unpin + 'static>,
+        mut reader: DropCloserReadHalf,
         size_info: UploadSizeInfo,
     ) -> ResultFuture<'a, ()> {
         Box::pin(async move {
-            let (fast_rx, mut fast_tx) = AsyncFixedBuf::new(vec![0u8; self.buffer_size]).split_into_reader_writer();
-            let (slow_rx, mut slow_tx) = AsyncFixedBuf::new(vec![0u8; self.buffer_size]).split_into_reader_writer();
+            let (mut fast_tx, fast_rx) = make_buf_channel_pair();
+            let (mut slow_tx, slow_rx) = make_buf_channel_pair();
 
             let data_stream_fut = async move {
-                let mut buffer = BytesMut::with_capacity(self.buffer_size);
                 loop {
-                    reader
-                        .read_buf(&mut buffer)
+                    let buffer = reader
+                        .recv()
                         .await
                         .err_tip(|| "Failed to read buffer in fastslow store")?;
-                    if buffer.is_empty() {
+                    if buffer.len() == 0 {
                         // EOF received.
                         fast_tx
-                            .write(&[])
+                            .send_eof()
                             .await
                             .err_tip(|| "Failed to write eof to fast store in fast_slow store update")?;
                         slow_tx
-                            .write(&[])
+                            .send_eof()
                             .await
                             .err_tip(|| "Failed to write eof to writer in fast_slow store update")?;
-                        return Ok(());
+                        return Result::<(), Error>::Ok(());
                     }
 
-                    let mut fast_tx_buf = buffer.split().freeze();
-                    let mut slow_tx_buf = fast_tx_buf.clone();
-
-                    let fast_send_fut = fast_tx.write_all_buf(&mut fast_tx_buf);
-                    let slow_send_fut = slow_tx.write_all_buf(&mut slow_tx_buf);
-
-                    let (fast_result, slow_result) = join(fast_send_fut, slow_send_fut).await;
-                    fast_result.map_err(|e| {
-                        make_err!(
-                            Code::Internal,
-                            "Failed to send message to fast_store in fast_slow_store {:?}",
-                            e
-                        )
-                    })?;
-                    slow_result.map_err(|e| {
-                        make_err!(
-                            Code::Internal,
-                            "Failed to send message to slow_store in fast_slow store {:?}",
-                            e
-                        )
-                    })?;
+                    let (fast_result, slow_result) = join!(fast_tx.send(buffer.clone()), slow_tx.send(buffer));
+                    fast_result
+                        .map_err(|e| {
+                            make_err!(
+                                Code::Internal,
+                                "Failed to send message to fast_store in fast_slow_store {:?}",
+                                e
+                            )
+                        })
+                        .merge(slow_result.map_err(|e| {
+                            make_err!(
+                                Code::Internal,
+                                "Failed to send message to slow_store in fast_slow store {:?}",
+                                e
+                            )
+                        }))?;
                 }
             };
 
-            let fast_store_fut = self
-                .pin_slow_store()
-                .update(digest.clone(), Box::new(fast_rx), size_info);
-            let slow_store_fut = self.pin_fast_store().update(digest, Box::new(slow_rx), size_info);
+            let fast_store_fut = self.pin_slow_store().update(digest.clone(), fast_rx, size_info);
+            let slow_store_fut = self.pin_fast_store().update(digest, slow_rx, size_info);
 
-            try_join3(data_stream_fut, fast_store_fut, slow_store_fut).await?;
+            let (data_stream_res, fast_res, slow_res) = join!(data_stream_fut, fast_store_fut, slow_store_fut);
+            data_stream_res.merge(fast_res).merge(slow_res)?;
             Ok(())
         })
     }
@@ -138,7 +115,7 @@ impl StoreTrait for FastSlowStore {
     fn get_part<'a>(
         self: std::pin::Pin<&'a Self>,
         digest: DigestInfo,
-        writer: &'a mut (dyn AsyncWrite + Send + Unpin + Sync),
+        mut writer: DropCloserWriteHalf,
         offset: usize,
         length: Option<usize>,
     ) -> ResultFuture<'a, ()> {
@@ -170,34 +147,29 @@ impl StoreTrait for FastSlowStore {
                 Err(err) => return Err(err),
             };
 
-            let (fast_rx, mut fast_tx) = AsyncFixedBuf::new(vec![0u8; self.buffer_size]).split_into_reader_writer();
-            let (mut slow_rx, mut slow_tx) = AsyncFixedBuf::new(vec![0u8; self.buffer_size]).split_into_reader_writer();
+            let (mut fast_tx, fast_rx) = make_buf_channel_pair();
+            let (slow_tx, mut slow_rx) = make_buf_channel_pair();
             let data_stream_fut = async move {
-                let mut writer_pin = Pin::new(writer);
-                let mut output_buf = BytesMut::new();
+                let mut writer_pin = Pin::new(&mut writer);
                 loop {
-                    println!("ASDF");
-                    slow_rx
-                        .read_buf(&mut output_buf)
+                    let output_buf = slow_rx
+                        .recv()
                         .await
                         .err_tip(|| "Failed to read data data buffer from slow store")?;
-                    if output_buf.is_empty() {
+                    if output_buf.len() == 0 {
                         // Write out our EOF.
                         // It is possible for the client to disconnect the stream because they got
                         // all the data they wanted, which could lead to an error when writing this
                         // EOF. If that was to happen, we could end up terminating this early and
                         // the resulting upload to the fast store might fail.
-                        let _ = fast_tx.write(&[]).await?;
-                        let _ = writer_pin.write(&[]).await?;
+                        let _ = fast_tx.send_eof().await?;
+                        let _ = writer_pin.send_eof().await?;
                         return Ok(());
                     }
-                    let (fast_tx_res, writer_res) = {
-                        let mut fast_tx_buf = output_buf.split().freeze();
-                        let mut writer_buf = fast_tx_buf.clone();
-                        let fast_write_fut = fast_tx.write_all_buf(&mut fast_tx_buf).boxed();
-                        let writer_fut = writer_pin.write_all_buf(&mut writer_buf).boxed();
-                        join(fast_write_fut, writer_fut).await
-                    };
+                    let (fast_tx_res, writer_res) = join!(
+                        fast_tx.send(output_buf.clone()).boxed(),
+                        writer_pin.send(output_buf).boxed(),
+                    );
                     if let Err(err) = fast_tx_res {
                         return Err(err).err_tip(|| "Failed to write to fast store in fast_slow store");
                     }
@@ -207,10 +179,11 @@ impl StoreTrait for FastSlowStore {
                 }
             };
 
-            let slow_store_fut = slow_store.get(digest.clone(), &mut slow_tx);
-            let fast_store_fut = fast_store.update(digest, Box::new(fast_rx), UploadSizeInfo::ExactSize(sz));
+            let slow_store_fut = slow_store.get(digest.clone(), slow_tx);
+            let fast_store_fut = fast_store.update(digest, fast_rx, UploadSizeInfo::ExactSize(sz));
 
-            try_join3(data_stream_fut, slow_store_fut, fast_store_fut).await?;
+            let (data_stream_res, slow_res, fast_res) = join!(data_stream_fut, slow_store_fut, fast_store_fut);
+            data_stream_res.merge(fast_res).merge(slow_res)?;
             Ok(())
         })
     }

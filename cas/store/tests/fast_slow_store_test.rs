@@ -1,6 +1,5 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
-use std::io::Cursor;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -9,7 +8,7 @@ use config;
 use error::Error;
 use memory_store::MemoryStore;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
-use traits::{StoreTrait, UploadSizeInfo};
+use traits::StoreTrait;
 
 use fast_slow_store::FastSlowStore;
 
@@ -22,7 +21,6 @@ fn make_stores() -> (Arc<impl StoreTrait>, Arc<impl StoreTrait>, Arc<impl StoreT
         &config::backends::FastSlowStore {
             fast: config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
             slow: config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
-            buffer_size: Default::default(),
         },
         fast_store.clone(),
         slow_store.clone(),
@@ -49,10 +47,9 @@ async fn check_data<S: StoreTrait>(
         debug_name
     );
 
-    let mut store_data = Vec::new();
-    check_store.get(digest.clone(), &mut store_data).await?;
+    let store_data = check_store.get_part_unchunked(digest.clone(), 0, None, None).await?;
     assert_eq!(
-        &store_data, original_data,
+        store_data, original_data,
         "Expected data to match in {} store",
         debug_name
     );
@@ -74,11 +71,7 @@ mod fast_slow_store_tests {
         let original_data = make_random_data(20 * MEGABYTE_SZ);
         let digest = DigestInfo::try_new(&VALID_HASH, 100).unwrap();
         store
-            .update(
-                digest.clone(),
-                Box::new(Cursor::new(original_data.clone())),
-                UploadSizeInfo::ExactSize(original_data.len()),
-            )
+            .update_oneshot(digest.clone(), original_data.clone().into())
             .await?;
 
         check_data(store, digest.clone(), &original_data, "fast_slow").await?;
@@ -98,11 +91,7 @@ mod fast_slow_store_tests {
         let original_data = make_random_data(MEGABYTE_SZ);
         let digest = DigestInfo::try_new(&VALID_HASH, 100).unwrap();
         slow_store
-            .update(
-                digest.clone(),
-                Box::new(Cursor::new(original_data.clone())),
-                UploadSizeInfo::ExactSize(original_data.len()),
-            )
+            .update_oneshot(digest.clone(), original_data.clone().into())
             .await?;
 
         assert_eq!(fast_slow_store.has(digest.clone()).await, Ok(Some(original_data.len())));
@@ -110,8 +99,9 @@ mod fast_slow_store_tests {
         assert_eq!(slow_store.has(digest.clone()).await, Ok(Some(original_data.len())));
 
         // This get() request should place the data in fast_store too.
-        let mut store_data = Vec::new();
-        fast_slow_store.get(digest.clone(), &mut store_data).await?;
+        fast_slow_store
+            .get_part_unchunked(digest.clone(), 0, None, None)
+            .await?;
 
         // Now the data should exist in all the stores.
         check_data(fast_store, digest.clone(), &original_data, "fast_store").await?;
@@ -130,17 +120,12 @@ mod fast_slow_store_tests {
         let original_data = make_random_data(MEGABYTE_SZ);
         let digest = DigestInfo::try_new(&VALID_HASH, 100).unwrap();
         slow_store
-            .update(
-                digest.clone(),
-                Box::new(Cursor::new(original_data.clone())),
-                UploadSizeInfo::ExactSize(original_data.len()),
-            )
+            .update_oneshot(digest.clone(), original_data.clone().into())
             .await?;
 
         // This get() request should place the data in fast_store too.
-        let mut store_data = Vec::new();
         fast_slow_store
-            .get_part(digest.clone(), &mut store_data, 0, Some(50))
+            .get_part_unchunked(digest.clone(), 0, Some(50), None)
             .await?;
 
         // Data should not exist in fast store, but should exist in slow store because

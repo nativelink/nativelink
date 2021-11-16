@@ -1,6 +1,5 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
-use std::io::Cursor;
 use std::pin::Pin;
 use std::str::from_utf8;
 use std::sync::{Arc, Mutex};
@@ -30,7 +29,7 @@ use config;
 use error::Error;
 use error::ResultExt;
 use s3_store::S3Store;
-use traits::{StoreTrait, UploadSizeInfo};
+use traits::StoreTrait;
 
 // Should match constant in s3_store.
 const MIN_MULTIPART_SIZE: usize = 5 * 1024 * 1024; // 5mb.
@@ -239,11 +238,7 @@ mod s3_store_tests {
             )?;
             let store_pin = Pin::new(&store);
             store_pin
-                .update(
-                    DigestInfo::try_new(&VALID_HASH1, 199)?,
-                    Box::new(Cursor::new(send_data.clone())),
-                    UploadSizeInfo::ExactSize(199),
-                )
+                .update_oneshot(DigestInfo::try_new(&VALID_HASH1, 199)?, send_data.clone().into())
                 .await?;
         }
 
@@ -291,12 +286,8 @@ mod s3_store_tests {
         )?;
         let store_pin = Pin::new(&store);
 
-        let mut store_data = Vec::new();
-        store_pin
-            .get(
-                DigestInfo::try_new(&VALID_HASH1, AC_ENTRY_SIZE)?,
-                &mut Cursor::new(&mut store_data),
-            )
+        let store_data = store_pin
+            .get_part_unchunked(DigestInfo::try_new(&VALID_HASH1, AC_ENTRY_SIZE)?, 0, None, None)
             .await?;
         assert_eq!(
             store_data,
@@ -340,11 +331,11 @@ mod s3_store_tests {
         const OFFSET: usize = 105;
         const LENGTH: usize = 50_000; // Just a size that is not the same as the real data size.
         store_pin
-            .get_part(
+            .get_part_unchunked(
                 DigestInfo::try_new(&VALID_HASH1, AC_ENTRY_SIZE)?,
-                &mut Cursor::new(Vec::new()),
                 OFFSET,
                 Some(LENGTH),
+                None,
             )
             .await?;
 
@@ -416,26 +407,16 @@ mod s3_store_tests {
             Result::<(), Error>::Ok(())
         };
 
-        let mut cursor = Cursor::new(Vec::new());
         let digest = DigestInfo::try_new(&VALID_HASH1, 100).unwrap();
-        let get_part_fut = Pin::new(&store).get_part(digest, &mut cursor, START_BYTE, None);
+        let get_part_fut = Pin::new(&store).get_part_unchunked(digest, START_BYTE, None, None);
 
         // Now run our test.
         let (get_part_result, send_data_result) = join!(get_part_fut, send_data_fut);
 
-        assert_eq!(get_part_result, Ok(()), "Expected get_part result to be success");
-        assert_eq!(
-            send_data_result,
-            Ok(()),
-            "Expected send_data result result to be success"
-        );
+        send_data_result?;
         // At this point we shutdown the stream 2 times, but sent a little bit each time. We need
         // to make sure it resumed the data properly and at the proper position.
-        assert_eq!(
-            cursor.get_mut()[..],
-            SEND_BYTES[START_BYTE..],
-            "Expected data to match."
-        );
+        assert_eq!(get_part_result?, SEND_BYTES[START_BYTE..], "Expected data to match.");
         Ok(())
     }
 
@@ -470,10 +451,8 @@ mod s3_store_tests {
         )?;
 
         let digest = DigestInfo::try_new(&VALID_HASH1, 100).unwrap();
-        let result = Pin::new(&store)
-            .get_part(digest, &mut Cursor::new(Vec::new()), 0, None)
-            .await;
-        assert_eq!(result, Ok(()), "Expected to find item, got: {:?}", result);
+        let result = Pin::new(&store).get_part_unchunked(digest, 0, None, None).await;
+        assert!(result.is_ok(), "Expected to find item, got: {:?}", result);
         Ok(())
     }
 
@@ -521,10 +500,7 @@ mod s3_store_tests {
                 Box::new(move |_delay| Duration::from_secs(0)),
             )?;
             let store_pin = Pin::new(&store);
-            let data_len = UploadSizeInfo::ExactSize(send_data.len());
-            store_pin
-                .update(digest, Box::new(Cursor::new(send_data.clone())), data_len)
-                .await?;
+            store_pin.update_oneshot(digest, send_data.clone().into()).await?;
         }
 
         // Check requests.

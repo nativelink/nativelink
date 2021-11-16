@@ -86,14 +86,6 @@ pub struct FastSlowStore {
     /// If the object does not exist in the `fast` store it will try to
     /// get it from this store.
     pub slow: StoreConfig,
-
-    /// Buffer size used to shuttle data between the different stores.
-    /// The amount of memory used per request will be apx 3-5x this
-    /// value per `get()` request.
-    ///
-    /// Default: 8192 (8k)
-    #[serde(default)]
-    pub buffer_size: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
