@@ -76,6 +76,15 @@ alias(
 )
 
 alias(
+    name = "filetime",
+    actual = "@raze__filetime__0_2_15//:filetime",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
     name = "fixed_buffer",
     actual = "@raze__fixed_buffer__0_2_3//:fixed_buffer",
     tags = [

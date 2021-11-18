@@ -22,12 +22,14 @@ const HASH2: &str = "9993456789abcdef000000000000000000000000000000000123456789a
 const HASH3: &str = "7773456789abcdef000000000000000000000000000000000123456789abc777";
 const BAD_HASH: &str = "BAD_HASH";
 
-fn make_store_manager() -> Result<StoreManager, Error> {
+async fn make_store_manager() -> Result<StoreManager, Error> {
     let mut store_manager = StoreManager::new();
-    store_manager.make_store(
-        "main_cas",
-        &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
-    )?;
+    store_manager
+        .make_store(
+            "main_cas",
+            &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+        )
+        .await?;
     Ok(store_manager)
 }
 
@@ -51,7 +53,7 @@ mod find_missing_blobs {
 
     #[tokio::test]
     async fn empty_store() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let cas_server = make_cas_server(&mut store_manager)?;
 
         let raw_response = cas_server
@@ -71,7 +73,7 @@ mod find_missing_blobs {
 
     #[tokio::test]
     async fn store_one_item_existence() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let cas_server = make_cas_server(&mut store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
@@ -98,7 +100,7 @@ mod find_missing_blobs {
 
     #[tokio::test]
     async fn has_three_requests_one_bad_hash() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let cas_server = make_cas_server(&mut store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
@@ -148,7 +150,7 @@ mod batch_update_blobs {
 
     #[tokio::test]
     async fn update_existing_item() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let cas_server = make_cas_server(&mut store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
@@ -214,7 +216,7 @@ mod batch_read_blobs {
 
     #[tokio::test]
     async fn batch_read_blobs_read_two_blobs_success_one_fail() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let cas_server = make_cas_server(&mut store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
@@ -308,7 +310,7 @@ mod end_to_end {
 
     #[tokio::test]
     async fn batch_update_blobs_two_items_existence_with_third_missing() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let cas_server = make_cas_server(&mut store_manager)?;
 
         const VALUE1: &str = "1";

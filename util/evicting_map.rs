@@ -1,8 +1,10 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::ops::DerefMut;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use async_trait::async_trait;
 use fast_async_mutex::mutex::Mutex;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
@@ -10,11 +12,9 @@ use serde::{Deserialize, Serialize};
 use common::{DigestInfo, SerializableDigestInfo};
 use config::backends::EvictionPolicy;
 
-type LastTouchSinceAnchor = u32;
-
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct SerializedLRU {
-    pub data: Vec<(SerializableDigestInfo, LastTouchSinceAnchor)>,
+    pub data: Vec<(SerializableDigestInfo, i32)>,
     pub anchor_time: u64,
 }
 
@@ -41,29 +41,47 @@ impl InstantWrapper for SystemTime {
 }
 
 struct EvictionItem<T: LenEntry> {
-    seconds_since_anchor: u32,
+    seconds_since_anchor: i32,
     data: T,
 }
 
+#[async_trait]
 pub trait LenEntry {
-    // Length of referenced data.
+    /// Length of referenced data.
     fn len(&self) -> usize;
 
-    // This will be called when object is removed from map.
-    // Note: There may still be a reference to it held somewhere else, which
-    // is why it can't be mutable. This is a good place to mark the item
-    // to be deleted and then in the Drop call actually do the deleting.
-    // This will ensure nowhere else in the program still holds a reference
-    // to this object.
-    // Note: You should not rely only on the Drop trait. Doing so might
-    // result in the program safely shutting down and calling the Drop method
-    // on each object, which if you are deleting items you may not want to do.
-    fn unref(&self) {}
+    /// Called when an entry is touched.
+    #[inline]
+    async fn touch(&self) {}
+
+    /// This will be called when object is removed from map.
+    /// Note: There may still be a reference to it held somewhere else, which
+    /// is why it can't be mutable. This is a good place to mark the item
+    /// to be deleted and then in the Drop call actually do the deleting.
+    /// This will ensure nowhere else in the program still holds a reference
+    /// to this object.
+    /// Note: You should not rely only on the Drop trait. Doing so might
+    /// result in the program safely shutting down and calling the Drop method
+    /// on each object, which if you are deleting items you may not want to do.
+    #[inline]
+    async fn unref(&self) {}
 }
 
-impl<T: AsRef<[u8]>> LenEntry for T {
+#[async_trait]
+impl<T: LenEntry + Send + Sync> LenEntry for Arc<T> {
+    #[inline]
     fn len(&self) -> usize {
-        <[u8]>::len(self.as_ref())
+        T::len(self.as_ref())
+    }
+
+    #[inline]
+    async fn touch(&self) {
+        self.as_ref().touch().await
+    }
+
+    #[inline]
+    async fn unref(&self) {
+        self.as_ref().unref().await
     }
 }
 
@@ -76,11 +94,15 @@ pub struct EvictingMap<T: LenEntry, I: InstantWrapper> {
     state: Mutex<State<T>>,
     anchor_time: I,
     max_bytes: u64,
-    max_seconds: u32,
+    max_seconds: i32,
     max_count: u64,
 }
 
-impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
+impl<T, I> EvictingMap<T, I>
+where
+    T: LenEntry + Clone + Send + Sync,
+    I: InstantWrapper,
+{
     pub fn new(config: &EvictionPolicy, anchor_time: I) -> Self {
         EvictingMap {
             // We use unbounded because if we use the bounded version we can't call the delete
@@ -91,7 +113,7 @@ impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
             }),
             anchor_time,
             max_bytes: config.max_bytes as u64,
-            max_seconds: config.max_seconds,
+            max_seconds: config.max_seconds as i32,
             max_count: config.max_count,
         }
     }
@@ -109,7 +131,7 @@ impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
             };
             serialized_lru
                 .data
-                .push((serialized_digest, eviction_item.seconds_since_anchor));
+                .push((serialized_digest, eviction_item.seconds_since_anchor as i32));
         }
         serialized_lru
     }
@@ -130,14 +152,14 @@ impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
             );
         }
         // Just in case we allow for some cleanup (eg: old items).
-        self.evict_items(state.deref_mut());
+        self.evict_items(state.deref_mut()).await;
     }
 
     fn should_evict(&self, lru_len: usize, peek_entry: &EvictionItem<T>, sum_store_size: u64) -> bool {
         let is_over_size = self.max_bytes != 0 && sum_store_size >= self.max_bytes;
 
         let evict_before_seconds =
-            (self.anchor_time.elapsed().as_secs() as u32).max(self.max_seconds) - self.max_seconds;
+            (self.anchor_time.elapsed().as_secs() as i32).max(self.max_seconds) - self.max_seconds;
         let old_item_exists = self.max_seconds != 0 && peek_entry.seconds_since_anchor < evict_before_seconds;
 
         let is_over_count = self.max_count != 0 && (lru_len as u64) > self.max_count;
@@ -148,7 +170,7 @@ impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
         false
     }
 
-    fn evict_items(&self, state: &mut State<T>) {
+    async fn evict_items(&self, state: &mut State<T>) {
         let mut peek_entry = if let Some((_, entry)) = state.lru.peek_lru() {
             entry
         } else {
@@ -157,7 +179,7 @@ impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
         while self.should_evict(state.lru.len(), peek_entry, state.sum_store_size) {
             let (_, eviction_item) = state.lru.pop_lru().expect("Tried to peek() then pop() but failed");
             state.sum_store_size -= eviction_item.data.len() as u64;
-            eviction_item.data.unref();
+            eviction_item.data.unref().await;
 
             peek_entry = if let Some((_, entry)) = state.lru.peek_lru() {
                 entry
@@ -170,8 +192,11 @@ impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
     pub async fn size_for_key(&self, digest: &DigestInfo) -> Option<usize> {
         let mut state = self.state.lock().await;
         if let Some(mut entry) = state.lru.get_mut(digest) {
-            entry.seconds_since_anchor = self.anchor_time.elapsed().as_secs() as u32;
-            return Some(entry.data.len());
+            entry.seconds_since_anchor = self.anchor_time.elapsed().as_secs() as i32;
+            let data = entry.data.clone();
+            drop(state);
+            data.touch().await;
+            return Some(data.len());
         }
         None
     }
@@ -179,25 +204,33 @@ impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
     pub async fn get(&self, digest: &DigestInfo) -> Option<T> {
         let mut state = self.state.lock().await;
         if let Some(mut entry) = state.lru.get_mut(digest) {
-            entry.seconds_since_anchor = self.anchor_time.elapsed().as_secs() as u32;
-            return Some(entry.data.clone());
+            entry.seconds_since_anchor = self.anchor_time.elapsed().as_secs() as i32;
+            let data = entry.data.clone();
+            drop(state);
+            data.touch().await;
+            return Some(data);
         }
         None
     }
 
     pub async fn insert(&self, digest: DigestInfo, data: T) {
+        self.insert_with_time(digest, data, self.anchor_time.elapsed().as_secs() as i32)
+            .await
+    }
+
+    pub async fn insert_with_time(&self, digest: DigestInfo, data: T, seconds_since_anchor: i32) {
         let new_item_size = data.len() as u64;
         let eviction_item = EvictionItem {
-            seconds_since_anchor: self.anchor_time.elapsed().as_secs() as u32,
+            seconds_since_anchor,
             data,
         };
         let mut state = self.state.lock().await;
         if let Some(old_item) = state.lru.put(digest.into(), eviction_item) {
             state.sum_store_size -= old_item.data.len() as u64;
-            old_item.data.unref();
+            old_item.data.unref().await;
         }
         state.sum_store_size += new_item_size;
-        self.evict_items(state.deref_mut());
+        self.evict_items(state.deref_mut()).await;
     }
 
     pub async fn remove(&self, digest: &DigestInfo) -> bool {
@@ -205,7 +238,7 @@ impl<T: LenEntry + Clone, I: InstantWrapper> EvictingMap<T, I> {
         if let Some(entry) = state.lru.pop(digest) {
             state.sum_store_size -= entry.data.len() as u64;
             drop(state);
-            entry.data.unref();
+            entry.data.unref().await;
             return true;
         }
         false

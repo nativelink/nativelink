@@ -51,6 +51,7 @@ rust_library(
         "//third_party:serde",
         "//util:common",
     ],
+    proc_macro_deps = ["//third_party:async_trait"],
     visibility = ["//visibility:public"],
 )
 

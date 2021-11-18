@@ -19,12 +19,14 @@ use store::StoreManager;
 const INSTANCE_NAME: &str = "foo_instance_name";
 const HASH1: &str = "0123456789abcdef000000000000000000000000000000000123456789abcdef";
 
-fn make_store_manager() -> Result<StoreManager, Error> {
+async fn make_store_manager() -> Result<StoreManager, Error> {
     let mut store_manager = StoreManager::new();
-    store_manager.make_store(
-        "main_cas",
-        &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
-    )?;
+    store_manager
+        .make_store(
+            "main_cas",
+            &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+        )
+        .await?;
     Ok(store_manager)
 }
 
@@ -87,7 +89,7 @@ pub mod write_tests {
 
     #[tokio::test]
     pub async fn chunked_stream_receives_all_data() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let bs_server = make_bytestream_server(&mut store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
@@ -181,7 +183,7 @@ pub mod read_tests {
 
     #[tokio::test]
     pub async fn chunked_stream_reads_small_set_of_data() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let bs_server = make_bytestream_server(&mut store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
@@ -221,7 +223,7 @@ pub mod read_tests {
 
     #[tokio::test]
     pub async fn chunked_stream_reads_10mb_of_data() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let bs_server = make_bytestream_server(&mut store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
@@ -267,7 +269,7 @@ pub mod read_tests {
     /// stream was never shutdown.
     #[tokio::test]
     pub async fn read_with_not_found_does_not_deadlock() -> Result<(), Error> {
-        let mut store_manager = make_store_manager().err_tip(|| "Couldn't get store manager")?;
+        let mut store_manager = make_store_manager().await.err_tip(|| "Couldn't get store manager")?;
         let mut read_stream = {
             let bs_server = make_bytestream_server(&mut store_manager).err_tip(|| "Couldn't make store")?;
             let read_request = ReadRequest {
@@ -327,7 +329,7 @@ pub mod query_tests {
 
     #[tokio::test]
     pub async fn test_query_write_status_smoke_test() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let bs_server = Arc::new(make_bytestream_server(&mut store_manager)?);
 
         let raw_data = "12456789abcdefghijk".as_bytes();
