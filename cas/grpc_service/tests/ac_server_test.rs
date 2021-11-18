@@ -31,16 +31,20 @@ async fn insert_into_store<T: Message>(
     Ok(digest.size_bytes)
 }
 
-fn make_store_manager() -> Result<StoreManager, Error> {
+async fn make_store_manager() -> Result<StoreManager, Error> {
     let mut store_manager = StoreManager::new();
-    store_manager.make_store(
-        "main_cas",
-        &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
-    )?;
-    store_manager.make_store(
-        "main_ac",
-        &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
-    )?;
+    store_manager
+        .make_store(
+            "main_cas",
+            &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+        )
+        .await?;
+    store_manager
+        .make_store(
+            "main_ac",
+            &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+        )
+        .await?;
     Ok(store_manager)
 }
 
@@ -79,7 +83,7 @@ mod get_action_result {
 
     #[tokio::test]
     async fn empty_store() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let ac_server = make_ac_server(&mut store_manager)?;
 
         let raw_response = get_action_result(&ac_server, HASH1, 0).await;
@@ -95,7 +99,7 @@ mod get_action_result {
 
     #[tokio::test]
     async fn has_single_item() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let ac_server = make_ac_server(&mut store_manager)?;
         let ac_store_owned = store_manager.get_store("main_ac").unwrap();
 
@@ -113,7 +117,7 @@ mod get_action_result {
 
     #[tokio::test]
     async fn single_item_wrong_digest_size() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let ac_server = make_ac_server(&mut store_manager)?;
         let ac_store_owned = store_manager.get_store("main_ac").unwrap();
 
@@ -165,7 +169,7 @@ mod update_action_result {
 
     #[tokio::test]
     async fn one_item_update_test() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager()?;
+        let mut store_manager = make_store_manager().await?;
         let ac_server = make_ac_server(&mut store_manager)?;
         let ac_store_owned = store_manager.get_store("main_ac").unwrap();
 

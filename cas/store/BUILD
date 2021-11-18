@@ -7,10 +7,12 @@ rust_library(
     srcs = ["lib.rs"],
     deps = [
         "//config",
+        "//third_party:futures",
         "//util:error",
         ":compression_store",
         ":dedup_store",
         ":fast_slow_store",
+        ":filesystem_store",
         ":memory_store",
         ":s3_store",
         ":traits",
@@ -149,6 +151,27 @@ rust_library(
     visibility = ["//cas:__pkg__"]
 )
 
+rust_library(
+    name = "filesystem_store",
+    srcs = ["filesystem_store.rs"],
+    deps = [
+        "//config",
+        "//third_party:bytes",
+        "//third_party:filetime",
+        "//third_party:futures",
+        "//third_party:rand",
+        "//third_party:tokio",
+        "//third_party:tokio_stream",
+        "//util:buf_channel",
+        "//util:common",
+        "//util:error",
+        "//util:evicting_map",
+        ":traits",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+    visibility = ["//cas:__pkg__"]
+)
+
 rust_test(
     name = "fast_slow_store_test",
     srcs = ["tests/fast_slow_store_test.rs"],
@@ -248,6 +271,23 @@ rust_test(
         "//util:common",
         "//util:error",
         ":memory_store",
+        ":traits",
+    ],
+)
+
+
+rust_test(
+    name = "filesystem_store_test",
+    srcs = ["tests/filesystem_store_test.rs"],
+    deps = [
+        "//config",
+        "//third_party:filetime",
+        "//third_party:pretty_assertions",
+        "//third_party:rand",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":filesystem_store",
         ":traits",
     ],
 )

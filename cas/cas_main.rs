@@ -29,6 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (name, store_cfg) in cfg.stores {
         store_manager
             .make_store(&name, &store_cfg)
+            .await
             .err_tip(|| format!("Failed to create store '{}'", name))?;
     }
 

@@ -7,9 +7,11 @@
             "index_store": {
               "fast_slow": {
                 "fast": {
-                  "memory": {
+                  "filesystem": {
+                    "content_path": "/tmp/bazel_cache/content_path-index",
+                    "temp_path": "/tmp/bazel_cache/tmp_path-index",
                     "eviction_policy": {
-                      // 32mb.
+                      // 100mb.
                       "max_bytes": 100000000,
                     }
                   }
@@ -23,7 +25,8 @@
                       "max_retries": 6,
                       "delay": 0.3,
                       "jitter": 0.5,
-                    }
+                    },
+                    "additional_max_concurrent_requests": 10
                   }
                 }
               }
@@ -36,10 +39,12 @@
                 "backend": {
                   "fast_slow": {
                     "fast": {
-                      "memory": {
+                      "filesystem": {
+                        "content_path": "/tmp/bazel_cache/content_path-content",
+                        "temp_path": "/tmp/bazel_cache/tmp_path-content",
                         "eviction_policy": {
-                          // 900mb.
-                          "max_bytes": 900000000,
+                          // 10gb.
+                          "max_bytes": 10000000000,
                         }
                       }
                     },
@@ -52,7 +57,8 @@
                           "max_retries": 6,
                           "delay": 0.3,
                           "jitter": 0.5,
-                        }
+                        },
+                        "additional_max_concurrent_requests": 10
                       }
                     }
                   }
@@ -66,20 +72,37 @@
       }
     },
     "AC_MAIN_STORE": {
-      // "memory": {
-      //   "eviction_policy": {
-      //     // 100mb.
-      //     "max_bytes": 100000000,
-      //   }
-      // }
-      "s3_store": {
-        "region": "us-west-1",
-        "bucket": "blaisebruer-cas-store",
-        "key_prefix": "test-prefix-ac/",
-        "retry": {
-          "max_retries": 6,
-          "delay": 0.3,
-          "jitter": 0.1,
+      "backend": {
+        "fast_slow": {
+          "fast": {
+            // "memory": {
+            //   "eviction_policy": {
+            //     // 100mb.
+            //     "max_bytes": 100000000,
+            //   }
+            // }
+            "filesystem": {
+              "content_path": "/tmp/bazel_cache/content_path-ac",
+              "temp_path": "/tmp/bazel_cache/tmp_path-ac",
+              "eviction_policy": {
+                // 100mb.
+                "max_bytes": 100000000,
+              }
+            }
+          },
+          "slow": {
+            "s3_store": {
+              "region": "us-west-1",
+              "bucket": "blaisebruer-cas-store",
+              "key_prefix": "test-prefix-ac/",
+              "retry": {
+                "max_retries": 6,
+                "delay": 0.3,
+                "jitter": 0.5,
+              },
+              "additional_max_concurrent_requests": 10
+            }
+          }
         }
       }
     }

@@ -10,11 +10,21 @@ use bytes::{Bytes, BytesMut};
 use common::DigestInfo;
 use config;
 use error::{Code, Error, ResultExt};
-use evicting_map::EvictingMap;
+use evicting_map::{EvictingMap, LenEntry};
 use traits::{StoreTrait, UploadSizeInfo};
 
+#[derive(Clone)]
+pub struct BytesWrapper(Bytes);
+
+impl LenEntry for BytesWrapper {
+    #[inline]
+    fn len(&self) -> usize {
+        Bytes::len(&self.0)
+    }
+}
+
 pub struct MemoryStore {
-    map: EvictingMap<Bytes, SystemTime>,
+    map: EvictingMap<BytesWrapper, SystemTime>,
 }
 
 impl MemoryStore {
@@ -62,7 +72,7 @@ impl StoreTrait for MemoryStore {
         } else {
             buffer
         };
-        self.map.insert(digest, buffer).await;
+        self.map.insert(digest, BytesWrapper(buffer)).await;
         Ok(())
     }
 
@@ -82,7 +92,7 @@ impl StoreTrait for MemoryStore {
         let default_len = value.len() - offset;
         let length = length.unwrap_or(default_len).min(default_len);
         writer
-            .send(value.slice(offset..(offset + length)))
+            .send(value.0.slice(offset..(offset + length)))
             .await
             .err_tip(|| "Failed to write data in memory store")?;
         writer

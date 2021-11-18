@@ -442,6 +442,7 @@ dependencies = [
  "clap",
  "env_logger 0.9.0",
  "fast-async-mutex",
+ "filetime",
  "fixed-buffer",
  "futures",
  "hex",
@@ -518,6 +519,18 @@ name = "fast-async-mutex"
 version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b877ceff2e3d2922823bab7960826ce198181f9c25f75d67b913fde9237e2da6"
+
+[[package]]
+name = "filetime"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "975ccf83d8d9d0d84682850a38c8169027be83368805971cc4f238c2b245bc98"
+dependencies = [
+ "cfg-if 1.0.0",
+ "libc",
+ "redox_syscall",
+ "winapi",
+]
 
 [[package]]
 name = "fixed-buffer"

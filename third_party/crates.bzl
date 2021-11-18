@@ -553,6 +553,16 @@ def raze_fetch_remote_crates():
 
     maybe(
         http_archive,
+        name = "raze__filetime__0_2_15",
+        url = "https://crates.io/api/v1/crates/filetime/0.2.15/download",
+        type = "tar.gz",
+        sha256 = "975ccf83d8d9d0d84682850a38c8169027be83368805971cc4f238c2b245bc98",
+        strip_prefix = "filetime-0.2.15",
+        build_file = Label("//third_party/remote:BUILD.filetime-0.2.15.bazel"),
+    )
+
+    maybe(
+        http_archive,
         name = "raze__fixed_buffer__0_2_3",
         url = "https://crates.io/api/v1/crates/fixed-buffer/0.2.3/download",
         type = "tar.gz",

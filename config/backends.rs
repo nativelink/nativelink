@@ -75,6 +75,36 @@ pub enum StoreConfig {
     /// that if an object exists `fast` store it will exist in `slow`
     /// store).
     fast_slow(Box<FastSlowStore>),
+
+    /// Stores the data on the filesystem. This store is designed for
+    /// local persistent storage. Restarts of this program should restore
+    /// the previous state, meaning anything uploaded will be persistent
+    /// as long as the filesystem integrity holds. This store uses the
+    /// filesystem's `atime` (access time) to hold the last touched time
+    /// of the file(s). Only filesystems that support `atime` are supported.
+    filesystem(FilesystemStore),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FilesystemStore {
+    /// Path on the system where to store the actual content. This is where
+    /// the bulk of the data will be placed.
+    /// On service bootup this folder will be scanned and all files will be
+    /// added to the cache. In the event one of the files doesn't match the
+    /// criteria, the file will be deleted.
+    pub content_path: String,
+
+    /// A temporary location of where files that are being uploaded or
+    /// deleted will be placed while the content cannot be guaranteed to be
+    /// accurate. This location must be on the same block device as
+    /// `content_path` so atomic moves can happen (ie: move without copy).
+    /// All files in this folder will be deleted on every startup.
+    pub temp_path: String,
+
+    /// Policy used to evict items out of the store. Failure to set this
+    /// value will cause items to never be removed from the store causing
+    /// infinite memory usage.
+    pub eviction_policy: Option<EvictionPolicy>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
