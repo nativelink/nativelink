@@ -1,5 +1,7 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
+use std::collections::HashMap;
+
 use futures::future::{select_all, BoxFuture};
 use json5;
 use runfiles::Runfiles;
@@ -38,6 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut server = Server::builder();
         let services = server_cfg.services.ok_or_else(|| "'services' must be configured")?;
 
+        let capabilities_config = services.capabilities.unwrap_or(HashMap::new());
+
         let server = server
             .add_optional_service(
                 services
@@ -59,7 +63,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 services
                     .execution
                     .map_or(Ok(None), |cfg| {
-                        ExecutionServer::new(&cfg, &store_manager).and_then(|v| Ok(Some(v.into_service())))
+                        ExecutionServer::new(&cfg, &capabilities_config, &store_manager)
+                            .and_then(|v| Ok(Some(v.into_service())))
                     })
                     .err_tip(|| "Could not create Execution service")?,
             )
@@ -72,12 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .err_tip(|| "Could not create ByteStream service")?,
             )
             .add_optional_service(
-                services
-                    .capabilities
-                    .map_or(Ok(None), |cfg| {
-                        CapabilitiesServer::new(&cfg, &store_manager).and_then(|v| Ok(Some(v.into_service())))
-                    })
-                    .err_tip(|| "Could not create Capabilities service")?,
+                CapabilitiesServer::new(&capabilities_config).and_then(|v| Ok(Some(v.into_service())))?,
             );
 
         let addr = server_cfg.listen_address.parse()?;

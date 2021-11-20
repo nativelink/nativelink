@@ -10,19 +10,15 @@ use bytes::BytesMut;
 use prost::Message;
 use tonic::{Request, Response, Status};
 
+use ac_utils::{get_and_decode_digest, ESTIMATED_DIGEST_SIZE};
+use common::{log, DigestInfo};
+use config::cas_server::{AcStoreConfig, InstanceName};
+use error::{make_input_err, Error, ResultExt};
 use proto::build::bazel::remote::execution::v2::{
     action_cache_server::ActionCache, action_cache_server::ActionCacheServer as Server, ActionResult,
     GetActionResultRequest, UpdateActionResultRequest,
 };
-
-use common::{log, DigestInfo};
-use config::cas_server::{AcStoreConfig, InstanceName};
-use error::{make_input_err, Code, Error, ResultExt};
 use store::{Store, StoreManager};
-
-// NOTE(blaise.bruer) From some local testing it looks like action cache items are rarely greater than
-// 1.2k. Giving a bit more just in case to reduce allocs.
-const ESTIMATED_DIGEST_SIZE: usize = 2048;
 
 pub struct AcServer {
     stores: HashMap<String, Arc<dyn Store>>,
@@ -64,23 +60,9 @@ impl AcServer {
                 .err_tip(|| format!("'instance_name' not configured for '{}'", &instance_name))?
                 .as_ref(),
         );
-        let mut store_data_resp = store
-            .get_part_unchunked(digest.clone(), 0, None, Some(ESTIMATED_DIGEST_SIZE))
-            .await;
-        if let Err(err) = &mut store_data_resp {
-            if err.code == Code::NotFound {
-                // Trim the error code. Not Found is quite common and we don't want to send a large
-                // error (debug) message for something that is common. We resize to just the last
-                // message as it will be the most relevant.
-                err.messages.resize_with(1, || "".to_string());
-            }
-        }
-        let store_data = store_data_resp?;
-
-        let action_result = ActionResult::decode(store_data)
-            .err_tip_with_code(|e| (Code::NotFound, format!("Stored value appears to be corrupt: {}", e)))?;
-
-        Ok(Response::new(action_result))
+        Ok(Response::new(
+            get_and_decode_digest::<ActionResult>(&store, &digest).await?,
+        ))
     }
 
     async fn inner_update_action_result(

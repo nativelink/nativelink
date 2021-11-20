@@ -5,8 +5,8 @@
         "backend": {
           "dedup": {
             "index_store": {
-              "fast_slow": {
-                "fast": {
+              // "fast_slow": {
+              //   "fast": {
                   "filesystem": {
                     "content_path": "/tmp/bazel_cache/content_path-index",
                     "temp_path": "/tmp/bazel_cache/tmp_path-index",
@@ -15,21 +15,21 @@
                       "max_bytes": 100000000,
                     }
                   }
-                },
-                "slow": {
-                  "s3_store": {
-                    "region": "us-west-1",
-                    "bucket": "blaisebruer-cas-store",
-                    "key_prefix": "test-prefix-index/",
-                    "retry": {
-                      "max_retries": 6,
-                      "delay": 0.3,
-                      "jitter": 0.5,
-                    },
-                    "additional_max_concurrent_requests": 10
-                  }
-                }
-              }
+              //   },
+              //   "slow": {
+              //     "s3_store": {
+              //       "region": "us-west-1",
+              //       "bucket": "blaisebruer-cas-store",
+              //       "key_prefix": "test-prefix-index/",
+              //       "retry": {
+              //         "max_retries": 6,
+              //         "delay": 0.3,
+              //         "jitter": 0.5,
+              //       },
+              //       "additional_max_concurrent_requests": 10
+              //     }
+              //   }
+              // }
             },
             "content_store": {
               "compression": {
@@ -37,8 +37,8 @@
                   "LZ4": {}
                 },
                 "backend": {
-                  "fast_slow": {
-                    "fast": {
+                  // "fast_slow": {
+                  //   "fast": {
                       "filesystem": {
                         "content_path": "/tmp/bazel_cache/content_path-content",
                         "temp_path": "/tmp/bazel_cache/tmp_path-content",
@@ -47,21 +47,21 @@
                           "max_bytes": 10000000000,
                         }
                       }
-                    },
-                    "slow": {
-                      "s3_store": {
-                        "region": "us-west-1",
-                        "bucket": "blaisebruer-cas-store",
-                        "key_prefix": "test-prefix-dedup-cas/",
-                        "retry": {
-                          "max_retries": 6,
-                          "delay": 0.3,
-                          "jitter": 0.5,
-                        },
-                        "additional_max_concurrent_requests": 10
-                      }
-                    }
-                  }
+                    // },
+                    // "slow": {
+                    //   "s3_store": {
+                    //     "region": "us-west-1",
+                    //     "bucket": "blaisebruer-cas-store",
+                    //     "key_prefix": "test-prefix-dedup-cas/",
+                    //     "retry": {
+                    //       "max_retries": 6,
+                    //       "delay": 0.3,
+                    //       "jitter": 0.5,
+                    //     },
+                    //     "additional_max_concurrent_requests": 10
+                    //   }
+                    // }
+                  // }
                 }
               }
             }
@@ -72,8 +72,8 @@
       }
     },
     "AC_MAIN_STORE": {
-      "fast_slow": {
-        "fast": {
+      // "fast_slow": {
+      //   "fast": {
           // "memory": {
           //   "eviction_policy": {
           //     // 100mb.
@@ -88,21 +88,21 @@
               "max_bytes": 100000000,
             }
           }
-        },
-        "slow": {
-          "s3_store": {
-            "region": "us-west-1",
-            "bucket": "blaisebruer-cas-store",
-            "key_prefix": "test-prefix-ac/",
-            "retry": {
-              "max_retries": 6,
-              "delay": 0.3,
-              "jitter": 0.5,
-            },
-            "additional_max_concurrent_requests": 10
-          }
-        }
-      }
+        // },
+        // "slow": {
+        //   "s3_store": {
+        //     "region": "us-west-1",
+        //     "bucket": "blaisebruer-cas-store",
+        //     "key_prefix": "test-prefix-ac/",
+        //     "retry": {
+        //       "max_retries": 6,
+        //       "delay": 0.3,
+        //       "jitter": 0.5,
+        //     },
+        //     "additional_max_concurrent_requests": 10
+        //   }
+        // }
+      // }
     }
   },
   "servers": [{
@@ -118,8 +118,33 @@
           "ac_store": "AC_MAIN_STORE"
         }
       },
-      "capabilities": {},
-      "execution": {},
+      "execution": {
+        "main": {
+          "cas_store": "CAS_MAIN_STORE",
+          "ac_store": "AC_MAIN_STORE",
+        }
+      },
+      "capabilities": {
+        "main": {
+          "supported_platform_properties": {
+            "cpu_count": "Minimum",
+            "memory_kb": "Minimum",
+            "network_kbps": "Minimum",
+            "disk_read_iops": "Minimum",
+            "disk_read_bps": "Minimum",
+            "disk_write_iops": "Minimum",
+            "disk_write_bps": "Minimum",
+            "shm_size": "Minimum",
+            "gpu_count": "Minimum",
+            "gpu_model": "Exact",
+            "cpu_vendor": "Exact",
+            "cpu_arch": "Exact",
+            "cpu_model": "Exact",
+            "kernel_version": "Exact",
+            "docker_image": "Exact",
+          }
+        }
+      },
       "bytestream": {
         "cas_stores": {
           "main": "CAS_MAIN_STORE",

@@ -32,6 +32,7 @@ rust_library(
         "//third_party:tonic",
         "//util:common",
         "//util:error",
+        ":ac_utils",
     ],
     visibility = ["//cas:__pkg__"]
 )
@@ -71,15 +72,32 @@ rust_library(
     name = "execution_server",
     srcs = ["execution_server.rs"],
     deps = [
+        "//cas/scheduler:platform_property_manager",
+        "//cas/scheduler:scheduler",
         "//cas/store",
         "//config",
         "//proto",
         "//third_party:futures",
         "//third_party:stdext",
         "//third_party:tonic",
+        "//util:common",
         "//util:error",
+        ":ac_utils",
     ],
     visibility = ["//cas:__pkg__"]
+)
+
+rust_library(
+    name = "ac_utils",
+    srcs = ["ac_utils.rs"],
+    deps = [
+        "//cas/store",
+        "//proto",
+        "//third_party:prost",
+        "//util:common",
+        "//util:error",
+    ],
+    visibility = ["//visibility:public"],
 )
 
 rust_test(

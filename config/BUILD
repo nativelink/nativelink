@@ -8,9 +8,9 @@ rust_library(
     name = "config",
     srcs = ["lib.rs"],
     deps = [
+        "//third_party:serde",
         ":backends",
         ":cas_server",
-        "//third_party:serde",
     ],
     visibility = ["//visibility:public"],
 )
@@ -19,8 +19,8 @@ rust_library(
     name = "cas_server",
     srcs = ["cas_server.rs"],
     deps = [
-        ":backends",
         "//third_party:serde",
+        ":backends",
     ],
 )
 

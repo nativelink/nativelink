@@ -27,12 +27,65 @@ pub struct CasStoreConfig {
     pub cas_store: StoreRefName,
 }
 
-#[derive(Deserialize, Debug)]
-pub struct CapabilitiesConfig {}
+#[derive(Deserialize, Debug, Default)]
+pub struct CapabilitiesConfig {
+    /// A list of supported platform properties mapped to how these properties
+    /// are used when the scheduler looks for worker nodes capable of running
+    /// the task.
+    ///
+    /// For example, a value of:
+    /// ```
+    /// { "cpu_count": "Minimum", "cpu_arch": "Exact" }
+    /// ```
+    /// With a job that contains:
+    /// ```
+    /// { "cpu_count": "8", "cpu_arch": "arm" }
+    /// ```
+    /// Will result in the scheduler filtering out any workers that do not have
+    /// "cpu_arch" = "arm" and filter out any workers that have less than 8 cpu
+    /// cores available.
+    ///
+    /// The property names here must match the property keys provided by the
+    /// worker nodes when they join the pool. In other words, the workers will
+    /// publish their capabilities to the scheduler when they join the worker
+    /// pool. If the worker fails to notify the scheduler of it's (for example)
+    /// "cpu_arch", the scheduler will never send any jobs to it, if all jobs
+    /// have the "cpu_arch" label. There is no special treatment of any platform
+    /// property labels other and entirely driven by worker configs and this
+    /// config.
+    pub supported_platform_properties: Option<HashMap<String, PropertyType>>,
+}
+
+/// When the scheduler matches tasks to workers that are capable of running
+/// the task, this value will be used to determine how the property is
+/// treated.
+///
+/// `Minimum` will require the platform property to be a u64 and when the
+/// scheduler looks for appropriate worker nodes that are capable of
+/// executing the task, the task will not run on a node that has less than
+/// this value.
+///
+/// `Exact` will require the platform property to be a string and when the
+/// scheduler looks for appropriate worker nodes that are capable of
+/// executing the task, the task will not run on a node that does not have
+/// this property set to the value with exact string match.
+#[derive(Deserialize, Debug, Clone, Copy)]
+pub enum PropertyType {
+    Minimum,
+    Exact,
+}
 
 #[derive(Deserialize, Debug)]
 pub struct ExecutionConfig {
-    // TODO(allada) Not implemented yet.
+    /// The store name referenced in the `stores` map in the main config.
+    /// This store name referenced here may be reused multiple times.
+    /// This value must be an AC (Action Cache) store reference.
+    pub ac_store: StoreRefName,
+
+    /// The store name referenced in the `stores` map in the main config.
+    /// This store name referenced here may be reused multiple times.
+    /// This value must be a CAS store reference.
+    pub cas_store: StoreRefName,
 }
 
 #[derive(Deserialize, Debug)]
@@ -57,13 +110,14 @@ pub struct ServicesConfig {
     pub ac: Option<HashMap<InstanceName, AcStoreConfig>>,
 
     /// Capabilities service is required in order to use most of the
-    /// bazel prtotocol. This service is used to provide the supported
+    /// bazel protocol. This service is used to provide the supported
     /// features and versions of this bazel GRPC service.
-    pub capabilities: Option<CapabilitiesConfig>,
+    pub capabilities: Option<HashMap<InstanceName, CapabilitiesConfig>>,
 
-    /// The remote execution service configuration. This service is
-    /// under development and is currently just a place holder.
-    pub execution: Option<ExecutionConfig>,
+    /// The remote execution service configuration.
+    /// NOTE: This service is under development and is currently just a
+    /// place holder.
+    pub execution: Option<HashMap<InstanceName, ExecutionConfig>>,
 
     /// This is the service used to stream data to and from the CAS.
     /// Bazel's protocol strongly encourages users to use this streaming
