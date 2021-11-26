@@ -121,7 +121,6 @@
       "execution": {
         "main": {
           "cas_store": "CAS_MAIN_STORE",
-          "ac_store": "AC_MAIN_STORE",
         }
       },
       "capabilities": {
@@ -141,7 +140,7 @@
             "cpu_arch": "Exact",
             "cpu_model": "Exact",
             "kernel_version": "Exact",
-            "docker_image": "Exact",
+            "docker_image": "Metadata",
           }
         }
       },

@@ -28,7 +28,7 @@ macro_rules! error_if {
     }};
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Error {
     pub code: Code,
     pub messages: Vec<String>,
@@ -59,6 +59,12 @@ impl Error {
 impl std::error::Error for Error {}
 
 impl Into<proto::google::rpc::Status> for Error {
+    fn into(self) -> proto::google::rpc::Status {
+        (&self).into()
+    }
+}
+
+impl Into<proto::google::rpc::Status> for &Error {
     fn into(self) -> proto::google::rpc::Status {
         proto::google::rpc::Status {
             code: self.code as i32,

@@ -16,13 +16,57 @@ rust_library(
     name = "scheduler",
     srcs = ["scheduler.rs"],
     deps = [
-        "//cas/grpc_service:ac_utils",
-        "//config",
+        "//third_party:fast_async_mutex",
+        "//third_party:rand",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":action_messages",
+        ":worker",
+    ],
+    visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
+)
+
+rust_library(
+    name = "worker",
+    srcs = ["worker.rs"],
+    deps = [
         "//proto",
-        "//cas/store",
+        "//third_party:tokio",
+        "//util:error",
+        ":action_messages",
+        ":platform_property_manager",
+    ],
+    visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
+)
+
+rust_library(
+    name = "action_messages",
+    srcs = ["action_messages.rs"],
+    deps = [
+        "//proto",
+        "//third_party:prost",
+        "//third_party:prost_types",
         "//util:common",
         "//util:error",
         ":platform_property_manager",
+    ],
+    visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
+)
+
+rust_test(
+    name = "scheduler_test",
+    srcs = ["tests/scheduler_test.rs"],
+    deps = [
+        "//proto",
+        "//third_party:pretty_assertions",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":action_messages",
+        ":platform_property_manager",
+        ":scheduler",
+        ":worker",
     ],
     visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
 )

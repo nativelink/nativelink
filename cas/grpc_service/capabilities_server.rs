@@ -86,7 +86,7 @@ impl Capabilities for CapabilitiesServer {
             }),
             high_api_version: Some(SemVer {
                 major: 2,
-                minor: 1,
+                minor: 2,
                 patch: 0,
                 prerelease: "".to_string(),
             }),

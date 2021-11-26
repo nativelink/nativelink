@@ -15,7 +15,7 @@ async-trait = "0.1.51"
 fixed-buffer = "0.2.3"
 futures = "0.3.17"
 tokio = { version = "1.13.0", features = ["macros", "io-util", "fs", "rt-multi-thread"] }
-tokio-stream = { version = "0.1.8", features = ["fs"] }
+tokio-stream = { version = "0.1.8", features = ["fs", "sync"] }
 tokio-util = { version = "0.6.9", features = ["io", "io-util"] }
 tonic = "0.6.1"
 lazy-init = "0.5.0"

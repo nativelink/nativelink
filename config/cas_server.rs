@@ -57,31 +57,27 @@ pub struct CapabilitiesConfig {
 }
 
 /// When the scheduler matches tasks to workers that are capable of running
-/// the task, this value will be used to determine how the property is
-/// treated.
-///
-/// `Minimum` will require the platform property to be a u64 and when the
-/// scheduler looks for appropriate worker nodes that are capable of
-/// executing the task, the task will not run on a node that has less than
-/// this value.
-///
-/// `Exact` will require the platform property to be a string and when the
-/// scheduler looks for appropriate worker nodes that are capable of
-/// executing the task, the task will not run on a node that does not have
-/// this property set to the value with exact string match.
+/// the task, this value will be used to determine how the property is treated.
 #[derive(Deserialize, Debug, Clone, Copy)]
 pub enum PropertyType {
+    /// Requires the platform property to be a u64 and when the scheduler looks
+    /// for appropriate worker nodes that are capable of executing the task,
+    /// the task will not run on a node that has less than this value.
     Minimum,
+
+    /// Requires the platform property to be a string and when the scheduler
+    /// looks for appropriate worker nodes that are capable of executing the
+    /// task, the task will not run on a node that does not have this property
+    /// set to the value with exact string match.
     Exact,
+
+    /// Does not restrict on this value and instead will be passed to the worker
+    /// as an informational piece.
+    Metadata,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct ExecutionConfig {
-    /// The store name referenced in the `stores` map in the main config.
-    /// This store name referenced here may be reused multiple times.
-    /// This value must be an AC (Action Cache) store reference.
-    pub ac_store: StoreRefName,
-
     /// The store name referenced in the `stores` map in the main config.
     /// This store name referenced here may be reused multiple times.
     /// This value must be a CAS store reference.

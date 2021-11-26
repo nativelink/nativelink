@@ -1,0 +1,101 @@
+// Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
+
+syntax = "proto3";
+
+package com.github.allada.rust_cas.remote_execution;
+
+import "build/bazel/remote/execution/v2/remote_execution.proto";
+import "google/protobuf/empty.proto";
+
+/// This API describes how schedulers communicate with Worker nodes.
+///
+/// When a worker node comes online it must be pre-configured with the
+/// endpoint of the scheduler it will register with. Once the worker
+/// connects to the scheduler it must send a `RegisterSupportedProperties`
+/// command to the scheduler. The scheduler will then use this information
+/// to determine which jobs the worker can process.
+service WorkerApi {
+    /// The worker will run this connect command which will initiate the
+    /// bi-directional stream. The worker must first run
+    /// `RegisterSupportedProperties` before issuing any other commands.
+    rpc ConnectWorker(stream UpdateFromWorker) returns (stream UpdateForWorker);
+}
+
+/// Communication from the worker to the scheduler.
+message UpdateFromWorker {
+    oneof update {
+        /// Message used to let the scheduler know that it is still alive as
+        /// well as check to see if the scheduler is still alive. The scheduler
+        /// may close the connection if the worker has not sent any messages
+        /// after some amount of time (configured in the scheduler's
+        /// configuration).
+        google.protobuf.Empty keep_alive = 1;
+
+        /// Registers this worker and informs the scheduler what properties
+        /// this worker supports. This command MUST be sent before issuing
+        /// any other commands. Failing to do so is undefined behavior.
+        RegisterSupportedProperties register_supported_properties = 2;
+
+        /// Informs the scheduler about the result of an execution request.
+        ExecuteResult execute_result = 3;
+
+        /// Informs the scheduler that the service is going offline and
+        /// should stop issuing any new actions on this worker.
+        ///
+        /// The worker may stay connected even after sending this command
+        /// and may even send an `ExecuteResult` after sending this command.
+        /// It is up to the scheduler implementation to decide how to handle
+        /// this case.
+        ///
+        /// Any job that was running on this instance likely needs to be
+        /// executed again, but up to the scheduler on how or when to handle
+        /// this case.
+        GoingAway going_away = 4;
+    }
+}
+
+/// Represents the initial request sent to the scheduler informing the
+/// scheduler about this worker's capabilities.
+message RegisterSupportedProperties {
+    /// The list of properties this worker can support. The exact
+    /// implementation is driven by the configuration matrix between the
+    /// worker and scheduler.
+    ///
+    /// The scheduler may reject this worker if any property keys that
+    /// the scheduler is not configured to support, or may simply ignore
+    /// the unsupported properties.
+    ///
+    /// The details on how to use this property can be found here:
+    /// https://github.com/allada/rust_cas/blob/c91f61edf182f2b64451fd48a5e63fa506a43aae/config/cas_server.rs
+    repeated build.bazel.remote.execution.v2.Platform.Property properties = 1;
+}
+
+/// Represents the result of an execution.
+message ExecuteResult {
+    /// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
+    /// for details.
+    build.bazel.remote.execution.v2.ExecuteResponse execute_response = 1;
+}
+
+/// Informs the scheduler that the node is going offline.
+message GoingAway {}
+
+/// Communication from the scheduler to the worker.
+message UpdateForWorker {
+    oneof update {
+        /// Message used to let the worker know that it is still alive as well
+        /// as check to see if the worker is still alive. The worker
+        /// may close the connection if the scheduler has not sent any messages
+        /// after some amount of time (configured in the scheduler's
+        /// configuration).
+        google.protobuf.Empty keep_alive = 1;
+
+        /// Informs the worker about some work it should begin performing the
+        /// requested action.
+        StartExecute start_action = 2;
+    }
+}
+
+message StartExecute {
+    build.bazel.remote.execution.v2.ExecuteRequest execute_request = 1;
+}

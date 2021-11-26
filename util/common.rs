@@ -17,14 +17,14 @@ use tokio::task::{JoinError, JoinHandle};
 use error::{make_input_err, Error, ResultExt};
 
 pub struct DigestInfo {
-    // Possibly the size of the digest in bytes. This should only be trusted
-    // if `truest_size` is true.
+    /// Possibly the size of the digest in bytes. This should only be trusted
+    /// if `truest_size` is true.
     pub size_bytes: i64,
 
-    // Raw hash in packed form.
+    /// Raw hash in packed form.
     pub packed_hash: [u8; 32],
 
-    // Cached string representation of the `packed_hash`.
+    /// Cached string representation of the `packed_hash`.
     str_hash: LazyTransform<Option<String>, String>,
 }
 
@@ -95,6 +95,7 @@ impl Clone for DigestInfo {
 
 impl TryFrom<Digest> for DigestInfo {
     type Error = Error;
+
     fn try_from(digest: Digest) -> Result<Self, Self::Error> {
         let packed_hash =
             <[u8; 32]>::from_hex(&digest.hash).err_tip(|| format!("Invalid sha256 hash: {}", digest.hash))?;
@@ -115,6 +116,15 @@ impl Into<Digest> for DigestInfo {
             .unwrap_or_else(|v| v.unwrap_or_else(|| hex::encode(packed_hash)));
         Digest {
             hash: hash,
+            size_bytes: self.size_bytes,
+        }
+    }
+}
+
+impl Into<Digest> for &DigestInfo {
+    fn into(self) -> Digest {
+        Digest {
+            hash: self.str().to_string(),
             size_bytes: self.size_bytes,
         }
     }
