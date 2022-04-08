@@ -113,8 +113,7 @@ impl ExecutionServer {
                 .err_tip(|| "Capabilities needs config for '{}' because it exists in execution")?;
             let cas_store = store_manager
                 .get_store(&exec_cfg.cas_store)
-                .ok_or_else(|| make_input_err!("'cas_store': '{}' does not exist", exec_cfg.cas_store))?
-                .clone();
+                .ok_or_else(|| make_input_err!("'cas_store': '{}' does not exist", exec_cfg.cas_store))?;
             let platform_property_manager = PlatformPropertyManager::new(
                 capabilities_cfg
                     .supported_platform_properties

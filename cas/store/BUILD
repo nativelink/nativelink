@@ -7,6 +7,19 @@ rust_library(
     srcs = ["lib.rs"],
     deps = [
         "//config",
+        "//third_party:fast_async_mutex",
+        "//third_party:futures",
+        "//util:error",
+        ":traits",
+    ],
+    visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
+)
+
+rust_library(
+    name = "default_store_factory",
+    srcs = ["default_store_factory.rs"],
+    deps = [
+        "//config",
         "//third_party:futures",
         "//util:error",
         ":compression_store",
@@ -14,7 +27,9 @@ rust_library(
         ":fast_slow_store",
         ":filesystem_store",
         ":memory_store",
+        ":ref_store",
         ":s3_store",
+        ":store",
         ":traits",
         ":verify_store",
     ],
@@ -31,6 +46,21 @@ rust_library(
         "//util:buf_channel",
         "//util:common",
         "//util:error",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+    visibility = ["//cas:__pkg__"]
+)
+
+rust_library(
+    name = "ref_store",
+    srcs = ["ref_store.rs"],
+    deps = [
+        "//config",
+        "//util:buf_channel",
+        "//util:common",
+        "//util:error",
+        ":store",
+        ":traits",
     ],
     proc_macro_deps = ["//third_party:async_trait"],
     visibility = ["//cas:__pkg__"]
@@ -171,6 +201,22 @@ rust_library(
     ],
     proc_macro_deps = ["//third_party:async_trait"],
     visibility = ["//cas:__pkg__"]
+)
+
+rust_test(
+    name = "ref_store_test",
+    srcs = ["tests/ref_store_test.rs"],
+    deps = [
+        "//config",
+        "//third_party:pretty_assertions",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":memory_store",
+        ":ref_store",
+        ":store",
+        # ":traits",
+    ],
 )
 
 rust_test(

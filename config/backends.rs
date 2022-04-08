@@ -85,6 +85,19 @@ pub enum StoreConfig {
     /// swap files if a file is being replaced. Only filesystems that
     /// support `atime` and the RENAME_EXCHANGE flag are supported.
     filesystem(FilesystemStore),
+
+    /// Store used to reference a store in the root store manager.
+    /// This is useful for cases when you want to share a store in different
+    /// nested stores. Example, you may want to share the same memory store
+    /// used for the action cache, but use a FastSlowStore and have the fast
+    /// store also share the memory store for efficiency.
+    ref_store(RefStore),
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct RefStore {
+    /// Name of the store under the root "stores" config object.
+    pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

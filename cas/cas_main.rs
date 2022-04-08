@@ -1,6 +1,7 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use clap::Parser;
 use futures::future::{select_all, BoxFuture};
@@ -13,6 +14,7 @@ use bytestream_server::ByteStreamServer;
 use capabilities_server::CapabilitiesServer;
 use cas_server::CasServer;
 use config::cas_server::CasConfig;
+use default_store_factory::store_factory;
 use error::ResultExt;
 use execution_server::ExecutionServer;
 use store::StoreManager;
@@ -54,12 +56,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let json_contents = String::from_utf8(tokio::fs::read(config_file).await?)?;
     let cfg: CasConfig = json5::from_str(&json_contents)?;
 
-    let mut store_manager = StoreManager::new();
+    let store_manager = Arc::new(StoreManager::new());
     for (name, store_cfg) in cfg.stores {
-        store_manager
-            .make_store(&name, &store_cfg)
-            .await
-            .err_tip(|| format!("Failed to create store '{}'", name))?;
+        store_manager.add_store(
+            &name,
+            store_factory(&store_cfg, &store_manager)
+                .await
+                .err_tip(|| format!("Failed to create store '{}'", name))?,
+        );
     }
 
     let mut servers: Vec<BoxFuture<Result<(), tonic::transport::Error>>> = Vec::new();

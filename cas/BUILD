@@ -13,6 +13,7 @@ rust_binary(
         "//cas/grpc_service:cas_server",
         "//cas/grpc_service:execution_server",
         "//cas/store",
+        "//cas/store:default_store_factory",
         "//config",
         "//third_party:clap",
         "//third_party:env_logger",

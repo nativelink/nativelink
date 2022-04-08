@@ -107,6 +107,7 @@ rust_test(
     srcs = ["tests/cas_server_test.rs"],
     deps = [
         "//cas/store",
+        "//cas/store:default_store_factory",
         "//config",
         "//proto",
         "//third_party:maplit",
@@ -124,6 +125,7 @@ rust_test(
     srcs = ["tests/ac_server_test.rs"],
     deps = [
         "//cas/store",
+        "//cas/store:default_store_factory",
         "//config",
         "//proto",
         "//third_party:bytes",
@@ -143,6 +145,7 @@ rust_test(
     srcs = ["tests/bytestream_server_test.rs"],
     deps = [
         "//cas/store",
+        "//cas/store:default_store_factory",
         "//config",
         "//proto",
         "//third_party:futures",

@@ -1,5 +1,22 @@
 {
   "stores": {
+    "FS_CONTENT_STORE": {
+      "compression": {
+        "compression_algorithm": {
+          "LZ4": {}
+        },
+        "backend": {
+          "filesystem": {
+            "content_path": "/tmp/rust_cas_data/content_path-cas",
+            "temp_path": "/tmp/rust_cas_data/tmp_path-cas",
+            "eviction_policy": {
+              // 2gb.
+              "max_bytes": 2000000000,
+            }
+          }
+        }
+      }
+    },
     "CAS_MAIN_STORE": {
       "verify": {
         "backend": {
@@ -15,20 +32,8 @@
               }
             },
             "content_store": {
-              "compression": {
-                "compression_algorithm": {
-                  "LZ4": {}
-                },
-                "backend": {
-                  "filesystem": {
-                    "content_path": "/tmp/rust_cas_data/content_path-cas",
-                    "temp_path": "/tmp/rust_cas_data/tmp_path-cas",
-                    "eviction_policy": {
-                      // 2gb.
-                      "max_bytes": 2000000000,
-                    }
-                  }
-                }
+              "ref_store": {
+                "name": "FS_CONTENT_STORE"
               }
             }
           }

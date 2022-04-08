@@ -41,8 +41,7 @@ impl ByteStreamServer {
         for (instance_name, store_name) in &config.cas_stores {
             let store = store_manager
                 .get_store(&store_name)
-                .ok_or_else(|| make_input_err!("'cas_store': '{}' does not exist", store_name))?
-                .clone();
+                .ok_or_else(|| make_input_err!("'cas_store': '{}' does not exist", store_name))?;
             stores.insert(instance_name.to_string(), store);
         }
         Ok(ByteStreamServer {

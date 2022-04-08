@@ -30,8 +30,7 @@ impl AcServer {
         for (instance_name, ac_cfg) in config {
             let store = store_manager
                 .get_store(&ac_cfg.ac_store)
-                .ok_or_else(|| make_input_err!("'ac_store': '{}' does not exist", ac_cfg.ac_store))?
-                .clone();
+                .ok_or_else(|| make_input_err!("'ac_store': '{}' does not exist", ac_cfg.ac_store))?;
             stores.insert(instance_name.to_string(), store);
         }
         Ok(AcServer { stores: stores.clone() })

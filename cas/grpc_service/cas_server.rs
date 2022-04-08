@@ -34,8 +34,7 @@ impl CasServer {
         for (instance_name, cas_cfg) in config {
             let store = store_manager
                 .get_store(&cas_cfg.cas_store)
-                .ok_or_else(|| make_input_err!("'cas_store': '{}' does not exist", cas_cfg.cas_store))?
-                .clone();
+                .ok_or_else(|| make_input_err!("'cas_store': '{}' does not exist", cas_cfg.cas_store))?;
             stores.insert(instance_name.to_string(), store);
         }
         Ok(CasServer { stores: stores })

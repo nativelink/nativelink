@@ -1,6 +1,7 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::pin::Pin;
+use std::sync::Arc;
 
 use bytes::BytesMut;
 use maplit::hashmap;
@@ -12,6 +13,7 @@ use proto::build::bazel::remote::execution::v2::{action_cache_server::ActionCach
 use ac_server::AcServer;
 use common::DigestInfo;
 use config;
+use default_store_factory::store_factory;
 use error::Error;
 use store::{Store, StoreManager};
 
@@ -31,24 +33,28 @@ async fn insert_into_store<T: Message>(
     Ok(digest.size_bytes)
 }
 
-async fn make_store_manager() -> Result<StoreManager, Error> {
-    let mut store_manager = StoreManager::new();
-    store_manager
-        .make_store(
-            "main_cas",
+async fn make_store_manager() -> Result<Arc<StoreManager>, Error> {
+    let store_manager = Arc::new(StoreManager::new());
+    store_manager.add_store(
+        "main_cas",
+        store_factory(
             &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+            &store_manager,
         )
-        .await?;
-    store_manager
-        .make_store(
-            "main_ac",
+        .await?,
+    );
+    store_manager.add_store(
+        "main_ac",
+        store_factory(
             &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+            &store_manager,
         )
-        .await?;
+        .await?,
+    );
     Ok(store_manager)
 }
 
-fn make_ac_server(store_manager: &mut StoreManager) -> Result<AcServer, Error> {
+fn make_ac_server(store_manager: &StoreManager) -> Result<AcServer, Error> {
     AcServer::new(
         &hashmap! {
             "foo_instance_name".to_string() => config::cas_server::AcStoreConfig{
@@ -83,8 +89,8 @@ mod get_action_result {
 
     #[tokio::test]
     async fn empty_store() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let ac_server = make_ac_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let ac_server = make_ac_server(&store_manager)?;
 
         let raw_response = get_action_result(&ac_server, HASH1, 0).await;
 
@@ -99,8 +105,8 @@ mod get_action_result {
 
     #[tokio::test]
     async fn has_single_item() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let ac_server = make_ac_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let ac_server = make_ac_server(&store_manager)?;
         let ac_store_owned = store_manager.get_store("main_ac").unwrap();
 
         let mut action_result = ActionResult::default();
@@ -117,8 +123,8 @@ mod get_action_result {
 
     #[tokio::test]
     async fn single_item_wrong_digest_size() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let ac_server = make_ac_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let ac_server = make_ac_server(&store_manager)?;
         let ac_store_owned = store_manager.get_store("main_ac").unwrap();
 
         let mut action_result = ActionResult::default();
@@ -169,8 +175,8 @@ mod update_action_result {
 
     #[tokio::test]
     async fn one_item_update_test() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let ac_server = make_ac_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let ac_server = make_ac_server(&store_manager)?;
         let ac_store_owned = store_manager.get_store("main_ac").unwrap();
 
         let mut action_result = ActionResult::default();

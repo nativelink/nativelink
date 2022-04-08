@@ -1,6 +1,7 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::pin::Pin;
+use std::sync::Arc;
 
 use maplit::hashmap;
 use tonic::Request;
@@ -13,6 +14,7 @@ use proto::google::rpc::Status as GrpcStatus;
 use cas_server::CasServer;
 use common::DigestInfo;
 use config;
+use default_store_factory::store_factory;
 use error::Error;
 use store::StoreManager;
 
@@ -22,18 +24,20 @@ const HASH2: &str = "9993456789abcdef000000000000000000000000000000000123456789a
 const HASH3: &str = "7773456789abcdef000000000000000000000000000000000123456789abc777";
 const BAD_HASH: &str = "BAD_HASH";
 
-async fn make_store_manager() -> Result<StoreManager, Error> {
-    let mut store_manager = StoreManager::new();
-    store_manager
-        .make_store(
-            "main_cas",
+async fn make_store_manager() -> Result<Arc<StoreManager>, Error> {
+    let store_manager = Arc::new(StoreManager::new());
+    store_manager.add_store(
+        "main_cas",
+        store_factory(
             &config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+            &store_manager,
         )
-        .await?;
+        .await?,
+    );
     Ok(store_manager)
 }
 
-fn make_cas_server(store_manager: &mut StoreManager) -> Result<CasServer, Error> {
+fn make_cas_server(store_manager: &StoreManager) -> Result<CasServer, Error> {
     CasServer::new(
         &hashmap! {
             "foo_instance_name".to_string() => config::cas_server::CasStoreConfig{
@@ -53,8 +57,8 @@ mod find_missing_blobs {
 
     #[tokio::test]
     async fn empty_store() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let cas_server = make_cas_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let cas_server = make_cas_server(&store_manager)?;
 
         let raw_response = cas_server
             .find_missing_blobs(Request::new(FindMissingBlobsRequest {
@@ -73,8 +77,8 @@ mod find_missing_blobs {
 
     #[tokio::test]
     async fn store_one_item_existence() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let cas_server = make_cas_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let cas_server = make_cas_server(&store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
         const VALUE: &str = "1";
@@ -100,8 +104,8 @@ mod find_missing_blobs {
 
     #[tokio::test]
     async fn has_three_requests_one_bad_hash() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let cas_server = make_cas_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let cas_server = make_cas_server(&store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
         const VALUE: &str = "1";
@@ -150,8 +154,8 @@ mod batch_update_blobs {
 
     #[tokio::test]
     async fn update_existing_item() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let cas_server = make_cas_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let cas_server = make_cas_server(&store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
         const VALUE1: &str = "1";
@@ -216,8 +220,8 @@ mod batch_read_blobs {
 
     #[tokio::test]
     async fn batch_read_blobs_read_two_blobs_success_one_fail() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let cas_server = make_cas_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let cas_server = make_cas_server(&store_manager)?;
         let store_owned = store_manager.get_store("main_cas").unwrap();
 
         const VALUE1: &str = "1";
@@ -310,8 +314,8 @@ mod end_to_end {
 
     #[tokio::test]
     async fn batch_update_blobs_two_items_existence_with_third_missing() -> Result<(), Box<dyn std::error::Error>> {
-        let mut store_manager = make_store_manager().await?;
-        let cas_server = make_cas_server(&mut store_manager)?;
+        let store_manager = make_store_manager().await?;
+        let cas_server = make_cas_server(&store_manager)?;
 
         const VALUE1: &str = "1";
         const VALUE2: &str = "23";
