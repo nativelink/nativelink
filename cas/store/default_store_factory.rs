@@ -13,6 +13,7 @@ use futures::Future;
 use memory_store::MemoryStore;
 use ref_store::RefStore;
 use s3_store::S3Store;
+use size_partitioning_store::SizePartitioningStore;
 use store::{Store, StoreManager};
 use verify_store::VerifyStore;
 
@@ -44,6 +45,11 @@ pub fn store_factory<'a>(
             )),
             StoreConfig::filesystem(config) => Arc::new(FilesystemStore::new(&config).await?),
             StoreConfig::ref_store(config) => Arc::new(RefStore::new(&config, store_manager.clone())),
+            StoreConfig::size_partitioning(config) => Arc::new(SizePartitioningStore::new(
+                &config,
+                store_factory(&config.lower_store, store_manager).await?,
+                store_factory(&config.upper_store, store_manager).await?,
+            )),
         };
         Ok(store)
     })

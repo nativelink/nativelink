@@ -92,6 +92,27 @@ pub enum StoreConfig {
     /// used for the action cache, but use a FastSlowStore and have the fast
     /// store also share the memory store for efficiency.
     ref_store(RefStore),
+
+    /// Store used to use the size field of the digest to separate which
+    /// store to send the data. This is useful for cases when you'd like
+    /// to put small objects in one store and large objects in another
+    /// store. This should only be used if the size field is the size of
+    /// the content, in other words, don't use on AC (Action Cache) stores.
+    /// Any store where you safely use VerifyStore.verify_size = true, this
+    /// store should be safe to use (ie: CAS stores).
+    size_partitioning(Box<SizePartitioningStore>),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SizePartitioningStore {
+    /// Size to partition the data on.
+    pub size: u64,
+
+    /// Store to send data when object is < (less than) size.
+    pub lower_store: StoreConfig,
+
+    /// Store to send data when object is >= (less than eq) size.
+    pub upper_store: StoreConfig,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

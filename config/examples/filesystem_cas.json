@@ -1,3 +1,8 @@
+// This configuration will place objects in various folders in
+// `/tmp/turbo_cache_data`. It will store all data on disk and
+// allows for restarts of the underlying service. It is optimized
+// so objects are compressed, deduplicated and uses some in-memory
+// optimizations for certain hot paths.
 {
   "stores": {
     "FS_CONTENT_STORE": {
@@ -20,20 +25,52 @@
     "CAS_MAIN_STORE": {
       "verify": {
         "backend": {
-          "dedup": {
-            "index_store": {
-              "filesystem": {
-                "content_path": "/tmp/turbo_cache_data/content_path-index",
-                "temp_path": "/tmp/turbo_cache_data/tmp_path-index",
-                "eviction_policy": {
-                  // 500mb.
-                  "max_bytes": 500000000,
-                }
-              }
-            },
-            "content_store": {
+          // Because we are using a dedup store, we can bypass small objects
+          // and put those objects directly into the content store without
+          // having to be indexed. This greatly improves performance of serving
+          // general build content, since many objects are quite small and by
+          // putting this size distinguish store in place will prevent 1+ index
+          // read/write per small object request.
+          "size_partitioning": {
+            "size": 262144, // 256k.
+            "lower_store": {
               "ref_store": {
                 "name": "FS_CONTENT_STORE"
+              }
+            },
+            "upper_store": {
+              "dedup": {
+                "index_store": {
+                  // Since our index store is queried so much, we use a fast_slow
+                  // store so it will keep in memory objects that are accessed
+                  // frequently before going to disk.
+                  // Note: indexes are generally quite small, but accessed frequently.
+                  "fast_slow": {
+                    "fast": {
+                      "memory": {
+                        "eviction_policy": {
+                          // 10mb.
+                          "max_bytes": 10000000,
+                        }
+                      }
+                    },
+                    "slow": {
+                      "filesystem": {
+                        "content_path": "/tmp/turbo_cache_data/content_path-index",
+                        "temp_path": "/tmp/turbo_cache_data/tmp_path-index",
+                        "eviction_policy": {
+                          // 500mb.
+                          "max_bytes": 500000000,
+                        }
+                      }
+                    }
+                  }
+                },
+                "content_store": {
+                  "ref_store": {
+                    "name": "FS_CONTENT_STORE"
+                  }
+                }
               }
             }
           }

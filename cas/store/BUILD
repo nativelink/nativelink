@@ -27,6 +27,7 @@ rust_library(
         ":memory_store",
         ":ref_store",
         ":s3_store",
+        ":size_partitioning_store",
         ":store",
         ":traits",
         ":verify_store",
@@ -44,6 +45,20 @@ rust_library(
         "//util:buf_channel",
         "//util:common",
         "//util:error",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+    visibility = ["//cas:__pkg__"]
+)
+
+rust_library(
+    name = "size_partitioning_store",
+    srcs = ["size_partitioning_store.rs"],
+    deps = [
+        "//config",
+        "//util:buf_channel",
+        "//util:common",
+        "//util:error",
+        ":traits",
     ],
     proc_macro_deps = ["//third_party:async_trait"],
     visibility = ["//cas:__pkg__"]
@@ -199,6 +214,21 @@ rust_library(
     ],
     proc_macro_deps = ["//third_party:async_trait"],
     visibility = ["//cas:__pkg__"]
+)
+
+rust_test(
+    name = "size_partitioning_store_test",
+    srcs = ["tests/size_partitioning_store_test.rs"],
+    deps = [
+        "//config",
+        "//third_party:pretty_assertions",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":memory_store",
+        ":size_partitioning_store",
+        ":traits",
+    ],
 )
 
 rust_test(
