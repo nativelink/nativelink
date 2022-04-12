@@ -81,6 +81,7 @@ rust_library(
         "//third_party:futures",
         "//third_party:rand",
         "//third_party:stdext",
+        "//third_party:tokio",
         "//third_party:tokio_stream",
         "//third_party:tonic",
         "//util:common",
@@ -126,6 +127,7 @@ rust_test(
     deps = [
         "//cas/scheduler",
         "//cas/scheduler:platform_property_manager",
+        "//cas/scheduler:worker",
         "//proto",
         "//third_party:pretty_assertions",
         "//third_party:tokio",

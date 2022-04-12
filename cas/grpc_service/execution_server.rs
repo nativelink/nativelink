@@ -3,10 +3,11 @@
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures::{Stream, StreamExt};
 use rand::{thread_rng, Rng};
+use tokio::time::interval;
 use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status};
 
@@ -27,8 +28,11 @@ use store::{Store, StoreManager};
 /// Default priority remote execution jobs will get when not provided.
 const DEFAULT_EXECUTION_PRIORITY: i64 = 0;
 
+/// Default timeout for workers in seconds.
+const DEFAULT_WORKER_TIMEOUT_S: u64 = 5;
+
 struct InstanceInfo {
-    scheduler: Scheduler,
+    scheduler: Arc<Scheduler>,
     cas_store: Arc<dyn Store>,
     platform_property_manager: PlatformPropertyManager,
 }
@@ -120,14 +124,38 @@ impl ExecutionServer {
                     .clone()
                     .unwrap_or(HashMap::new()),
             );
+            let mut worker_timeout_s = exec_cfg.worker_timeout_s;
+            if worker_timeout_s == 0 {
+                worker_timeout_s = DEFAULT_WORKER_TIMEOUT_S;
+            }
+            let scheduler = Arc::new(Scheduler::new(worker_timeout_s));
+            let weak_scheduler = Arc::downgrade(&scheduler);
             instance_infos.insert(
                 instance_name.to_string(),
                 InstanceInfo {
-                    scheduler: Scheduler::new(),
+                    scheduler,
                     cas_store,
                     platform_property_manager,
                 },
             );
+            tokio::spawn(async move {
+                let mut ticker = interval(Duration::from_secs(1));
+                loop {
+                    ticker.tick().await;
+                    let timestamp = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .expect("Error: system time is now behind unix epoch");
+                    match weak_scheduler.upgrade() {
+                        Some(scheduler) => {
+                            if let Err(e) = scheduler.remove_timedout_workers(timestamp.as_secs()).await {
+                                log::error!("Error while running remove_timedout_workers : {:?}", e);
+                            }
+                        }
+                        // If we fail to upgrade, our service is probably destroyed, so return.
+                        None => return,
+                    }
+                }
+            });
         }
         Ok(Self { instance_infos })
     }

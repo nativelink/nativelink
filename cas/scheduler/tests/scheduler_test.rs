@@ -47,21 +47,24 @@ async fn verify_initial_connection_message(worker_id: WorkerId, rx: &mut mpsc::U
 }
 
 #[cfg(test)]
-mod buf_channel_tests {
+mod scheduler_tests {
     use super::*;
     use pretty_assertions::assert_eq; // Must be declared in every module.
+
+    const NOW_TIME: u64 = 10000;
+    const BASE_WORKER_TIMEOUT_S: u64 = 100;
 
     #[tokio::test]
     async fn basic_add_action_with_one_worker_test() -> Result<(), Error> {
         const WORKER_ID: WorkerId = WorkerId(0x123456789111);
 
-        let scheduler = Scheduler::new();
+        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
         let action_digest = DigestInfo::new([99u8; 32], 512);
 
         let mut rx_from_worker = {
             let (tx, rx) = mpsc::unbounded_channel();
             scheduler
-                .add_worker(Worker::new(WORKER_ID, PlatformProperties::default(), tx))
+                .add_worker(Worker::new(WORKER_ID, PlatformProperties::default(), tx, NOW_TIME))
                 .await
                 .err_tip(|| "Failed to add worker")?;
             rx
@@ -106,7 +109,7 @@ mod buf_channel_tests {
 
     #[tokio::test]
     async fn worker_should_not_queue_if_properties_dont_match_test() -> Result<(), Error> {
-        let scheduler = Scheduler::new();
+        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
         let action_digest = DigestInfo::new([99u8; 32], 512);
         let mut platform_properties = PlatformProperties::default();
         platform_properties
@@ -122,7 +125,7 @@ mod buf_channel_tests {
         let mut rx_from_worker1 = {
             let (tx, rx) = mpsc::unbounded_channel();
             scheduler
-                .add_worker(Worker::new(WORKER_ID1, platform_properties.clone(), tx))
+                .add_worker(Worker::new(WORKER_ID1, platform_properties.clone(), tx, NOW_TIME))
                 .await
                 .err_tip(|| "Failed to add worker")?;
             rx
@@ -151,7 +154,7 @@ mod buf_channel_tests {
         let mut rx_from_worker2 = {
             let (tx, rx) = mpsc::unbounded_channel();
             scheduler
-                .add_worker(Worker::new(WORKER_ID2, worker_properties, tx))
+                .add_worker(Worker::new(WORKER_ID2, worker_properties, tx, NOW_TIME))
                 .await
                 .err_tip(|| "Failed to add worker")?;
             rx
@@ -194,7 +197,7 @@ mod buf_channel_tests {
     async fn cacheable_items_join_same_action_queued_test() -> Result<(), Error> {
         const WORKER_ID: WorkerId = WorkerId(0x100009);
 
-        let scheduler = Scheduler::new();
+        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
         let action_digest = DigestInfo::new([99u8; 32], 512);
 
         let mut expected_action_state = ActionState {
@@ -228,7 +231,7 @@ mod buf_channel_tests {
         let mut rx_from_worker = {
             let (tx, rx) = mpsc::unbounded_channel();
             scheduler
-                .add_worker(Worker::new(WORKER_ID, PlatformProperties::default(), tx))
+                .add_worker(Worker::new(WORKER_ID, PlatformProperties::default(), tx, NOW_TIME))
                 .await
                 .err_tip(|| "Failed to add worker")?;
             rx
@@ -275,14 +278,14 @@ mod buf_channel_tests {
     #[tokio::test]
     async fn worker_disconnects_does_not_schedule_for_execution_test() -> Result<(), Error> {
         const WORKER_ID: WorkerId = WorkerId(0x100010);
-        let scheduler = Scheduler::new();
+        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
         let action_digest = DigestInfo::new([99u8; 32], 512);
         let platform_properties = PlatformProperties::default();
 
         let rx_from_worker = {
             let (tx, rx) = mpsc::unbounded_channel();
             scheduler
-                .add_worker(Worker::new(WORKER_ID, platform_properties.clone(), tx))
+                .add_worker(Worker::new(WORKER_ID, platform_properties.clone(), tx, NOW_TIME))
                 .await
                 .err_tip(|| "Failed to add worker")?;
             rx
@@ -306,6 +309,108 @@ mod buf_channel_tests {
                 stage: ActionStage::Queued,
             };
             assert_eq!(action_state.as_ref(), &expected_action_state);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn worker_timesout_reschedules_running_job_test() -> Result<(), Error> {
+        const WORKER_ID1: WorkerId = WorkerId(0x111111);
+        const WORKER_ID2: WorkerId = WorkerId(0x222222);
+        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
+        let action_digest = DigestInfo::new([99u8; 32], 512);
+        let platform_properties = PlatformProperties::default();
+
+        // Note: This needs to stay in scope or a disconnect will trigger.
+        let mut rx_from_worker1 = {
+            let (tx1, rx1) = mpsc::unbounded_channel();
+            scheduler
+                .add_worker(Worker::new(WORKER_ID1, platform_properties.clone(), tx1, NOW_TIME))
+                .await
+                .err_tip(|| "Failed to add worker1")?;
+            rx1
+        };
+        verify_initial_connection_message(WORKER_ID1, &mut rx_from_worker1).await;
+
+        let mut client_rx = {
+            let mut action_info = make_base_action_info();
+            action_info.digest = action_digest.clone();
+            scheduler.add_action(action_info).await?
+        };
+
+        // Note: This needs to stay in scope or a disconnect will trigger.
+        let mut rx_from_worker2 = {
+            let (tx2, rx2) = mpsc::unbounded_channel();
+            scheduler
+                .add_worker(Worker::new(WORKER_ID2, platform_properties.clone(), tx2, NOW_TIME))
+                .await
+                .err_tip(|| "Failed to add worker2")?;
+            rx2
+        };
+        verify_initial_connection_message(WORKER_ID2, &mut rx_from_worker2).await;
+
+        let mut expected_action_state = ActionState {
+            // Name is a random string, so we ignore it and just make it the same.
+            name: "UNKNOWN_HERE".to_string(),
+            action_digest: action_digest.clone(),
+            stage: ActionStage::Executing,
+        };
+
+        let execution_request_for_worker = UpdateForWorker {
+            update: Some(update_for_worker::Update::StartAction(StartExecute {
+                execute_request: Some(ExecuteRequest {
+                    instance_name: INSTANCE_NAME.to_string(),
+                    skip_cache_lookup: true,
+                    action_digest: Some(action_digest.clone().into()),
+                    ..Default::default()
+                }),
+            })),
+        };
+
+        {
+            // Worker1 should now see execution request.
+            let msg_for_worker = rx_from_worker1.recv().await.unwrap();
+            assert_eq!(msg_for_worker, execution_request_for_worker);
+        }
+
+        {
+            // Client should get notification saying it's being executed.
+            let action_state = client_rx.borrow_and_update();
+            // We now know the name of the action so populate it.
+            expected_action_state.name = action_state.name.clone();
+            assert_eq!(action_state.as_ref(), &expected_action_state);
+        }
+
+        // Keep worker 2 alive.
+        scheduler
+            .worker_keep_alive_received(&WORKER_ID2, NOW_TIME + BASE_WORKER_TIMEOUT_S)
+            .await?;
+        // This should remove worker 1 (the one executing our job).
+        scheduler
+            .remove_timedout_workers(NOW_TIME + BASE_WORKER_TIMEOUT_S)
+            .await?;
+
+        {
+            // Worker1 should have received a disconnect message.
+            let msg_for_worker = rx_from_worker1.recv().await.unwrap();
+            assert_eq!(
+                msg_for_worker,
+                UpdateForWorker {
+                    update: Some(update_for_worker::Update::Disconnect(()))
+                }
+            );
+        }
+        {
+            // Client should get notification saying it's being executed.
+            let action_state = client_rx.borrow_and_update();
+            expected_action_state.stage = ActionStage::Executing;
+            assert_eq!(action_state.as_ref(), &expected_action_state);
+        }
+        {
+            // Worker2 should now see execution request.
+            let msg_for_worker = rx_from_worker2.recv().await.unwrap();
+            assert_eq!(msg_for_worker, execution_request_for_worker);
         }
 
         Ok(())

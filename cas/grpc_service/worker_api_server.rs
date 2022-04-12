@@ -2,7 +2,7 @@
 
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures::{stream::unfold, Stream};
 use tokio::sync::mpsc;
@@ -10,26 +10,45 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 use common::log;
-use error::{Error, ResultExt};
+use error::{make_err, Code, Error, ResultExt};
 use platform_property_manager::{PlatformProperties, PlatformPropertyManager};
 use proto::com::github::allada::turbo_cache::remote_execution::{
-    worker_api_server::WorkerApi, ExecuteResult, SupportedProperties, UpdateForWorker,
+    worker_api_server::WorkerApi, ExecuteResult, GoingAwayRequest, KeepAliveRequest, SupportedProperties,
+    UpdateForWorker,
 };
 use scheduler::Scheduler;
 use worker::{Worker, WorkerId};
 
-type ConnectWorkerStream = Pin<Box<dyn Stream<Item = Result<UpdateForWorker, Status>> + Send + Sync + 'static>>;
+pub type ConnectWorkerStream = Pin<Box<dyn Stream<Item = Result<UpdateForWorker, Status>> + Send + Sync + 'static>>;
+
+pub type NowFn = dyn Fn() -> Result<Duration, Error> + Send + Sync + 'static;
 
 pub struct WorkerApiServer {
     platform_property_manager: Arc<PlatformPropertyManager>,
     scheduler: Arc<Scheduler>,
+    now_fn: &'static NowFn,
 }
 
 impl WorkerApiServer {
     pub fn new(platform_property_manager: Arc<PlatformPropertyManager>, scheduler: Arc<Scheduler>) -> Self {
+        Self::new_with_now_fn(platform_property_manager, scheduler, &|| {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|_| make_err!(Code::Internal, "System time is now behind unix epoch"))
+        })
+    }
+
+    /// Same as new(), but you can pass a custom `now_fn`, that returns a Duration since UNIX_EPOCH
+    /// representing the current time. Used mostly in  unit tests.
+    pub fn new_with_now_fn(
+        platform_property_manager: Arc<PlatformPropertyManager>,
+        scheduler: Arc<Scheduler>,
+        now_fn: &'static NowFn,
+    ) -> Self {
         Self {
             platform_property_manager,
             scheduler,
+            now_fn,
         }
     }
 
@@ -57,7 +76,7 @@ impl WorkerApiServer {
         // Now register the worker with the scheduler.
         let worker_id = {
             let worker_id = Uuid::new_v4().as_u128();
-            let worker = Worker::new(WorkerId(worker_id), platform_properties, tx);
+            let worker = Worker::new(WorkerId(worker_id), platform_properties, tx, (self.now_fn)()?.as_secs());
             self.scheduler
                 .add_worker(worker)
                 .await
@@ -81,6 +100,15 @@ impl WorkerApiServer {
             },
         ))))
     }
+
+    async fn inner_keep_alive(&self, keep_alive_request: KeepAliveRequest) -> Result<Response<()>, Error> {
+        let worker_id: WorkerId = keep_alive_request.worker_id.try_into()?;
+        self.scheduler
+            .worker_keep_alive_received(&worker_id, (self.now_fn)()?.as_secs())
+            .await
+            .err_tip(|| "Could not process keep_alive from worker in inner_keep_alive()")?;
+        Ok(Response::new(()))
+    }
 }
 
 #[tonic::async_trait]
@@ -103,11 +131,21 @@ impl WorkerApi for WorkerApiServer {
         return resp.map_err(|e| e.into());
     }
 
-    async fn keep_alive(&self, _grpc_request: Request<()>) -> Result<Response<()>, Status> {
-        unimplemented!();
+    async fn keep_alive(&self, grpc_request: Request<KeepAliveRequest>) -> Result<Response<()>, Status> {
+        let now = Instant::now();
+        log::info!("\x1b[0;31mkeep_alive Req\x1b[0m: {:?}", grpc_request.get_ref());
+        let keep_alive_request = grpc_request.into_inner();
+        let resp = self.inner_keep_alive(keep_alive_request).await;
+        let d = now.elapsed().as_secs_f32();
+        if let Err(err) = resp.as_ref() {
+            log::error!("\x1b[0;31mkeep_alive Resp\x1b[0m: {} {:?}", d, err);
+        } else {
+            log::info!("\x1b[0;31mkeep_alive Resp\x1b[0m: {}", d);
+        }
+        return resp.map_err(|e| e.into());
     }
 
-    async fn going_away(&self, _grpc_request: Request<()>) -> Result<Response<()>, Status> {
+    async fn going_away(&self, _grpc_request: Request<GoingAwayRequest>) -> Result<Response<()>, Status> {
         unimplemented!();
     }
 

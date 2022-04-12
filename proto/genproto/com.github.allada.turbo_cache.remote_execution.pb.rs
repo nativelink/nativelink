@@ -1,4 +1,18 @@
 // Copyright 2020 Nathan (Blaise) Bruer.  All rights reserved.
+//// Request object for keep alive requests.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct KeepAliveRequest {
+    //// ID of the worker making the request.
+    #[prost(string, tag = "1")]
+    pub worker_id: ::prost::alloc::string::String,
+}
+//// Request object for going away requests.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct GoingAwayRequest {
+    //// ID of the worker making the request.
+    #[prost(string, tag = "1")]
+    pub worker_id: ::prost::alloc::string::String,
+}
 //// Represents the initial request sent to the scheduler informing the
 //// scheduler about this worker's capabilities.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -21,9 +35,11 @@ pub struct SupportedProperties {
 //// Represents the result of an execution.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecuteResult {
+    #[prost(string, tag = "1")]
+    pub worker_id: ::prost::alloc::string::String,
     //// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
     //// for details.
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag = "2")]
     pub execute_response: ::core::option::Option<
         super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteResponse,
     >,
@@ -38,7 +54,7 @@ pub struct ConnectionResult {
 //// Communication from the scheduler to the worker.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateForWorker {
-    #[prost(oneof = "update_for_worker::Update", tags = "1, 2, 3")]
+    #[prost(oneof = "update_for_worker::Update", tags = "1, 2, 3, 4")]
     pub update: ::core::option::Option<update_for_worker::Update>,
 }
 /// Nested message and enum types in `UpdateForWorker`.
@@ -60,6 +76,10 @@ pub mod update_for_worker {
         //// requested action.
         #[prost(message, tag = "3")]
         StartAction(super::StartExecute),
+        //// Informs the worker that it has been disconnected from the pool.
+        //// The worker may discard any outstanding work that is being executed.
+        #[prost(message, tag = "4")]
+        Disconnect(()),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -165,7 +185,7 @@ pub mod worker_api_client {
         #[doc = "/ configuration)."]
         pub async fn keep_alive(
             &mut self,
-            request: impl tonic::IntoRequest<()>,
+            request: impl tonic::IntoRequest<super::KeepAliveRequest>,
         ) -> Result<tonic::Response<()>, tonic::Status> {
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
@@ -192,7 +212,7 @@ pub mod worker_api_client {
         #[doc = "/ this case."]
         pub async fn going_away(
             &mut self,
-            request: impl tonic::IntoRequest<()>,
+            request: impl tonic::IntoRequest<super::GoingAwayRequest>,
         ) -> Result<tonic::Response<()>, tonic::Status> {
             self.inner.ready().await.map_err(|e| {
                 tonic::Status::new(
@@ -250,7 +270,7 @@ pub mod worker_api_server {
         #[doc = "/ configuration)."]
         async fn keep_alive(
             &self,
-            request: tonic::Request<()>,
+            request: tonic::Request<super::KeepAliveRequest>,
         ) -> Result<tonic::Response<()>, tonic::Status>;
         #[doc = "/ Informs the scheduler that the service is going offline and"]
         #[doc = "/ should stop issuing any new actions on this worker."]
@@ -265,7 +285,7 @@ pub mod worker_api_server {
         #[doc = "/ this case."]
         async fn going_away(
             &self,
-            request: tonic::Request<()>,
+            request: tonic::Request<super::GoingAwayRequest>,
         ) -> Result<tonic::Response<()>, tonic::Status>;
         #[doc = "/ Informs the scheduler about the result of an execution request."]
         async fn execution_response(
@@ -358,10 +378,13 @@ pub mod worker_api_server {
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/KeepAlive" => {
                     #[allow(non_camel_case_types)]
                     struct KeepAliveSvc<T: WorkerApi>(pub Arc<T>);
-                    impl<T: WorkerApi> tonic::server::UnaryService<()> for KeepAliveSvc<T> {
+                    impl<T: WorkerApi> tonic::server::UnaryService<super::KeepAliveRequest> for KeepAliveSvc<T> {
                         type Response = ();
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(&mut self, request: tonic::Request<()>) -> Self::Future {
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::KeepAliveRequest>,
+                        ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move { (*inner).keep_alive(request).await };
                             Box::pin(fut)
@@ -386,10 +409,13 @@ pub mod worker_api_server {
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/GoingAway" => {
                     #[allow(non_camel_case_types)]
                     struct GoingAwaySvc<T: WorkerApi>(pub Arc<T>);
-                    impl<T: WorkerApi> tonic::server::UnaryService<()> for GoingAwaySvc<T> {
+                    impl<T: WorkerApi> tonic::server::UnaryService<super::GoingAwayRequest> for GoingAwaySvc<T> {
                         type Response = ();
                         type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
-                        fn call(&mut self, request: tonic::Request<()>) -> Self::Future {
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::GoingAwayRequest>,
+                        ) -> Self::Future {
                             let inner = self.0.clone();
                             let fut = async move { (*inner).going_away(request).await };
                             Box::pin(fut)

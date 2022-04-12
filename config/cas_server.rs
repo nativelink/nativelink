@@ -82,6 +82,12 @@ pub struct ExecutionConfig {
     /// This store name referenced here may be reused multiple times.
     /// This value must be a CAS store reference.
     pub cas_store: StoreRefName,
+
+    /// Remove workers from pool once the worker has not responded in this
+    /// amount of time in seconds.
+    /// Default: 5 (seconds)
+    #[serde(default)]
+    pub worker_timeout_s: u64,
 }
 
 #[derive(Deserialize, Debug)]

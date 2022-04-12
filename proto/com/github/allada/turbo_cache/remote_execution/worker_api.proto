@@ -25,7 +25,7 @@ service WorkerApi {
     /// may close the connection if the worker has not sent any messages
     /// after some amount of time (configured in the scheduler's
     /// configuration).
-    rpc KeepAlive(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc KeepAlive(KeepAliveRequest) returns (google.protobuf.Empty);
 
     /// Informs the scheduler that the service is going offline and
     /// should stop issuing any new actions on this worker.
@@ -38,10 +38,24 @@ service WorkerApi {
     /// Any job that was running on this instance likely needs to be
     /// executed again, but up to the scheduler on how or when to handle
     /// this case.
-    rpc GoingAway(google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc GoingAway(GoingAwayRequest) returns (google.protobuf.Empty);
 
     /// Informs the scheduler about the result of an execution request.
     rpc ExecutionResponse(ExecuteResult) returns (google.protobuf.Empty);
+}
+
+/// Request object for keep alive requests.
+message KeepAliveRequest {
+    /// ID of the worker making the request.
+    string worker_id = 1;
+    reserved 2; // NextId.
+}
+
+/// Request object for going away requests.
+message GoingAwayRequest {
+    /// ID of the worker making the request.
+    string worker_id = 1;
+    reserved 2; // NextId.
 }
 
 /// Represents the initial request sent to the scheduler informing the
@@ -63,10 +77,11 @@ message SupportedProperties {
 
 /// Represents the result of an execution.
 message ExecuteResult {
+    string worker_id = 1;
     /// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
     /// for details.
-    build.bazel.remote.execution.v2.ExecuteResponse execute_response = 1;
-    reserved 2; // NextId.
+    build.bazel.remote.execution.v2.ExecuteResponse execute_response = 2;
+    reserved 3; // NextId.
 }
 
 /// Result sent back from the server when a node connects.
@@ -93,8 +108,12 @@ message UpdateForWorker {
         /// Informs the worker about some work it should begin performing the
         /// requested action.
         StartExecute start_action = 3;
+
+        /// Informs the worker that it has been disconnected from the pool.
+        /// The worker may discard any outstanding work that is being executed.
+        google.protobuf.Empty disconnect = 4;
     }
-    reserved 4; // NextId.
+    reserved 5; // NextId.
 }
 
 message StartExecute {
