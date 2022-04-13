@@ -7,6 +7,7 @@ use std::time::Duration;
 use tokio_stream::StreamExt;
 use tonic::Request;
 
+use config::cas_server::SchedulerConfig;
 use error::{Error, ResultExt};
 use platform_property_manager::PlatformPropertyManager;
 use proto::com::github::allada::turbo_cache::remote_execution::{
@@ -32,7 +33,10 @@ fn static_now_fn() -> Result<Duration, Error> {
 
 async fn setup_api_server(worker_timeout: u64, now_fn: NowFn) -> Result<TestContext, Error> {
     let platform_properties = HashMap::new();
-    let scheduler = Arc::new(Scheduler::new(worker_timeout));
+    let scheduler = Arc::new(Scheduler::new(&SchedulerConfig {
+        worker_timeout_s: worker_timeout,
+        ..Default::default()
+    }));
     let worker_api_server = WorkerApiServer::new_with_now_fn(
         Arc::new(PlatformPropertyManager::new(platform_properties)),
         scheduler.clone(),

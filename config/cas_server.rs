@@ -10,6 +10,10 @@ use backends;
 /// in the `CasConfig::stores`'s map key.
 pub type StoreRefName = String;
 
+/// Name of the scheduler. This type will be used when referencing a
+/// scheduler in the `CasConfig::schedulers`'s map key.
+pub type SchedulerRefName = String;
+
 /// Used when the config references `instance_name` in the protocol.
 pub type InstanceName = String;
 
@@ -28,7 +32,7 @@ pub struct CasStoreConfig {
 }
 
 #[derive(Deserialize, Debug, Default)]
-pub struct CapabilitiesConfig {
+pub struct SchedulerConfig {
     /// A list of supported platform properties mapped to how these properties
     /// are used when the scheduler looks for worker nodes capable of running
     /// the task.
@@ -54,6 +58,23 @@ pub struct CapabilitiesConfig {
     /// property labels other and entirely driven by worker configs and this
     /// config.
     pub supported_platform_properties: Option<HashMap<String, PropertyType>>,
+
+    /// Remove workers from pool once the worker has not responded in this
+    /// amount of time in seconds.
+    /// Default: 5 (seconds)
+    #[serde(default)]
+    pub worker_timeout_s: u64,
+}
+
+#[derive(Deserialize, Debug, Default)]
+pub struct CapabilitiesRemoteExecutionConfig {
+    /// Scheduler used to configure the capabilities of remote execution.
+    pub scheduler: SchedulerRefName,
+}
+
+#[derive(Deserialize, Debug, Default)]
+pub struct CapabilitiesConfig {
+    pub remote_execution: Option<CapabilitiesRemoteExecutionConfig>,
 }
 
 /// When the scheduler matches tasks to workers that are capable of running
@@ -83,11 +104,8 @@ pub struct ExecutionConfig {
     /// This value must be a CAS store reference.
     pub cas_store: StoreRefName,
 
-    /// Remove workers from pool once the worker has not responded in this
-    /// amount of time in seconds.
-    /// Default: 5 (seconds)
-    #[serde(default)]
-    pub worker_timeout_s: u64,
+    /// The scheduler name referenced in the `schedulers` map in the main config.
+    pub scheduler: SchedulerRefName,
 }
 
 #[derive(Deserialize, Debug)]
@@ -140,8 +158,13 @@ pub struct ServerConfig {
 #[derive(Deserialize, Debug)]
 pub struct CasConfig {
     /// List of stores available to use in this config.
-    /// The keys can be used in other conigs when needing to reference a store.
+    /// The keys can be used in other configs when needing to reference a store.
     pub stores: HashMap<StoreRefName, backends::StoreConfig>,
+
+    /// List of schedulers available to use in this config.
+    /// The keys can be used in other configs when needing to reference a
+    /// scheduler.
+    pub schedulers: Option<HashMap<SchedulerRefName, SchedulerConfig>>,
 
     /// Servers to setup for this process.
     pub servers: Vec<ServerConfig>,

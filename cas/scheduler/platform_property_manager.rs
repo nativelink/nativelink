@@ -85,6 +85,11 @@ impl PlatformPropertyManager {
         Self { known_properties }
     }
 
+    /// Returns the `known_properties` map.
+    pub fn get_known_properties(&self) -> &HashMap<String, PropertyType> {
+        &self.known_properties
+    }
+
     /// Given a specific key and value, returns the translated `PlatformPropertyValue`. This will
     /// automatically convert any strings to the type-value pairs of `PlatformPropertyValue` based
     /// on the configuration passed into the `PlatformPropertyManager` constructor.

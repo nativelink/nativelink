@@ -16,6 +16,7 @@ rust_library(
     name = "scheduler",
     srcs = ["scheduler.rs"],
     deps = [
+        "//config",
         "//third_party:fast_async_mutex",
         "//third_party:lru",
         "//third_party:rand",
@@ -23,6 +24,7 @@ rust_library(
         "//util:common",
         "//util:error",
         ":action_messages",
+        ":platform_property_manager",
         ":worker",
     ],
     visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
@@ -60,6 +62,7 @@ rust_test(
     name = "scheduler_test",
     srcs = ["tests/scheduler_test.rs"],
     deps = [
+        "//config",
         "//proto",
         "//third_party:pretty_assertions",
         "//third_party:tokio",

@@ -14,9 +14,9 @@ use tonic::{Request, Response, Status};
 use ac_utils::get_and_decode_digest;
 use action_messages::ActionInfo;
 use common::{log, DigestInfo};
-use config::cas_server::{CapabilitiesConfig, ExecutionConfig, InstanceName};
+use config::cas_server::{ExecutionConfig, InstanceName};
 use error::{make_input_err, Error, ResultExt};
-use platform_property_manager::{PlatformProperties, PlatformPropertyManager};
+use platform_property_manager::PlatformProperties;
 use proto::build::bazel::remote::execution::v2::{
     execution_server::Execution, execution_server::ExecutionServer as Server, Action, ExecuteRequest,
     WaitExecutionRequest,
@@ -28,13 +28,9 @@ use store::{Store, StoreManager};
 /// Default priority remote execution jobs will get when not provided.
 const DEFAULT_EXECUTION_PRIORITY: i64 = 0;
 
-/// Default timeout for workers in seconds.
-const DEFAULT_WORKER_TIMEOUT_S: u64 = 5;
-
 struct InstanceInfo {
     scheduler: Arc<Scheduler>,
     cas_store: Arc<dyn Store>,
-    platform_property_manager: PlatformPropertyManager,
 }
 
 impl InstanceInfo {
@@ -73,7 +69,8 @@ impl InstanceInfo {
         if let Some(platform) = &action.platform {
             for property in &platform.properties {
                 let platform_property = self
-                    .platform_property_manager
+                    .scheduler
+                    .get_platform_property_manager()
                     .make_prop_value(&property.name, &property.value)
                     .err_tip(|| "Failed to convert platform property in queue_action")?;
                 platform_properties.insert(property.name.clone(), platform_property);
@@ -107,37 +104,29 @@ type ExecuteStream = Pin<Box<dyn Stream<Item = Result<Operation, Status>> + Send
 impl ExecutionServer {
     pub fn new(
         config: &HashMap<InstanceName, ExecutionConfig>,
-        capabilities_config: &HashMap<InstanceName, CapabilitiesConfig>,
+        scheduler_map: &HashMap<String, Arc<Scheduler>>,
         store_manager: &StoreManager,
     ) -> Result<Self, Error> {
         let mut instance_infos = HashMap::with_capacity(config.len());
         for (instance_name, exec_cfg) in config {
-            let capabilities_cfg = capabilities_config
-                .get(instance_name)
-                .err_tip(|| "Capabilities needs config for '{}' because it exists in execution")?;
             let cas_store = store_manager
                 .get_store(&exec_cfg.cas_store)
                 .ok_or_else(|| make_input_err!("'cas_store': '{}' does not exist", exec_cfg.cas_store))?;
-            let platform_property_manager = PlatformPropertyManager::new(
-                capabilities_cfg
-                    .supported_platform_properties
-                    .clone()
-                    .unwrap_or(HashMap::new()),
-            );
-            let mut worker_timeout_s = exec_cfg.worker_timeout_s;
-            if worker_timeout_s == 0 {
-                worker_timeout_s = DEFAULT_WORKER_TIMEOUT_S;
-            }
-            let scheduler = Arc::new(Scheduler::new(worker_timeout_s));
+            let scheduler = scheduler_map
+                .get(&exec_cfg.scheduler)
+                .err_tip(|| {
+                    format!(
+                        "Scheduler needs config for '{}' because it exists in execution",
+                        exec_cfg.scheduler
+                    )
+                })?
+                .clone();
+
+            // This will protect us from holding a reference to the scheduler forever in the
+            // event our ExecutionServer dies. Our scheduler is a weak ref, so the spawn will
+            // eventually see the Arc went away and return.
             let weak_scheduler = Arc::downgrade(&scheduler);
-            instance_infos.insert(
-                instance_name.to_string(),
-                InstanceInfo {
-                    scheduler,
-                    cas_store,
-                    platform_property_manager,
-                },
-            );
+            instance_infos.insert(instance_name.to_string(), InstanceInfo { scheduler, cas_store });
             tokio::spawn(async move {
                 let mut ticker = interval(Duration::from_secs(1));
                 loop {

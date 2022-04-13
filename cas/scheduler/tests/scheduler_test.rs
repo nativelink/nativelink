@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 
 use action_messages::{ActionInfo, ActionStage, ActionState};
 use common::DigestInfo;
+use config::cas_server::SchedulerConfig;
 use error::{Error, ResultExt};
 use platform_property_manager::{PlatformProperties, PlatformPropertyValue};
 use proto::build::bazel::remote::execution::v2::ExecuteRequest;
@@ -58,7 +59,7 @@ mod scheduler_tests {
     async fn basic_add_action_with_one_worker_test() -> Result<(), Error> {
         const WORKER_ID: WorkerId = WorkerId(0x123456789111);
 
-        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
+        let scheduler = Scheduler::new(&SchedulerConfig::default());
         let action_digest = DigestInfo::new([99u8; 32], 512);
 
         let mut rx_from_worker = {
@@ -109,7 +110,7 @@ mod scheduler_tests {
 
     #[tokio::test]
     async fn worker_should_not_queue_if_properties_dont_match_test() -> Result<(), Error> {
-        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
+        let scheduler = Scheduler::new(&SchedulerConfig::default());
         let action_digest = DigestInfo::new([99u8; 32], 512);
         let mut platform_properties = PlatformProperties::default();
         platform_properties
@@ -197,7 +198,7 @@ mod scheduler_tests {
     async fn cacheable_items_join_same_action_queued_test() -> Result<(), Error> {
         const WORKER_ID: WorkerId = WorkerId(0x100009);
 
-        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
+        let scheduler = Scheduler::new(&SchedulerConfig::default());
         let action_digest = DigestInfo::new([99u8; 32], 512);
 
         let mut expected_action_state = ActionState {
@@ -278,7 +279,7 @@ mod scheduler_tests {
     #[tokio::test]
     async fn worker_disconnects_does_not_schedule_for_execution_test() -> Result<(), Error> {
         const WORKER_ID: WorkerId = WorkerId(0x100010);
-        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
+        let scheduler = Scheduler::new(&SchedulerConfig::default());
         let action_digest = DigestInfo::new([99u8; 32], 512);
         let platform_properties = PlatformProperties::default();
 
@@ -318,7 +319,10 @@ mod scheduler_tests {
     async fn worker_timesout_reschedules_running_job_test() -> Result<(), Error> {
         const WORKER_ID1: WorkerId = WorkerId(0x111111);
         const WORKER_ID2: WorkerId = WorkerId(0x222222);
-        let scheduler = Scheduler::new(BASE_WORKER_TIMEOUT_S);
+        let scheduler = Scheduler::new(&SchedulerConfig {
+            worker_timeout_s: BASE_WORKER_TIMEOUT_S,
+            ..Default::default()
+        });
         let action_digest = DigestInfo::new([99u8; 32], 512);
         let platform_properties = PlatformProperties::default();
 

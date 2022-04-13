@@ -103,31 +103,8 @@
           "ac_store": "AC_MAIN_STORE"
         }
       },
-      "execution": {
-        "main": {
-          "cas_store": "CAS_MAIN_STORE",
-        }
-      },
       "capabilities": {
-        "main": {
-          "supported_platform_properties": {
-            "cpu_count": "Minimum",
-            "memory_kb": "Minimum",
-            "network_kbps": "Minimum",
-            "disk_read_iops": "Minimum",
-            "disk_read_bps": "Minimum",
-            "disk_write_iops": "Minimum",
-            "disk_write_bps": "Minimum",
-            "shm_size": "Minimum",
-            "gpu_count": "Minimum",
-            "gpu_model": "Exact",
-            "cpu_vendor": "Exact",
-            "cpu_arch": "Exact",
-            "cpu_model": "Exact",
-            "kernel_version": "Exact",
-            "docker_image": "Metadata",
-          }
-        }
+        "main": {},
       },
       "bytestream": {
         "cas_stores": {

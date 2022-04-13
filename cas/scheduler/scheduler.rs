@@ -11,8 +11,13 @@ use tokio::sync::watch;
 
 use action_messages::{ActionInfo, ActionStage, ActionState};
 use common::log;
+use config::cas_server::SchedulerConfig;
 use error::{error_if, make_input_err, Error, ResultExt};
+use platform_property_manager::PlatformPropertyManager;
 use worker::{Worker, WorkerId, WorkerTimestamp, WorkerUpdate};
+
+/// Default timeout for workers in seconds.
+const DEFAULT_WORKER_TIMEOUT_S: u64 = 5;
 
 /// An action that is being awaited on and last known state.
 struct AwaitedAction {
@@ -291,10 +296,23 @@ impl SchedulerImpl {
 /// should be held in this struct.
 pub struct Scheduler {
     inner: Mutex<SchedulerImpl>,
+    platform_property_manager: PlatformPropertyManager,
 }
 
 impl Scheduler {
-    pub fn new(worker_timeout_s: u64) -> Self {
+    pub fn new(scheduler_cfg: &SchedulerConfig) -> Self {
+        let platform_property_manager = PlatformPropertyManager::new(
+            scheduler_cfg
+                .supported_platform_properties
+                .clone()
+                .unwrap_or(HashMap::new()),
+        );
+
+        let mut worker_timeout_s = scheduler_cfg.worker_timeout_s;
+        if worker_timeout_s == 0 {
+            worker_timeout_s = DEFAULT_WORKER_TIMEOUT_S;
+        }
+
         Self {
             inner: Mutex::new(SchedulerImpl {
                 queued_actions_set: HashSet::new(),
@@ -303,7 +321,12 @@ impl Scheduler {
                 active_actions: HashMap::new(),
                 worker_timeout_s,
             }),
+            platform_property_manager,
         }
+    }
+
+    pub fn get_platform_property_manager(&self) -> &PlatformPropertyManager {
+        &self.platform_property_manager
     }
 
     /// Adds a worker to the scheduler and begin using it to execute actions (when able).

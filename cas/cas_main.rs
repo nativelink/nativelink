@@ -17,6 +17,7 @@ use config::cas_server::CasConfig;
 use default_store_factory::store_factory;
 use error::ResultExt;
 use execution_server::ExecutionServer;
+use scheduler::Scheduler;
 use store::StoreManager;
 
 const DEFAULT_CONFIG_FILE: &str = "<built-in example in config/examples/basic_cas.json>";
@@ -66,6 +67,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
+    let mut schedulers = HashMap::new();
+    if let Some(schedulers_cfg) = cfg.schedulers {
+        for (scheduler_name, scheduler_cfg) in schedulers_cfg {
+            schedulers.insert(scheduler_name, Arc::new(Scheduler::new(&scheduler_cfg)));
+        }
+    }
+
     let mut servers: Vec<BoxFuture<Result<(), tonic::transport::Error>>> = Vec::new();
     for server_cfg in cfg.servers {
         let mut server = Server::builder();
@@ -94,8 +102,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 services
                     .execution
                     .map_or(Ok(None), |cfg| {
-                        ExecutionServer::new(&cfg, &capabilities_config, &store_manager)
-                            .and_then(|v| Ok(Some(v.into_service())))
+                        ExecutionServer::new(&cfg, &schedulers, &store_manager).and_then(|v| Ok(Some(v.into_service())))
                     })
                     .err_tip(|| "Could not create Execution service")?,
             )
@@ -108,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .err_tip(|| "Could not create ByteStream service")?,
             )
             .add_optional_service(
-                CapabilitiesServer::new(&capabilities_config).and_then(|v| Ok(Some(v.into_service())))?,
+                CapabilitiesServer::new(&capabilities_config, &schedulers).and_then(|v| Ok(Some(v.into_service())))?,
             );
 
         let addr = server_cfg.listen_address.parse()?;

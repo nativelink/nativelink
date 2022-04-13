@@ -47,7 +47,6 @@ A very basic configuration that is a pure in-memory store is:
       "capabilities": {
         "main": {}
       },
-      "execution": {},
       "bytestream": {
         "cas_stores": {
           "main": "CAS_MAIN_STORE",

@@ -41,6 +41,7 @@ rust_library(
     name = "capabilities_server",
     srcs = ["capabilities_server.rs"],
     deps = [
+        "//cas/scheduler",
         "//cas/store",
         "//config",
         "//proto",
@@ -128,6 +129,7 @@ rust_test(
         "//cas/scheduler",
         "//cas/scheduler:platform_property_manager",
         "//cas/scheduler:worker",
+        "//config",
         "//proto",
         "//third_party:pretty_assertions",
         "//third_party:tokio",
