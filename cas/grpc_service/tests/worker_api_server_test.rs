@@ -209,3 +209,29 @@ pub mod keep_alive_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+pub mod going_away_tests {
+    use super::*;
+
+    #[tokio::test]
+    pub async fn going_away_removes_worker() -> Result<(), Box<dyn std::error::Error>> {
+        let test_context = setup_api_server(BASE_WORKER_TIMEOUT_S, Box::new(static_now_fn)).await?;
+
+        let worker_exists = test_context
+            .scheduler
+            .contains_worker_for_test(&test_context.worker_id)
+            .await;
+        assert!(worker_exists, "Expected worker to exist in worker map");
+
+        test_context.scheduler.remove_worker(test_context.worker_id).await;
+
+        let worker_exists = test_context
+            .scheduler
+            .contains_worker_for_test(&test_context.worker_id)
+            .await;
+        assert!(!worker_exists, "Expected worker to be removed from worker map");
+
+        Ok(())
+    }
+}

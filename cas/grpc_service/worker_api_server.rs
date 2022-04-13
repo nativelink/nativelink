@@ -124,6 +124,12 @@ impl WorkerApiServer {
             .err_tip(|| "Could not process keep_alive from worker in inner_keep_alive()")?;
         Ok(Response::new(()))
     }
+
+    async fn inner_going_away(&self, going_away_request: GoingAwayRequest) -> Result<Response<()>, Error> {
+        let worker_id: WorkerId = going_away_request.worker_id.try_into()?;
+        self.scheduler.remove_worker(worker_id).await;
+        Ok(Response::new(()))
+    }
 }
 
 #[tonic::async_trait]
@@ -149,8 +155,8 @@ impl WorkerApi for WorkerApiServer {
     async fn keep_alive(&self, grpc_request: Request<KeepAliveRequest>) -> Result<Response<()>, Status> {
         let now = Instant::now();
         log::info!("\x1b[0;31mkeep_alive Req\x1b[0m: {:?}", grpc_request.get_ref());
-        let keep_alive_request = grpc_request.into_inner();
-        let resp = self.inner_keep_alive(keep_alive_request).await;
+        let going_away_request = grpc_request.into_inner();
+        let resp = self.inner_keep_alive(going_away_request).await;
         let d = now.elapsed().as_secs_f32();
         if let Err(err) = resp.as_ref() {
             log::error!("\x1b[0;31mkeep_alive Resp\x1b[0m: {} {:?}", d, err);
@@ -160,8 +166,18 @@ impl WorkerApi for WorkerApiServer {
         return resp.map_err(|e| e.into());
     }
 
-    async fn going_away(&self, _grpc_request: Request<GoingAwayRequest>) -> Result<Response<()>, Status> {
-        unimplemented!();
+    async fn going_away(&self, grpc_request: Request<GoingAwayRequest>) -> Result<Response<()>, Status> {
+        let now = Instant::now();
+        log::info!("\x1b[0;31mgoing_away Req\x1b[0m: {:?}", grpc_request.get_ref());
+        let going_away_request = grpc_request.into_inner();
+        let resp = self.inner_going_away(going_away_request).await;
+        let d = now.elapsed().as_secs_f32();
+        if let Err(err) = resp.as_ref() {
+            log::error!("\x1b[0;31mgoing_away Resp\x1b[0m: {} {:?}", d, err);
+        } else {
+            log::info!("\x1b[0;31mgoing_away Resp\x1b[0m: {}", d);
+        }
+        return resp.map_err(|e| e.into());
     }
 
     async fn execution_response(&self, _grpc_request: Request<ExecuteResult>) -> Result<Response<()>, Status> {

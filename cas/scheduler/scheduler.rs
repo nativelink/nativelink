@@ -370,6 +370,13 @@ impl Scheduler {
             .err_tip(|| "Error refreshing lifetime in worker_keep_alive_received()")
     }
 
+    /// Removes worker from pool and reschedule any tasks that might be running on it.
+    pub async fn remove_worker(&self, worker_id: WorkerId) {
+        let mut inner = self.inner.lock().await;
+        inner.immediate_evict_worker(&worker_id);
+        inner.do_try_match();
+    }
+
     pub async fn remove_timedout_workers(&self, now_timestamp: WorkerTimestamp) -> Result<(), Error> {
         let mut inner = self.inner.lock().await;
         // Items should be sorted based on last_update_timestamp, so we don't need to iterate the entire
