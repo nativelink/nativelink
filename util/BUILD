@@ -9,6 +9,7 @@ rust_library(
         "//proto",
         "//third_party:hex",
         "//third_party:prost",
+        "//third_party:prost_types",
         "//third_party:tokio",
         "//third_party:tonic",
     ],

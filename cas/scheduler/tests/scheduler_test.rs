@@ -2,11 +2,14 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::sync::{mpsc, watch};
 
-use action_messages::{ActionInfo, ActionStage, ActionState};
+use action_messages::{
+    ActionInfo, ActionInfoHashKey, ActionResult, ActionStage, ActionState, DirectoryInfo, ExecutionMetadata, FileInfo,
+    NameOrPath, SymlinkInfo,
+};
 use common::DigestInfo;
 use config::cas_server::SchedulerConfig;
 use error::{Error, ResultExt};
@@ -23,7 +26,6 @@ const INSTANCE_NAME: &str = "foobar_instance_name";
 fn make_base_action_info() -> ActionInfo {
     ActionInfo {
         instance_name: INSTANCE_NAME.to_string(),
-        digest: DigestInfo::new([0u8; 32], 0),
         command_digest: DigestInfo::new([0u8; 32], 0),
         input_root_digest: DigestInfo::new([0u8; 32], 0),
         timeout: Duration::MAX,
@@ -32,7 +34,10 @@ fn make_base_action_info() -> ActionInfo {
         },
         priority: 0,
         insert_timestamp: SystemTime::now(),
-        salt: 0,
+        unique_qualifier: ActionInfoHashKey {
+            digest: DigestInfo::new([0u8; 32], 0),
+            salt: 0,
+        },
     }
 }
 
@@ -49,6 +54,12 @@ async fn verify_initial_connection_message(worker_id: WorkerId, rx: &mut mpsc::U
 }
 
 const NOW_TIME: u64 = 10000;
+
+fn make_system_time(add_time: u64) -> SystemTime {
+    UNIX_EPOCH
+        .checked_add(Duration::from_secs(NOW_TIME + add_time))
+        .unwrap()
+}
 
 async fn setup_new_worker(
     scheduler: &Scheduler,
@@ -69,7 +80,7 @@ async fn setup_action(
 ) -> Result<watch::Receiver<Arc<ActionState>>, Error> {
     let mut action_info = make_base_action_info();
     action_info.platform_properties = platform_properties;
-    action_info.digest = action_digest;
+    action_info.unique_qualifier.digest = action_digest;
     scheduler.add_action(action_info).await
 }
 
@@ -100,6 +111,7 @@ mod scheduler_tests {
                         action_digest: Some(action_digest.clone().into()),
                         ..Default::default()
                     }),
+                    salt: 0,
                 })),
             };
             let msg_for_worker = rx_from_worker.recv().await.unwrap();
@@ -149,6 +161,7 @@ mod scheduler_tests {
                     action_digest: Some(action_digest.clone().into()),
                     ..Default::default()
                 }),
+                salt: 0,
             })),
         };
         {
@@ -234,6 +247,7 @@ mod scheduler_tests {
                         action_digest: Some(action_digest.clone().into()),
                         ..Default::default()
                     }),
+                    salt: 0,
                 })),
             };
             let msg_for_worker = rx_from_worker2.recv().await.unwrap();
@@ -295,6 +309,7 @@ mod scheduler_tests {
                         action_digest: Some(action_digest.clone().into()),
                         ..Default::default()
                     }),
+                    salt: 0,
                 })),
             };
             let msg_for_worker = rx_from_worker.recv().await.unwrap();
@@ -378,6 +393,7 @@ mod scheduler_tests {
                     action_digest: Some(action_digest.clone().into()),
                     ..Default::default()
                 }),
+                salt: 0,
             })),
         };
 
@@ -422,6 +438,175 @@ mod scheduler_tests {
             // Worker2 should now see execution request.
             let msg_for_worker = rx_from_worker2.recv().await.unwrap();
             assert_eq!(msg_for_worker, execution_request_for_worker);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn update_action_sends_completed_result_to_client_test() -> Result<(), Error> {
+        const WORKER_ID: WorkerId = WorkerId(0x123456789111);
+
+        let scheduler = Scheduler::new(&SchedulerConfig::default());
+        let action_digest = DigestInfo::new([99u8; 32], 512);
+
+        let mut rx_from_worker = setup_new_worker(&scheduler, WORKER_ID, Default::default()).await?;
+        let mut client_rx = setup_action(&scheduler, action_digest.clone(), Default::default()).await?;
+
+        {
+            // Other tests check full data. We only care if we got StartAction.
+            match rx_from_worker.recv().await.unwrap().update {
+                Some(update_for_worker::Update::StartAction(_)) => { /* Success */ }
+                v => assert!(false, "Expected StartAction, got : {:?}", v),
+            }
+            // Other tests check full data. We only care if client thinks we are Executing.
+            assert_eq!(client_rx.borrow_and_update().stage, ActionStage::Executing);
+        }
+
+        let action_info_hash_key = ActionInfoHashKey {
+            digest: action_digest.clone(),
+            salt: 0,
+        };
+        let action_result = ActionResult {
+            output_files: vec![FileInfo {
+                name_or_path: NameOrPath::Name("hello".to_string()),
+                digest: DigestInfo::new([5u8; 32], 18),
+                is_executable: true,
+                mtime: make_system_time(111),
+                permissions: 55,
+            }],
+            output_folders: vec![DirectoryInfo {
+                path: "123".to_string(),
+                tree_digest: DigestInfo::new([9u8; 32], 100),
+            }],
+            output_symlinks: vec![SymlinkInfo {
+                name_or_path: NameOrPath::Name("foo".to_string()),
+                target: "bar".to_string(),
+                mtime: make_system_time(99),
+                permissions: 445,
+            }],
+            exit_code: 0,
+            stdout_digest: DigestInfo::new([6u8; 32], 19),
+            stderr_digest: DigestInfo::new([7u8; 32], 20),
+            execution_metadata: ExecutionMetadata {
+                worker: WORKER_ID.to_string(),
+                queued_timestamp: make_system_time(5),
+                worker_start_timestamp: make_system_time(6),
+                worker_completed_timestamp: make_system_time(7),
+                input_fetch_start_timestamp: make_system_time(8),
+                input_fetch_completed_timestamp: make_system_time(9),
+                execution_start_timestamp: make_system_time(10),
+                execution_completed_timestamp: make_system_time(11),
+                output_upload_start_timestamp: make_system_time(12),
+                output_upload_completed_timestamp: make_system_time(13),
+            },
+            server_logs: Default::default(),
+        };
+        scheduler
+            .update_action(
+                &WORKER_ID,
+                &action_info_hash_key,
+                ActionStage::Completed(action_result.clone()),
+            )
+            .await?;
+
+        {
+            // Client should get notification saying it's being completed.
+            let action_state = client_rx.borrow_and_update();
+            let expected_action_state = ActionState {
+                // Name is a random string, so we ignore it and just make it the same.
+                name: action_state.name.clone(),
+                action_digest: action_digest.clone(),
+                stage: ActionStage::Completed(action_result),
+            };
+            assert_eq!(action_state.as_ref(), &expected_action_state);
+        }
+        {
+            // Update info for the action should now be closed (notification happens through Err).
+            let result = client_rx.changed().await;
+            assert!(result.is_err(), "Expected result to be an error : {:?}", result);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn update_action_with_wrong_worker_id_errors_test() -> Result<(), Error> {
+        const GOOD_WORKER_ID: WorkerId = WorkerId(0x123456789111);
+        const ROGUE_WORKER_ID: WorkerId = WorkerId(0x987654321);
+
+        let scheduler = Scheduler::new(&SchedulerConfig::default());
+        let action_digest = DigestInfo::new([99u8; 32], 512);
+
+        let mut rx_from_worker = setup_new_worker(&scheduler, GOOD_WORKER_ID, Default::default()).await?;
+        let mut client_rx = setup_action(&scheduler, action_digest.clone(), Default::default()).await?;
+
+        {
+            // Other tests check full data. We only care if we got StartAction.
+            match rx_from_worker.recv().await.unwrap().update {
+                Some(update_for_worker::Update::StartAction(_)) => { /* Success */ }
+                v => assert!(false, "Expected StartAction, got : {:?}", v),
+            }
+            // Other tests check full data. We only care if client thinks we are Executing.
+            assert_eq!(client_rx.borrow_and_update().stage, ActionStage::Executing);
+        }
+
+        let action_info_hash_key = ActionInfoHashKey {
+            digest: action_digest.clone(),
+            salt: 0,
+        };
+        let action_result = ActionResult {
+            output_files: Default::default(),
+            output_folders: Default::default(),
+            output_symlinks: Default::default(),
+            exit_code: 0,
+            stdout_digest: DigestInfo::new([6u8; 32], 19),
+            stderr_digest: DigestInfo::new([7u8; 32], 20),
+            execution_metadata: ExecutionMetadata {
+                worker: GOOD_WORKER_ID.to_string(),
+                queued_timestamp: make_system_time(5),
+                worker_start_timestamp: make_system_time(6),
+                worker_completed_timestamp: make_system_time(7),
+                input_fetch_start_timestamp: make_system_time(8),
+                input_fetch_completed_timestamp: make_system_time(9),
+                execution_start_timestamp: make_system_time(10),
+                execution_completed_timestamp: make_system_time(11),
+                output_upload_start_timestamp: make_system_time(12),
+                output_upload_completed_timestamp: make_system_time(13),
+            },
+            server_logs: Default::default(),
+        };
+        let update_action_result = scheduler
+            .update_action(
+                &ROGUE_WORKER_ID,
+                &action_info_hash_key,
+                ActionStage::Completed(action_result.clone()),
+            )
+            .await;
+
+        {
+            // Our request should have sent an error back.
+            assert!(
+                update_action_result.is_err(),
+                "Expected error, got: {:?}",
+                &update_action_result
+            );
+            const EXPECTED_ERR: &str = "Got a result from a worker that should not be running the action";
+            let err = update_action_result.unwrap_err();
+            assert!(
+                err.to_string().contains(EXPECTED_ERR),
+                "Error should contain '{}', got: {:?}",
+                EXPECTED_ERR,
+                err
+            );
+        }
+        {
+            // Ensure client did not get notified.
+            assert_eq!(
+                client_rx.has_changed().unwrap(),
+                false,
+                "Client should not have been notified of event"
+            );
         }
 
         Ok(())

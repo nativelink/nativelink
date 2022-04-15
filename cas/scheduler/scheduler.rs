@@ -9,7 +9,7 @@ use lru::LruCache;
 use rand::{thread_rng, Rng};
 use tokio::sync::watch;
 
-use action_messages::{ActionInfo, ActionStage, ActionState};
+use action_messages::{ActionInfo, ActionInfoHashKey, ActionStage, ActionState};
 use common::log;
 use config::cas_server::SchedulerConfig;
 use error::{error_if, make_input_err, Error, ResultExt};
@@ -28,7 +28,7 @@ struct AwaitedAction {
 
 /// Holds the relationship of a worker that is executing a specific action.
 struct RunningAction {
-    _worker_id: WorkerId,
+    worker_id: WorkerId,
     action: AwaitedAction,
 }
 
@@ -170,8 +170,12 @@ impl SchedulerImpl {
 
         // Action needs to be added to queue or is not cacheable.
         let action_info = Arc::new(action_info);
-        let action_digest = action_info.digest.clone();
+        let action_digest = action_info.digest().clone();
 
+        // TODO(allada) This name field needs to be indexable. The client might perform operations
+        // based on the name later. It cannot be the same index used as the workers though, because
+        // we multiplex the same job requests from clients to the same worker, but one client should
+        // not shutdown a job if another client is still waiting on it.
         let current_state = Arc::new(ActionState {
             name: format!("{:X}", thread_rng().gen::<u128>()),
             stage: ActionStage::Queued,
@@ -213,7 +217,7 @@ impl SchedulerImpl {
                             // again.
                             log::warn!(
                                 "Action {} has no more listeners during evict_worker()",
-                                action_info.digest.str()
+                                action_info.digest().str()
                             );
                         }
                     }
@@ -274,13 +278,13 @@ impl SchedulerImpl {
                     // again.
                     log::warn!(
                         "Action {} has no more listeners",
-                        awaited_action.action_info.digest.str()
+                        awaited_action.action_info.digest().str()
                     );
                 }
                 self.active_actions.insert(
                     action_info.clone(),
                     RunningAction {
-                        _worker_id: worker_id,
+                        worker_id: worker_id,
                         action: awaited_action,
                     },
                 );
@@ -288,6 +292,72 @@ impl SchedulerImpl {
             }
         }
         should_run_again
+    }
+
+    async fn update_action(
+        &mut self,
+        worker_id: &WorkerId,
+        action_info_hash_key: &ActionInfoHashKey,
+        action_stage: ActionStage,
+    ) -> Result<(), Error> {
+        match &action_stage {
+            ActionStage::Completed(_) => {}
+            ActionStage::CompletedFromCache(_) => {}
+            ActionStage::Error(_) => {}
+            // Anything that is not one of the above enums is undefined behavior. Probably best
+            // to remove the worker as it probably went rogue.
+            _ => {
+                let msg = format!(
+                    "Worker '{}' set the action_stage of running action {:?} to {:?}. Removing worker.",
+                    worker_id, action_info_hash_key, action_stage
+                );
+                log::error!("{}", msg);
+                self.immediate_evict_worker(worker_id);
+                return Err(make_input_err!("{}", msg));
+            }
+        }
+
+        let (action_info, mut running_action) =
+            self.active_actions.remove_entry(action_info_hash_key).err_tip(|| {
+                format!(
+                    "Could not find action info in active actions : {:?}",
+                    action_info_hash_key
+                )
+            })?;
+
+        if running_action.worker_id != *worker_id {
+            let msg = format!(
+                "Got a result from a worker that should not be running the action, {}",
+                format_args!(
+                    "Removing worker. Expected worker {} got worker {}",
+                    running_action.worker_id, worker_id
+                )
+            );
+            log::error!("{}", msg);
+            // First put it back in our active_actions or we will drop the task.
+            self.active_actions.insert(action_info.clone(), running_action);
+            self.immediate_evict_worker(worker_id);
+            return Err(make_input_err!("{}", msg));
+        }
+
+        Arc::make_mut(&mut running_action.action.current_state).stage = action_stage;
+
+        let send_result = running_action
+            .action
+            .notify_channel
+            .send(running_action.action.current_state);
+        if send_result.is_err() {
+            // Don't remove this task, instead we keep them around for a bit just in case the
+            // client disconnected and will reconnect and ask for same job to be executed again.
+            log::warn!(
+                "Action {} has no more listeners during evict_worker()",
+                action_info.digest().str()
+            );
+        }
+
+        // TODO(allada) We should probably hold a small queue of recent actions for debugging.
+        // Right now it will drop the action which also disconnects listeners here.
+        Ok(())
     }
 }
 
@@ -351,10 +421,15 @@ impl Scheduler {
         inner.add_action(action_info)
     }
 
-    /// Checks to see if the worker exists in the worker pool. Should only be used in unit tests.
-    pub async fn contains_worker_for_test(&self, worker_id: &WorkerId) -> bool {
-        let inner = self.inner.lock().await;
-        inner.workers.workers.contains(worker_id)
+    /// Adds an action to the scheduler for remote execution.
+    pub async fn update_action(
+        &self,
+        worker_id: &WorkerId,
+        action_info_hash_key: &ActionInfoHashKey,
+        action_stage: ActionStage,
+    ) -> Result<(), Error> {
+        let mut inner = self.inner.lock().await;
+        inner.update_action(worker_id, action_info_hash_key, action_stage).await
     }
 
     /// Event for when the keep alive message was received from the worker.
@@ -400,6 +475,12 @@ impl Scheduler {
         }
         inner.do_try_match();
         Ok(())
+    }
+
+    /// Checks to see if the worker exists in the worker pool. Should only be used in unit tests.
+    pub async fn contains_worker_for_test(&self, worker_id: &WorkerId) -> bool {
+        let inner = self.inner.lock().await;
+        inner.workers.workers.contains(worker_id)
     }
 
     /// A unit test function used to send the keep alive message to the worker from the server.

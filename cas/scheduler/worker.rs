@@ -127,6 +127,7 @@ impl Worker {
         self.reduce_platform_properties(&action_info.platform_properties);
         self.send_msg_to_worker(update_for_worker::Update::StartAction(StartExecute {
             execute_request: Some(self.running_action_info.as_ref().unwrap().as_ref().into()),
+            salt: *action_info.salt(),
         }))
     }
 

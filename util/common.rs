@@ -1,5 +1,6 @@
-// Copyright 2020 Nathan (Blaise) Bruer.  All rights reserved.
+// Copyright 2020-2022 Nathan (Blaise) Bruer.  All rights reserved.
 
+use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::future::Future;
@@ -166,5 +167,47 @@ impl<T> Future for JoinHandleDropGuard<T> {
 impl<T> Drop for JoinHandleDropGuard<T> {
     fn drop(&mut self) {
         self.inner.abort();
+    }
+}
+
+pub trait VecExt<T> {
+    fn try_map<F, U>(self, f: F) -> Result<Vec<U>, Error>
+    where
+        Self: Sized,
+        F: (std::ops::Fn(T) -> Result<U, Error>) + Sized;
+}
+
+impl<T> VecExt<T> for Vec<T> {
+    fn try_map<F, U>(self, f: F) -> Result<Vec<U>, Error>
+    where
+        Self: Sized,
+        F: (std::ops::Fn(T) -> Result<U, Error>) + Sized,
+    {
+        let mut output = Vec::with_capacity(self.len());
+        for item in self {
+            output.push((f)(item)?);
+        }
+        Ok(output)
+    }
+}
+
+pub trait HashMapExt<K: std::cmp::Eq + std::hash::Hash, T> {
+    fn try_map<F, U>(self, f: F) -> Result<HashMap<K, U>, Error>
+    where
+        Self: Sized,
+        F: (std::ops::Fn(T) -> Result<U, Error>) + Sized;
+}
+
+impl<K: std::cmp::Eq + std::hash::Hash, T> HashMapExt<K, T> for HashMap<K, T> {
+    fn try_map<F, U>(self, f: F) -> Result<HashMap<K, U>, Error>
+    where
+        Self: Sized,
+        F: (std::ops::Fn(T) -> Result<U, Error>) + Sized,
+    {
+        let mut output = HashMap::with_capacity(self.len());
+        for (k, v) in self {
+            output.insert(k, (f)(v)?);
+        }
+        Ok(output)
     }
 }

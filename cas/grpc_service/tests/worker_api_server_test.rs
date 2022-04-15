@@ -2,16 +2,24 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio_stream::StreamExt;
 use tonic::Request;
 
+use action_messages::{ActionInfo, ActionInfoHashKey, ActionStage};
+use common::DigestInfo;
 use config::cas_server::{SchedulerConfig, WorkerApiConfig};
 use error::{Error, ResultExt};
-use proto::com::github::allada::turbo_cache::remote_execution::{
-    update_for_worker, worker_api_server::WorkerApi, KeepAliveRequest, SupportedProperties,
+use platform_property_manager::PlatformProperties;
+use proto::build::bazel::remote::execution::v2::{
+    ActionResult as ProtoActionResult, ExecuteResponse, ExecutedActionMetadata, LogFile, NodeProperties,
+    OutputDirectory, OutputFile, OutputSymlink,
 };
+use proto::com::github::allada::turbo_cache::remote_execution::{
+    update_for_worker, worker_api_server::WorkerApi, ExecuteResult, KeepAliveRequest, SupportedProperties,
+};
+use proto::google::rpc::Status as ProtoStatus;
 use scheduler::Scheduler;
 use worker::WorkerId;
 use worker_api_server::{ConnectWorkerStream, NowFn, WorkerApiServer};
@@ -215,7 +223,7 @@ pub mod going_away_tests {
     use super::*;
 
     #[tokio::test]
-    pub async fn going_away_removes_worker() -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn going_away_removes_worker_test() -> Result<(), Box<dyn std::error::Error>> {
         let test_context = setup_api_server(BASE_WORKER_TIMEOUT_S, Box::new(static_now_fn)).await?;
 
         let worker_exists = test_context
@@ -232,6 +240,143 @@ pub mod going_away_tests {
             .await;
         assert!(!worker_exists, "Expected worker to be removed from worker map");
 
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+pub mod execution_response_tests {
+    use super::*;
+    use pretty_assertions::assert_eq; // Must be declared in every module.
+
+    fn make_system_time(time: u64) -> SystemTime {
+        UNIX_EPOCH.checked_add(Duration::from_secs(time)).unwrap()
+    }
+
+    #[tokio::test]
+    pub async fn execution_response_success_test() -> Result<(), Box<dyn std::error::Error>> {
+        let test_context = setup_api_server(BASE_WORKER_TIMEOUT_S, Box::new(static_now_fn)).await?;
+
+        const SALT: u64 = 5;
+        let action_digest = DigestInfo::new([7u8; 32], 123);
+
+        let action_info = ActionInfo {
+            instance_name: "instance_name".to_string(),
+            command_digest: DigestInfo::new([0u8; 32], 0),
+            input_root_digest: DigestInfo::new([0u8; 32], 0),
+            timeout: Duration::MAX,
+            platform_properties: PlatformProperties {
+                properties: HashMap::new(),
+            },
+            priority: 0,
+            insert_timestamp: make_system_time(0),
+            unique_qualifier: ActionInfoHashKey {
+                digest: action_digest.clone(),
+                salt: SALT,
+            },
+        };
+        let mut client_action_state_receiver = test_context.scheduler.add_action(action_info).await?;
+
+        let output_file_digest = DigestInfo::new([8u8; 32], 124);
+        let log_digest = DigestInfo::new([9u8; 32], 124);
+        let stdout_digest = DigestInfo::new([10u8; 32], 124);
+        let stderr_digest = DigestInfo::new([11u8; 32], 124);
+        let output_directory_digest = DigestInfo::new([12u8; 32], 124);
+
+        let mut server_logs = HashMap::new();
+        server_logs.insert(
+            "log_name".to_string(),
+            LogFile {
+                digest: Some(log_digest.clone().into()),
+                human_readable: false, // We only support non-human readable.
+            },
+        );
+        let execute_result = ExecuteResult {
+            worker_id: test_context.worker_id.to_string(),
+            action_digest: Some(action_digest.clone().into()),
+            salt: SALT,
+            execute_response: Some(ExecuteResponse {
+                result: Some(ProtoActionResult {
+                    output_files: vec![OutputFile {
+                        path: "some path1".to_string(),
+                        digest: Some(output_file_digest.clone().into()),
+                        is_executable: true,
+                        contents: Default::default(), // We don't implement this.
+                        node_properties: Some(NodeProperties {
+                            properties: Default::default(), // We don't implement this.
+                            mtime: Some(make_system_time(99).into()),
+                            unix_mode: Some(12),
+                        }),
+                    }],
+                    output_file_symlinks: Default::default(), // Bazel deprecated this.
+                    output_symlinks: vec![OutputSymlink {
+                        path: "some path3".to_string(),
+                        target: "some target3".to_string(),
+                        node_properties: Some(NodeProperties {
+                            properties: Default::default(), // We don't implement this.
+                            mtime: Some(make_system_time(97).into()),
+                            unix_mode: Some(10),
+                        }),
+                    }],
+                    output_directories: vec![OutputDirectory {
+                        path: "some path4".to_string(),
+                        tree_digest: Some(output_directory_digest.into()),
+                    }],
+                    output_directory_symlinks: Default::default(), // Bazel deprecated this.
+                    exit_code: 5,
+                    stdout_raw: Default::default(), // We don't implement this.
+                    stdout_digest: Some(stdout_digest.clone().into()),
+                    stderr_raw: Default::default(), // We don't implement this.
+                    stderr_digest: Some(stderr_digest.clone().into()),
+                    execution_metadata: Some(ExecutedActionMetadata {
+                        worker: test_context.worker_id.to_string(),
+                        queued_timestamp: Some(make_system_time(1).into()),
+                        worker_start_timestamp: Some(make_system_time(2).into()),
+                        worker_completed_timestamp: Some(make_system_time(3).into()),
+                        input_fetch_start_timestamp: Some(make_system_time(4).into()),
+                        input_fetch_completed_timestamp: Some(make_system_time(5).into()),
+                        execution_start_timestamp: Some(make_system_time(6).into()),
+                        execution_completed_timestamp: Some(make_system_time(7).into()),
+                        output_upload_start_timestamp: Some(make_system_time(8).into()),
+                        output_upload_completed_timestamp: Some(make_system_time(9).into()),
+                        auxiliary_metadata: vec![],
+                    }),
+                }),
+                cached_result: false,
+                status: Some(ProtoStatus {
+                    code: 9,
+                    message: "foo".to_string(),
+                    details: Default::default(),
+                }),
+                server_logs: server_logs,
+                message: "TODO(blaise.bruer) We should put a reference something like bb_browser".to_string(),
+            }),
+        };
+        {
+            // Ensure our client thinks we are executing.
+            client_action_state_receiver.changed().await?;
+            let action_state = client_action_state_receiver.borrow();
+            assert_eq!(action_state.as_ref().stage, ActionStage::Executing);
+        }
+
+        // Now send the result of our execution to the scheduler.
+        test_context
+            .worker_api_server
+            .execution_response(Request::new(execute_result.clone()))
+            .await?;
+
+        {
+            // Check the result that the client would have received.
+            client_action_state_receiver.changed().await?;
+            let client_given_state = client_action_state_receiver.borrow();
+            let execute_response = execute_result.execute_response.unwrap();
+
+            assert_eq!(client_given_state.stage, execute_response.clone().try_into()?);
+
+            // We just checked if conversion from ExecuteResponse into ActionStage was an exact mach.
+            // Now check if we cast the ActionStage into an ExecuteResponse we get the exact same struct.
+            assert_eq!(execute_response, (&client_given_state.stage).into());
+        }
         Ok(())
     }
 }

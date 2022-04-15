@@ -287,10 +287,7 @@ mod batch_read_blobs {
                             data: vec![].into(),
                             status: Some(GrpcStatus {
                                 code: Code::NotFound as i32,
-                                message: format!(
-                                    "Error: Error {{ code: NotFound, messages: [\"Hash {} not found\"] }}",
-                                    digest3.hash
-                                ),
+                                message: format!("Hash {} not found", digest3.hash),
                                 details: vec![],
                             }),
                         }

@@ -35,11 +35,24 @@ pub struct SupportedProperties {
 //// Represents the result of an execution.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecuteResult {
+    //// ID of the worker making the request.
     #[prost(string, tag = "1")]
     pub worker_id: ::prost::alloc::string::String,
+    //// The original execution digest request for this response. The scheduler knows what it
+    //// should be, but we do safety checks to ensure it really is the request we expected.
+    #[prost(message, optional, tag = "2")]
+    pub action_digest: ::core::option::Option<
+        super::super::super::super::super::build::bazel::remote::execution::v2::Digest,
+    >,
+    //// The salt originally sent along with the StartExecute request. This salt is used
+    //// as a seed for cases where the execution digest should never be cached or merged
+    //// with other jobs. This salt is added to the hash function used to compute jobs that
+    //// are running or cached.
+    #[prost(uint64, tag = "3")]
+    pub salt: u64,
     //// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
     //// for details.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag = "4")]
     pub execute_response: ::core::option::Option<
         super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteResponse,
     >,
@@ -84,10 +97,14 @@ pub mod update_for_worker {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StartExecute {
+    //// The action information used to execute job.
     #[prost(message, optional, tag = "1")]
     pub execute_request: ::core::option::Option<
         super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteRequest,
     >,
+    //// See documentation in ExecuteResult::salt.
+    #[prost(uint64, tag = "2")]
+    pub salt: u64,
 }
 #[doc = r" Generated client implementations."]
 pub mod worker_api_client {

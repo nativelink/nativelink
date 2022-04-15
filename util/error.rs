@@ -2,6 +2,8 @@
 
 use std::result::Result;
 
+use prost_types::TimestampOutOfSystemRangeError;
+
 #[macro_export]
 macro_rules! make_err {
     ($code:expr, $($arg:tt)+) => {{
@@ -54,6 +56,10 @@ impl Error {
     pub fn to_std_err(self) -> std::io::Error {
         std::io::Error::new(self.code.into(), self.messages.join(" : "))
     }
+
+    pub fn message_string(&self) -> String {
+        self.messages.join(" : ")
+    }
 }
 
 impl std::error::Error for Error {}
@@ -68,8 +74,17 @@ impl Into<proto::google::rpc::Status> for &Error {
     fn into(self) -> proto::google::rpc::Status {
         proto::google::rpc::Status {
             code: self.code as i32,
-            message: format!("Error: {:?}", self),
+            message: self.message_string(),
             details: vec![],
+        }
+    }
+}
+
+impl From<proto::google::rpc::Status> for Error {
+    fn from(status: proto::google::rpc::Status) -> Error {
+        Error {
+            code: status.code.into(),
+            messages: vec![status.message],
         }
     }
 }
@@ -122,6 +137,19 @@ impl From<std::num::ParseIntError> for Error {
 impl From<hex::FromHexError> for Error {
     fn from(err: hex::FromHexError) -> Self {
         make_err!(Code::InvalidArgument, "{}", err.to_string())
+    }
+}
+
+impl From<std::convert::Infallible> for Error {
+    fn from(_err: std::convert::Infallible) -> Self {
+        // Infallible is an error type that can never happen.
+        unreachable!();
+    }
+}
+
+impl From<TimestampOutOfSystemRangeError> for Error {
+    fn from(err: TimestampOutOfSystemRangeError) -> Self {
+        make_err!(Code::InvalidArgument, "{}", err)
     }
 }
 
@@ -256,6 +284,31 @@ pub enum Code {
     // New Codes may be added in the future, so never exhaustively match!
     #[doc(hidden)]
     __NonExhaustive,
+}
+
+impl From<i32> for Code {
+    fn from(code: i32) -> Self {
+        match code {
+            x if x == Code::Ok as i32 => Code::Ok,
+            x if x == Code::Cancelled as i32 => Code::Cancelled,
+            x if x == Code::Unknown as i32 => Code::Unknown,
+            x if x == Code::InvalidArgument as i32 => Code::InvalidArgument,
+            x if x == Code::DeadlineExceeded as i32 => Code::DeadlineExceeded,
+            x if x == Code::NotFound as i32 => Code::NotFound,
+            x if x == Code::AlreadyExists as i32 => Code::AlreadyExists,
+            x if x == Code::PermissionDenied as i32 => Code::PermissionDenied,
+            x if x == Code::ResourceExhausted as i32 => Code::ResourceExhausted,
+            x if x == Code::FailedPrecondition as i32 => Code::FailedPrecondition,
+            x if x == Code::Aborted as i32 => Code::Aborted,
+            x if x == Code::OutOfRange as i32 => Code::OutOfRange,
+            x if x == Code::Unimplemented as i32 => Code::Unimplemented,
+            x if x == Code::Internal as i32 => Code::Internal,
+            x if x == Code::Unavailable as i32 => Code::Unavailable,
+            x if x == Code::DataLoss as i32 => Code::DataLoss,
+            x if x == Code::Unauthenticated as i32 => Code::Unauthenticated,
+            _ => Code::Unknown,
+        }
+    }
 }
 
 impl From<tonic::Code> for Code {

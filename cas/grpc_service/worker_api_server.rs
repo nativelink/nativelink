@@ -10,7 +10,9 @@ use tokio::sync::mpsc;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
+use action_messages::ActionInfoHashKey;
 use common::log;
+use common::DigestInfo;
 use config::cas_server::WorkerApiConfig;
 use error::{make_err, Code, Error, ResultExt};
 use platform_property_manager::PlatformProperties;
@@ -130,6 +132,28 @@ impl WorkerApiServer {
         self.scheduler.remove_worker(worker_id).await;
         Ok(Response::new(()))
     }
+
+    async fn inner_execution_response(&self, execute_result: ExecuteResult) -> Result<Response<()>, Error> {
+        let worker_id: WorkerId = execute_result.worker_id.try_into()?;
+        let action_digest: DigestInfo = execute_result
+            .action_digest
+            .err_tip(|| "Expected action_digest to exist")?
+            .try_into()?;
+        let action_info_hash_key = ActionInfoHashKey {
+            digest: action_digest.clone(),
+            salt: execute_result.salt,
+        };
+        let action_stage = execute_result
+            .execute_response
+            .err_tip(|| "Expected execute_response to exist in ExecuteResult")?
+            .try_into()
+            .err_tip(|| "Failed to convert ExecuteResponse into an ActionStage")?;
+        self.scheduler
+            .update_action(&worker_id, &action_info_hash_key, action_stage)
+            .await
+            .err_tip(|| format!("Failed to update_action {:?}", action_digest))?;
+        Ok(Response::new(()))
+    }
 }
 
 #[tonic::async_trait]
@@ -180,7 +204,17 @@ impl WorkerApi for WorkerApiServer {
         return resp.map_err(|e| e.into());
     }
 
-    async fn execution_response(&self, _grpc_request: Request<ExecuteResult>) -> Result<Response<()>, Status> {
-        unimplemented!();
+    async fn execution_response(&self, grpc_request: Request<ExecuteResult>) -> Result<Response<()>, Status> {
+        let now = Instant::now();
+        log::info!("\x1b[0;31mexecution_response Req\x1b[0m: {:?}", grpc_request.get_ref());
+        let execute_result = grpc_request.into_inner();
+        let resp = self.inner_execution_response(execute_result).await;
+        let d = now.elapsed().as_secs_f32();
+        if let Err(err) = resp.as_ref() {
+            log::error!("\x1b[0;31mexecution_response Resp\x1b[0m: {} {:?}", d, err);
+        } else {
+            log::info!("\x1b[0;31mexecution_response Resp\x1b[0m: {}", d);
+        }
+        return resp.map_err(|e| e.into());
     }
 }

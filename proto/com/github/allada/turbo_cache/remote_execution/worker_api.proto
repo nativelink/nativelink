@@ -77,11 +77,23 @@ message SupportedProperties {
 
 /// Represents the result of an execution.
 message ExecuteResult {
+    /// ID of the worker making the request.
     string worker_id = 1;
+
+    /// The original execution digest request for this response. The scheduler knows what it
+    /// should be, but we do safety checks to ensure it really is the request we expected.
+    build.bazel.remote.execution.v2.Digest action_digest = 2;
+
+    /// The salt originally sent along with the StartExecute request. This salt is used
+    /// as a seed for cases where the execution digest should never be cached or merged
+    /// with other jobs. This salt is added to the hash function used to compute jobs that
+    /// are running or cached.
+    uint64 salt = 3;
+
     /// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
     /// for details.
-    build.bazel.remote.execution.v2.ExecuteResponse execute_response = 2;
-    reserved 3; // NextId.
+    build.bazel.remote.execution.v2.ExecuteResponse execute_response = 4;
+    reserved 5; // NextId.
 }
 
 /// Result sent back from the server when a node connects.
@@ -117,6 +129,10 @@ message UpdateForWorker {
 }
 
 message StartExecute {
+    /// The action information used to execute job.
     build.bazel.remote.execution.v2.ExecuteRequest execute_request = 1;
-    reserved 2; // NextId.
+
+    /// See documentation in ExecuteResult::salt.
+    uint64 salt = 2;
+    reserved 3; // NextId.
 }

@@ -12,7 +12,7 @@ use tokio_stream::wrappers::WatchStream;
 use tonic::{Request, Response, Status};
 
 use ac_utils::get_and_decode_digest;
-use action_messages::ActionInfo;
+use action_messages::{ActionInfo, ActionInfoHashKey};
 use common::{log, DigestInfo};
 use config::cas_server::{ExecutionConfig, InstanceName};
 use error::{make_input_err, Error, ResultExt};
@@ -79,17 +79,19 @@ impl InstanceInfo {
 
         Ok(ActionInfo {
             instance_name,
-            digest: action_digest,
             command_digest,
             input_root_digest,
             timeout,
             platform_properties: PlatformProperties::new(platform_properties),
             priority,
             insert_timestamp: SystemTime::now(),
-            salt: if action.do_not_cache {
-                thread_rng().gen::<u64>()
-            } else {
-                0
+            unique_qualifier: ActionInfoHashKey {
+                digest: action_digest,
+                salt: if action.do_not_cache {
+                    thread_rng().gen::<u64>()
+                } else {
+                    0
+                },
             },
         })
     }
