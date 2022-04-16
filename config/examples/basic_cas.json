@@ -15,6 +15,16 @@
           "max_bytes": 10000000,
         }
       }
+    },
+    "WORKER_FILESYSTEM_STORE": {
+      "filesystem": {
+        "content_path": "/tmp/turbo_cache/data/content_path-cas",
+        "temp_path": "/tmp/turbo_cache/data/tmp_path-cas",
+        "eviction_policy": {
+          // 2gb.
+          "max_bytes": 2000000000,
+        }
+      }
     }
   },
   "schedulers": {
@@ -34,10 +44,37 @@
         "cpu_arch": "Exact",
         "cpu_model": "Exact",
         "kernel_version": "Exact",
-        "docker_image": "Metadata",
+        "docker_image": "Priority",
       }
     }
   },
+  "workers": [{
+    "local": {
+      "worker_api_endpoint": "127.0.0.1:50061",
+      "entrypoint_cmd": "./examples/worker/local_entrypoint.sh $@",
+      "local_filesystem_store_ref": "WORKER_FILESYSTEM_STORE",
+      "cas_store": "CAS_MAIN_STORE",
+      "ac_store": "AC_MAIN_STORE",
+      "work_directory": "/tmp/turbo_cache/work",
+      "platform_properties": {
+        "cpu_count": {
+          "values": ["1"],
+        },
+        "memory_kb": {
+          "values": ["500000"],
+        },
+        "network_kbps": {
+          "values": ["100000"],
+        },
+        "cpu_arch": {
+          "values": ["x86_64"],
+        },
+        "docker_image": {
+          "query_cmd": "docker images --format {{.Repository}}:{{.Tag}}",
+        }
+      }
+    }
+  }],
   "servers": [{
     "listen_address": "0.0.0.0:50051",
     "services": {

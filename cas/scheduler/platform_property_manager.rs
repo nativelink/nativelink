@@ -43,14 +43,17 @@ impl PlatformProperties {
 /// Minimum  - Means that workers must have at least this number available. When
 ///            a worker executes a task that has this value, the worker will have
 ///            this value subtracted from the available resources of the worker.
-/// Metadata - Means the worker is given this information, but does not restrict
+/// Priority - Means the worker is given this information, but does not restrict
 ///            what workers can take this value. However, the worker must have the
 ///            associated key present to be matched.
+///            TODO(allada) In the future this will be used by the scheduler and
+///            worker to cause the scheduler to prefer certain workers over others,
+///            but not restrict them based on these values.
 #[derive(Eq, PartialEq, Hash, Clone, Ord, PartialOrd, Debug)]
 pub enum PlatformPropertyValue {
     Exact(String),
     Minimum(u64),
-    Metadata(String),
+    Priority(String),
 }
 
 impl PlatformPropertyValue {
@@ -66,9 +69,10 @@ impl PlatformPropertyValue {
                 }
                 false
             }
-            // Metadata is used to pass info to the worker and not restrict which
-            // workers can be selected.
-            PlatformPropertyValue::Metadata(_) => true,
+            // Priority is used to pass info to the worker and not restrict which
+            // workers can be selected, but might be used to prefer certain workers
+            // over others.
+            PlatformPropertyValue::Priority(_) => true,
             // Success exact case is handled above.
             PlatformPropertyValue::Exact(_) => false,
         }
@@ -105,7 +109,7 @@ impl PlatformPropertyManager {
                     })?,
                 )),
                 PropertyType::Exact => Ok(PlatformPropertyValue::Exact(value.to_string())),
-                PropertyType::Metadata => Ok(PlatformPropertyValue::Metadata(value.to_string())),
+                PropertyType::Priority => Ok(PlatformPropertyValue::Priority(value.to_string())),
             };
         }
         Err(make_input_err!("Unknown platform property '{}'", key))

@@ -1,5 +1,5 @@
 // This configuration will place objects in various folders in
-// `/tmp/turbo_cache_data`. It will store all data on disk and
+// `/tmp/turbo_cache/data`. It will store all data on disk and
 // allows for restarts of the underlying service. It is optimized
 // so objects are compressed, deduplicated and uses some in-memory
 // optimizations for certain hot paths.
@@ -12,8 +12,8 @@
         },
         "backend": {
           "filesystem": {
-            "content_path": "/tmp/turbo_cache_data/content_path-cas",
-            "temp_path": "/tmp/turbo_cache_data/tmp_path-cas",
+            "content_path": "/tmp/turbo_cache/data/content_path-cas",
+            "temp_path": "/tmp/turbo_cache/data/tmp_path-cas",
             "eviction_policy": {
               // 2gb.
               "max_bytes": 2000000000,
@@ -56,8 +56,8 @@
                     },
                     "slow": {
                       "filesystem": {
-                        "content_path": "/tmp/turbo_cache_data/content_path-index",
-                        "temp_path": "/tmp/turbo_cache_data/tmp_path-index",
+                        "content_path": "/tmp/turbo_cache/data/content_path-index",
+                        "temp_path": "/tmp/turbo_cache/data/tmp_path-index",
                         "eviction_policy": {
                           // 500mb.
                           "max_bytes": 500000000,
@@ -81,8 +81,8 @@
     },
     "AC_MAIN_STORE": {
       "filesystem": {
-        "content_path": "/tmp/turbo_cache_data/content_path-ac",
-        "temp_path": "/tmp/turbo_cache_data/tmp_path-ac",
+        "content_path": "/tmp/turbo_cache/data/content_path-ac",
+        "temp_path": "/tmp/turbo_cache/data/tmp_path-ac",
         "eviction_policy": {
           // 500mb.
           "max_bytes": 500000000,
@@ -107,7 +107,7 @@
         "cpu_arch": "Exact",
         "cpu_model": "Exact",
         "kernel_version": "Exact",
-        "docker_image": "Metadata",
+        "docker_image": "Priority",
       }
     }
   },
