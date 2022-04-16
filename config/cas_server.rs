@@ -82,7 +82,7 @@ pub struct CapabilitiesConfig {
 
 /// When the scheduler matches tasks to workers that are capable of running
 /// the task, this value will be used to determine how the property is treated.
-#[derive(Deserialize, Debug, Clone, Copy)]
+#[derive(Deserialize, Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum PropertyType {
     /// Requires the platform property to be a u64 and when the scheduler looks
     /// for appropriate worker nodes that are capable of executing the task,
@@ -97,7 +97,10 @@ pub enum PropertyType {
 
     /// Does not restrict on this value and instead will be passed to the worker
     /// as an informational piece.
-    Metadata,
+    /// TODO(allada) In the future this will be used by the scheduler and worker
+    /// to cause the scheduler to prefer certain workers over others, but not
+    /// restrict them based on these values.
+    Priority,
 }
 
 #[derive(Deserialize, Debug)]
@@ -174,10 +177,51 @@ pub struct ServerConfig {
 }
 
 #[derive(Deserialize, Debug)]
+pub enum WrokerProperty {
+    /// List of static values.
+    /// Note: Generally there should only ever be 1 value, but if the platform
+    /// property key is PropertyType::Priority it may have more than one value.
+    values(Vec<String>),
+
+    /// A dynamic configuration. The string will be executed as a command
+    /// (not sell) and will be split by "\n" (new line character) then.
+    query_cmd(String),
+}
+
+#[derive(Deserialize, Debug)]
+pub struct LocalWorker {
+    /// Endpoint which the worker will connect to the scheduler's WorkerApiService.
+    pub worker_api_endpoint: String,
+
+    /// The command to execute on every execution request. This will be parsed as
+    /// a command + arguments (not shell).
+    /// '$@' has a special meaning in that all the arguments will expand into this
+    /// location.
+    /// Example: "run.sh $@" and a job with command: "sleep 5" will result in a
+    /// command like: "run.sh sleep 5".
+    pub entrypoint_cmd: String,
+
+    /// Properties of this worker. This configuration will be sent to the scheduler
+    /// and used to tell the scheduler to restrict what should be executed on this
+    /// worker.
+    pub platform_properties: HashMap<PropertyType, WrokerProperty>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Deserialize, Debug)]
+pub enum WorkerConfig {
+    /// A worker type that executes jobs locally on this machine.
+    local(LocalWorker),
+}
+
+#[derive(Deserialize, Debug)]
 pub struct CasConfig {
     /// List of stores available to use in this config.
     /// The keys can be used in other configs when needing to reference a store.
     pub stores: HashMap<StoreRefName, backends::StoreConfig>,
+
+    /// Worker configurations used to execute jobs.
+    pub workers: Option<Vec<WorkerConfig>>,
 
     /// List of schedulers available to use in this config.
     /// The keys can be used in other configs when needing to reference a
