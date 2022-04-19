@@ -26,16 +26,14 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT OR Apache-2.0"
+    "notice",  # Apache-2.0 from expression "Apache-2.0"
 ])
 
 # Generated Targets
 
-rust_library(
-    name = "dirs_sys_next",
+rust_proc_macro(
+    name = "prost_derive",
     srcs = glob(["**/*.rs"]),
-    aliases = {
-    },
     crate_features = [
     ],
     crate_root = "src/lib.rs",
@@ -48,16 +46,13 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.1.2",
+    version = "0.10.1",
     # buildifier: leave-alone
     deps = [
-    ] + selects.with_or({
-        # cfg(unix)
-        (
-            "@rules_rust//rust/platform:x86_64-unknown-linux-gnu",
-        ): [
-            "@raze__libc__0_2_124//:libc",
-        ],
-        "//conditions:default": [],
-    }),
+        "@raze__anyhow__1_0_56//:anyhow",
+        "@raze__itertools__0_10_3//:itertools",
+        "@raze__proc_macro2__1_0_37//:proc_macro2",
+        "@raze__quote__1_0_18//:quote",
+        "@raze__syn__1_0_91//:syn",
+    ],
 )

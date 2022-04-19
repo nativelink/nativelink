@@ -3,14 +3,14 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct KeepAliveRequest {
     //// ID of the worker making the request.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub worker_id: ::prost::alloc::string::String,
 }
 //// Request object for going away requests.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GoingAwayRequest {
     //// ID of the worker making the request.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub worker_id: ::prost::alloc::string::String,
 }
 //// Represents the initial request sent to the scheduler informing the
@@ -27,15 +27,13 @@ pub struct SupportedProperties {
     ////
     //// The details on how to use this property can be found here:
     //// <https://github.com/allada/turbo-cache/blob/c91f61edf182f2b64451fd48a5e63fa506a43aae/config/cas_server.rs>
-    #[prost(message, repeated, tag = "1")]
-    pub properties: ::prost::alloc::vec::Vec<
-        super::super::super::super::super::build::bazel::remote::execution::v2::platform::Property,
-    >,
+    #[prost(message, repeated, tag="1")]
+    pub properties: ::prost::alloc::vec::Vec<super::super::super::super::super::build::bazel::remote::execution::v2::platform::Property>,
 }
 //// The result of an ExecutionRequest.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecuteResult {
-    #[prost(oneof = "execute_result::Response", tags = "1, 2")]
+    #[prost(oneof="execute_result::Response", tags="1, 2")]
     pub response: ::core::option::Option<execute_result::Response>,
 }
 /// Nested message and enum types in `ExecuteResult`.
@@ -43,12 +41,12 @@ pub mod execute_result {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Response {
         //// Result of an execution request if there were not detectable internal errors.
-        #[prost(message, tag = "1")]
+        #[prost(message, tag="1")]
         Result(super::ExecuteFinishedResult),
         //// An internal error. This is only present when an internal error happened that
         //// was not recoverable. If the execution job failed but at no fault of the worker
         //// it should not use this field and should send the error via ExecuteFinishedResult.
-        #[prost(message, tag = "2")]
+        #[prost(message, tag="2")]
         InternalError(super::super::super::super::super::super::google::rpc::Status),
     }
 }
@@ -56,38 +54,34 @@ pub mod execute_result {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecuteFinishedResult {
     //// ID of the worker making the request.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub worker_id: ::prost::alloc::string::String,
     //// The original execution digest request for this response. The scheduler knows what it
     //// should be, but we do safety checks to ensure it really is the request we expected.
-    #[prost(message, optional, tag = "2")]
-    pub action_digest: ::core::option::Option<
-        super::super::super::super::super::build::bazel::remote::execution::v2::Digest,
-    >,
+    #[prost(message, optional, tag="2")]
+    pub action_digest: ::core::option::Option<super::super::super::super::super::build::bazel::remote::execution::v2::Digest>,
     //// The salt originally sent along with the StartExecute request. This salt is used
     //// as a seed for cases where the execution digest should never be cached or merged
     //// with other jobs. This salt is added to the hash function used to compute jobs that
     //// are running or cached.
-    #[prost(uint64, tag = "3")]
+    #[prost(uint64, tag="3")]
     pub salt: u64,
     //// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
     //// for details.
-    #[prost(message, optional, tag = "4")]
-    pub execute_response: ::core::option::Option<
-        super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteResponse,
-    >,
+    #[prost(message, optional, tag="4")]
+    pub execute_response: ::core::option::Option<super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteResponse>,
 }
 //// Result sent back from the server when a node connects.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConnectionResult {
     //// The internal ID given to the newly connected node.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub worker_id: ::prost::alloc::string::String,
 }
 //// Communication from the scheduler to the worker.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateForWorker {
-    #[prost(oneof = "update_for_worker::Update", tags = "1, 2, 3, 4")]
+    #[prost(oneof="update_for_worker::Update", tags="1, 2, 3, 4")]
     pub update: ::core::option::Option<update_for_worker::Update>,
 }
 /// Nested message and enum types in `UpdateForWorker`.
@@ -96,53 +90,51 @@ pub mod update_for_worker {
     pub enum Update {
         //// This will be sent only as the first item in the stream after the node
         //// has connected.
-        #[prost(message, tag = "1")]
+        #[prost(message, tag="1")]
         ConnectionResult(super::ConnectionResult),
         //// Message used to let the worker know that it is still alive as well
         //// as check to see if the worker is still alive. The worker
         //// may close the connection if the scheduler has not sent any messages
         //// after some amount of time (configured in the scheduler's
         //// configuration).
-        #[prost(message, tag = "2")]
+        #[prost(message, tag="2")]
         KeepAlive(()),
         //// Informs the worker about some work it should begin performing the
         //// requested action.
-        #[prost(message, tag = "3")]
+        #[prost(message, tag="3")]
         StartAction(super::StartExecute),
         //// Informs the worker that it has been disconnected from the pool.
         //// The worker may discard any outstanding work that is being executed.
-        #[prost(message, tag = "4")]
+        #[prost(message, tag="4")]
         Disconnect(()),
     }
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StartExecute {
     //// The action information used to execute job.
-    #[prost(message, optional, tag = "1")]
-    pub execute_request: ::core::option::Option<
-        super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteRequest,
-    >,
+    #[prost(message, optional, tag="1")]
+    pub execute_request: ::core::option::Option<super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteRequest>,
     //// See documentation in ExecuteFinishedResult::salt.
-    #[prost(uint64, tag = "2")]
+    #[prost(uint64, tag="2")]
     pub salt: u64,
 }
-#[doc = r" Generated client implementations."]
+/// Generated client implementations.
 pub mod worker_api_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "/ This API describes how schedulers communicate with Worker nodes."]
-    #[doc = "/"]
-    #[doc = "/ When a worker node comes online it must be pre-configured with the"]
-    #[doc = "/ endpoint of the scheduler it will register with. Once the worker"]
-    #[doc = "/ connects to the scheduler it must send a `RegisterSupportedProperties`"]
-    #[doc = "/ command to the scheduler. The scheduler will then use this information"]
-    #[doc = "/ to determine which jobs the worker can process."]
+    //// This API describes how schedulers communicate with Worker nodes.
+    ////
+    //// When a worker node comes online it must be pre-configured with the
+    //// endpoint of the scheduler it will register with. Once the worker
+    //// connects to the scheduler it must send a `RegisterSupportedProperties`
+    //// command to the scheduler. The scheduler will then use this information
+    //// to determine which jobs the worker can process.
     #[derive(Debug, Clone)]
     pub struct WorkerApiClient<T> {
         inner: tonic::client::Grpc<T>,
     }
     impl WorkerApiClient<tonic::transport::Channel> {
-        #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
+        /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
             D: std::convert::TryInto<tonic::transport::Endpoint>,
@@ -155,8 +147,8 @@ pub mod worker_api_client {
     impl<T> WorkerApiClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::ResponseBody: Body + Send + 'static,
         T::Error: Into<StdError>,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -175,106 +167,121 @@ pub mod worker_api_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             WorkerApiClient::new(InterceptedService::new(inner, interceptor))
         }
-        #[doc = r" Compress requests with `gzip`."]
-        #[doc = r""]
-        #[doc = r" This requires the server to support it otherwise it might respond with an"]
-        #[doc = r" error."]
+        /// Compress requests with `gzip`.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
         pub fn send_gzip(mut self) -> Self {
             self.inner = self.inner.send_gzip();
             self
         }
-        #[doc = r" Enable decompressing responses with `gzip`."]
+        /// Enable decompressing responses with `gzip`.
+        #[must_use]
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
         }
-        #[doc = "/ Registers this worker and informs the scheduler what properties"]
-        #[doc = "/ this worker supports. The response must be listened on the client"]
-        #[doc = "/ side for updates from the server. The first item sent will always be"]
-        #[doc = "/ a ConnectionResult, after that it is undefined."]
+        //// Registers this worker and informs the scheduler what properties
+        //// this worker supports. The response must be listened on the client
+        //// side for updates from the server. The first item sent will always be
+        //// a ConnectionResult, after that it is undefined.
         pub async fn connect_worker(
             &mut self,
             request: impl tonic::IntoRequest<super::SupportedProperties>,
-        ) -> Result<tonic::Response<tonic::codec::Streaming<super::UpdateForWorker>>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> Result<
+                tonic::Response<tonic::codec::Streaming<super::UpdateForWorker>>,
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/ConnectWorker",
             );
-            self.inner
-                .server_streaming(request.into_request(), path, codec)
-                .await
+            self.inner.server_streaming(request.into_request(), path, codec).await
         }
-        #[doc = "/ Message used to let the scheduler know that it is still alive as"]
-        #[doc = "/ well as check to see if the scheduler is still alive. The scheduler"]
-        #[doc = "/ may close the connection if the worker has not sent any messages"]
-        #[doc = "/ after some amount of time (configured in the scheduler's"]
-        #[doc = "/ configuration)."]
+        //// Message used to let the scheduler know that it is still alive as
+        //// well as check to see if the scheduler is still alive. The scheduler
+        //// may close the connection if the worker has not sent any messages
+        //// after some amount of time (configured in the scheduler's
+        //// configuration).
         pub async fn keep_alive(
             &mut self,
             request: impl tonic::IntoRequest<super::KeepAliveRequest>,
         ) -> Result<tonic::Response<()>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/KeepAlive",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = "/ Informs the scheduler that the service is going offline and"]
-        #[doc = "/ should stop issuing any new actions on this worker."]
-        #[doc = "/"]
-        #[doc = "/ The worker may stay connected even after sending this command"]
-        #[doc = "/ and may even send an `ExecuteResult` after sending this command."]
-        #[doc = "/ It is up to the scheduler implementation to decide how to handle"]
-        #[doc = "/ this case."]
-        #[doc = "/"]
-        #[doc = "/ Any job that was running on this instance likely needs to be"]
-        #[doc = "/ executed again, but up to the scheduler on how or when to handle"]
-        #[doc = "/ this case."]
+        //// Informs the scheduler that the service is going offline and
+        //// should stop issuing any new actions on this worker.
+        ////
+        //// The worker may stay connected even after sending this command
+        //// and may even send an `ExecuteResult` after sending this command.
+        //// It is up to the scheduler implementation to decide how to handle
+        //// this case.
+        ////
+        //// Any job that was running on this instance likely needs to be
+        //// executed again, but up to the scheduler on how or when to handle
+        //// this case.
         pub async fn going_away(
             &mut self,
             request: impl tonic::IntoRequest<super::GoingAwayRequest>,
         ) -> Result<tonic::Response<()>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/GoingAway",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = "/ Informs the scheduler about the result of an execution request."]
+        //// Informs the scheduler about the result of an execution request.
         pub async fn execution_response(
             &mut self,
             request: impl tonic::IntoRequest<super::ExecuteResult>,
         ) -> Result<tonic::Response<()>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/ExecutionResponse",
@@ -283,62 +290,64 @@ pub mod worker_api_client {
         }
     }
 }
-#[doc = r" Generated server implementations."]
+/// Generated server implementations.
 pub mod worker_api_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with WorkerApiServer."]
+    ///Generated trait containing gRPC methods that should be implemented for use with WorkerApiServer.
     #[async_trait]
     pub trait WorkerApi: Send + Sync + 'static {
-        #[doc = "Server streaming response type for the ConnectWorker method."]
-        type ConnectWorkerStream: futures_core::Stream<Item = Result<super::UpdateForWorker, tonic::Status>>
+        ///Server streaming response type for the ConnectWorker method.
+        type ConnectWorkerStream: futures_core::Stream<
+                Item = Result<super::UpdateForWorker, tonic::Status>,
+            >
             + Send
             + 'static;
-        #[doc = "/ Registers this worker and informs the scheduler what properties"]
-        #[doc = "/ this worker supports. The response must be listened on the client"]
-        #[doc = "/ side for updates from the server. The first item sent will always be"]
-        #[doc = "/ a ConnectionResult, after that it is undefined."]
+        //// Registers this worker and informs the scheduler what properties
+        //// this worker supports. The response must be listened on the client
+        //// side for updates from the server. The first item sent will always be
+        //// a ConnectionResult, after that it is undefined.
         async fn connect_worker(
             &self,
             request: tonic::Request<super::SupportedProperties>,
         ) -> Result<tonic::Response<Self::ConnectWorkerStream>, tonic::Status>;
-        #[doc = "/ Message used to let the scheduler know that it is still alive as"]
-        #[doc = "/ well as check to see if the scheduler is still alive. The scheduler"]
-        #[doc = "/ may close the connection if the worker has not sent any messages"]
-        #[doc = "/ after some amount of time (configured in the scheduler's"]
-        #[doc = "/ configuration)."]
+        //// Message used to let the scheduler know that it is still alive as
+        //// well as check to see if the scheduler is still alive. The scheduler
+        //// may close the connection if the worker has not sent any messages
+        //// after some amount of time (configured in the scheduler's
+        //// configuration).
         async fn keep_alive(
             &self,
             request: tonic::Request<super::KeepAliveRequest>,
         ) -> Result<tonic::Response<()>, tonic::Status>;
-        #[doc = "/ Informs the scheduler that the service is going offline and"]
-        #[doc = "/ should stop issuing any new actions on this worker."]
-        #[doc = "/"]
-        #[doc = "/ The worker may stay connected even after sending this command"]
-        #[doc = "/ and may even send an `ExecuteResult` after sending this command."]
-        #[doc = "/ It is up to the scheduler implementation to decide how to handle"]
-        #[doc = "/ this case."]
-        #[doc = "/"]
-        #[doc = "/ Any job that was running on this instance likely needs to be"]
-        #[doc = "/ executed again, but up to the scheduler on how or when to handle"]
-        #[doc = "/ this case."]
+        //// Informs the scheduler that the service is going offline and
+        //// should stop issuing any new actions on this worker.
+        ////
+        //// The worker may stay connected even after sending this command
+        //// and may even send an `ExecuteResult` after sending this command.
+        //// It is up to the scheduler implementation to decide how to handle
+        //// this case.
+        ////
+        //// Any job that was running on this instance likely needs to be
+        //// executed again, but up to the scheduler on how or when to handle
+        //// this case.
         async fn going_away(
             &self,
             request: tonic::Request<super::GoingAwayRequest>,
         ) -> Result<tonic::Response<()>, tonic::Status>;
-        #[doc = "/ Informs the scheduler about the result of an execution request."]
+        //// Informs the scheduler about the result of an execution request.
         async fn execution_response(
             &self,
             request: tonic::Request<super::ExecuteResult>,
         ) -> Result<tonic::Response<()>, tonic::Status>;
     }
-    #[doc = "/ This API describes how schedulers communicate with Worker nodes."]
-    #[doc = "/"]
-    #[doc = "/ When a worker node comes online it must be pre-configured with the"]
-    #[doc = "/ endpoint of the scheduler it will register with. Once the worker"]
-    #[doc = "/ connects to the scheduler it must send a `RegisterSupportedProperties`"]
-    #[doc = "/ command to the scheduler. The scheduler will then use this information"]
-    #[doc = "/ to determine which jobs the worker can process."]
+    //// This API describes how schedulers communicate with Worker nodes.
+    ////
+    //// When a worker node comes online it must be pre-configured with the
+    //// endpoint of the scheduler it will register with. Once the worker
+    //// connects to the scheduler it must send a `RegisterSupportedProperties`
+    //// command to the scheduler. The scheduler will then use this information
+    //// to determine which jobs the worker can process.
     #[derive(Debug)]
     pub struct WorkerApiServer<T: WorkerApi> {
         inner: _Inner<T>,
@@ -348,7 +357,9 @@ pub mod worker_api_server {
     struct _Inner<T>(Arc<T>);
     impl<T: WorkerApi> WorkerApiServer<T> {
         pub fn new(inner: T) -> Self {
-            let inner = Arc::new(inner);
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
             let inner = _Inner(inner);
             Self {
                 inner,
@@ -356,7 +367,10 @@ pub mod worker_api_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -370,9 +384,12 @@ pub mod worker_api_server {
         B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
-        type Error = Never;
+        type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -381,20 +398,24 @@ pub mod worker_api_server {
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/ConnectWorker" => {
                     #[allow(non_camel_case_types)]
                     struct ConnectWorkerSvc<T: WorkerApi>(pub Arc<T>);
-                    impl<T: WorkerApi>
-                        tonic::server::ServerStreamingService<super::SupportedProperties>
-                        for ConnectWorkerSvc<T>
-                    {
+                    impl<
+                        T: WorkerApi,
+                    > tonic::server::ServerStreamingService<super::SupportedProperties>
+                    for ConnectWorkerSvc<T> {
                         type Response = super::UpdateForWorker;
                         type ResponseStream = T::ConnectWorkerStream;
-                        type Future =
-                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::SupportedProperties>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).connect_worker(request).await };
+                            let fut = async move {
+                                (*inner).connect_worker(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -405,10 +426,11 @@ pub mod worker_api_server {
                         let inner = inner.0;
                         let method = ConnectWorkerSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
@@ -417,9 +439,15 @@ pub mod worker_api_server {
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/KeepAlive" => {
                     #[allow(non_camel_case_types)]
                     struct KeepAliveSvc<T: WorkerApi>(pub Arc<T>);
-                    impl<T: WorkerApi> tonic::server::UnaryService<super::KeepAliveRequest> for KeepAliveSvc<T> {
+                    impl<
+                        T: WorkerApi,
+                    > tonic::server::UnaryService<super::KeepAliveRequest>
+                    for KeepAliveSvc<T> {
                         type Response = ();
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::KeepAliveRequest>,
@@ -436,10 +464,11 @@ pub mod worker_api_server {
                         let inner = inner.0;
                         let method = KeepAliveSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -448,9 +477,15 @@ pub mod worker_api_server {
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/GoingAway" => {
                     #[allow(non_camel_case_types)]
                     struct GoingAwaySvc<T: WorkerApi>(pub Arc<T>);
-                    impl<T: WorkerApi> tonic::server::UnaryService<super::GoingAwayRequest> for GoingAwaySvc<T> {
+                    impl<
+                        T: WorkerApi,
+                    > tonic::server::UnaryService<super::GoingAwayRequest>
+                    for GoingAwaySvc<T> {
                         type Response = ();
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::GoingAwayRequest>,
@@ -467,10 +502,11 @@ pub mod worker_api_server {
                         let inner = inner.0;
                         let method = GoingAwaySvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -479,15 +515,21 @@ pub mod worker_api_server {
                 "/com.github.allada.turbo_cache.remote_execution.WorkerApi/ExecutionResponse" => {
                     #[allow(non_camel_case_types)]
                     struct ExecutionResponseSvc<T: WorkerApi>(pub Arc<T>);
-                    impl<T: WorkerApi> tonic::server::UnaryService<super::ExecuteResult> for ExecutionResponseSvc<T> {
+                    impl<T: WorkerApi> tonic::server::UnaryService<super::ExecuteResult>
+                    for ExecutionResponseSvc<T> {
                         type Response = ();
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ExecuteResult>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).execution_response(request).await };
+                            let fut = async move {
+                                (*inner).execution_response(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -498,23 +540,28 @@ pub mod worker_api_server {
                         let inner = inner.0;
                         let method = ExecutionResponseSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }

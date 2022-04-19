@@ -41,8 +41,11 @@ cargo_build_script(
     name = "prost_build_build_script",
     srcs = glob(["**/*.rs"]),
     build_script_env = {
+        "PROTOC": "bazel-out/host/bin/external/com_google_protobuf/protoc",
+        "PROTOC_NO_VENDOR": "1",
     },
     crate_features = [
+        "default",
     ],
     crate_root = "build.rs",
     data = glob(["**"]),
@@ -54,9 +57,11 @@ cargo_build_script(
         "cargo-raze",
         "manual",
     ],
-    version = "0.9.0",
+    version = "0.10.1",
     visibility = ["//visibility:private"],
     deps = [
+        "@raze__cfg_if__1_0_0//:cfg_if",
+        "@raze__cmake__0_1_48//:cmake",
         "@raze__which__4_2_5//:which",
     ],
 )
@@ -65,6 +70,7 @@ rust_library(
     name = "prost_build",
     srcs = glob(["**/*.rs"]),
     crate_features = [
+        "default",
     ],
     crate_root = "src/lib.rs",
     data = [],
@@ -79,20 +85,20 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.9.0",
+    version = "0.10.1",
     # buildifier: leave-alone
     deps = [
         ":prost_build_build_script",
         "@com_google_protobuf//:protoc",
         "@raze__bytes__1_1_0//:bytes",
-        "@raze__heck__0_3_3//:heck",
+        "@raze__heck__0_4_0//:heck",
         "@raze__itertools__0_10_3//:itertools",
         "@raze__lazy_static__1_4_0//:lazy_static",
         "@raze__log__0_4_16//:log",
         "@raze__multimap__0_8_3//:multimap",
         "@raze__petgraph__0_6_0//:petgraph",
-        "@raze__prost__0_9_0//:prost",
-        "@raze__prost_types__0_9_0//:prost_types",
+        "@raze__prost__0_10_1//:prost",
+        "@raze__prost_types__0_10_1//:prost_types",
         "@raze__regex__1_5_5//:regex",
         "@raze__tempfile__3_3_0//:tempfile",
     ],

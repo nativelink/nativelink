@@ -32,7 +32,6 @@ fn main() -> std::io::Result<()> {
     config.bytes(&["."]);
     tonic_build::configure()
         .out_dir(&output_dir)
-        .format(true) // don't run `rustfmt`; shouldn't be needed to build
         .compile_with_config(config, &paths, &["proto"])?;
     Ok(())
 }

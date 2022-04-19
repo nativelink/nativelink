@@ -37,10 +37,12 @@ rust_library(
     name = "tonic",
     srcs = glob(["**/*.rs"]),
     aliases = {
-        "@raze__prost__0_9_0//:prost": "prost1",
+        "@raze__prost__0_10_1//:prost": "prost1",
     },
     crate_features = [
         "async-trait",
+        "axum",
+        "channel",
         "codegen",
         "default",
         "h2",
@@ -59,7 +61,7 @@ rust_library(
     edition = "2018",
     proc_macro_deps = [
         "@raze__async_trait__0_1_53//:async_trait",
-        "@raze__prost_derive__0_9_0//:prost_derive",
+        "@raze__prost_derive__0_10_1//:prost_derive",
     ],
     rustc_flags = [
         "--cap-lints=allow",
@@ -68,10 +70,11 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.6.2",
+    version = "0.7.1",
     # buildifier: leave-alone
     deps = [
         "@raze__async_stream__0_3_3//:async_stream",
+        "@raze__axum__0_5_3//:axum",
         "@raze__base64__0_13_0//:base64",
         "@raze__bytes__1_1_0//:bytes",
         "@raze__futures_core__0_3_21//:futures_core",
@@ -83,10 +86,10 @@ rust_library(
         "@raze__hyper_timeout__0_4_1//:hyper_timeout",
         "@raze__percent_encoding__2_1_0//:percent_encoding",
         "@raze__pin_project__1_0_10//:pin_project",
-        "@raze__prost__0_9_0//:prost",
+        "@raze__prost__0_10_1//:prost",
         "@raze__tokio__1_17_0//:tokio",
         "@raze__tokio_stream__0_1_8//:tokio_stream",
-        "@raze__tokio_util__0_6_9//:tokio_util",
+        "@raze__tokio_util__0_7_1//:tokio_util",
         "@raze__tower__0_4_12//:tower",
         "@raze__tower_layer__0_3_1//:tower_layer",
         "@raze__tower_service__0_3_1//:tower_service",

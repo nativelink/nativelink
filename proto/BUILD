@@ -12,7 +12,8 @@ load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
 
 _proto_files = glob(["**/*.proto"])
 _proto_base_files = depset(['.'.join(file[:-len(".proto")].split('/')[:-1]) for file in _proto_files]).to_list()
-_genproto_files = ["%s.pb.rs" % pkg for pkg in _proto_base_files]
+_proto_base_files_without_google = [name for name in _proto_base_files if name != "google.protobuf"]
+_genproto_files = ["%s.pb.rs" % pkg for pkg in _proto_base_files_without_google]
 
 _checked_in_proto_files = ["genproto/%s" % file for file in _genproto_files]
 
@@ -46,7 +47,7 @@ genrule(
         "$(execpath :gen_protos_tool) --output_dir $(RULEDIR) " + " ".join([
             ("--input $(location :%s)" % file) for file in _proto_files
         ]),
-    ] + ["mv $(RULEDIR)/{name}.rs $(RULEDIR)/{name}.pb.rs".format(name=name) for name in _proto_base_files]),
+    ] + ["mv $(RULEDIR)/{name}.rs $(RULEDIR)/{name}.pb.rs".format(name=name) for name in _proto_base_files_without_google]),
     tools = [
         ":gen_protos_tool",
         "@com_google_protobuf//:protoc",
@@ -85,7 +86,7 @@ rust_library(
 py_binary(
     name = "update_protos",
     srcs = ["update_protos.py"],
-    args = ["--update"] + _proto_base_files,
+    args = ["--update"] + _proto_base_files_without_google,
     data = _genproto_files,
     python_version = "PY3",
     srcs_version = "PY3",
@@ -95,7 +96,7 @@ py_binary(
 py_test(
     name = "update_protos_test",
     srcs = ["update_protos.py"],
-    args = ["--check"] + _proto_base_files,
+    args = ["--check"] + _proto_base_files_without_google,
     data = _genproto_files + glob(_checked_in_proto_files),
     main = "update_protos.py",
     python_version = "PY3",

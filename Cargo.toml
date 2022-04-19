@@ -8,16 +8,16 @@ version = "0.0.0"
 path = "needed_only_to_make_cargo_tooling_happy.rs"
 
 [dependencies]
-prost = "0.9.0"
-prost-types = "0.9.0"
+prost = "0.10.1"
+prost-types = "0.10.1"
 hex = "0.4.3"
 async-trait = "0.1.51"
 fixed-buffer = "0.2.3"
 futures = "0.3.17"
 tokio = { version = "1.13.0", features = ["macros", "io-util", "fs", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.8", features = ["fs", "sync"] }
-tokio-util = { version = "0.6.9", features = ["io", "io-util"] }
-tonic = "0.6.1"
+tokio-util = { version = "0.6.9", features = ["io", "io-util", "codec"] }
+tonic = "0.7.1"
 lazy-init = "0.5.0"
 log = "0.4.14"
 env_logger = "0.9.0"
@@ -45,8 +45,8 @@ shlex = "1.1.0"
 
 [dev-dependencies]
 stdext = "0.2.1"
-prost-build = "0.9.0"
-tonic-build = "0.6.0"
+prost-build = "0.10.1"
+tonic-build = "0.7.0"
 pretty_assertions = "0.7.2"
 # Crates.io does not have `rustfmt` that is sufficient version, so load from github directly.
 rustfmt-nightly =  { git = "https://github.com/rust-lang/rustfmt", tag = "v1.4.38" }
@@ -71,6 +71,10 @@ compile_data_attr = "['README.md']"
 gen_buildrs = true
 additional_deps = ["@com_google_protobuf//:protoc"]
 additional_env = { PROTOC = "bazel-out/host/bin/external/com_google_protobuf/protoc" }
+buildrs_additional_environment_variables = { PROTOC = "bazel-out/host/bin/external/com_google_protobuf/protoc", PROTOC_NO_VENDOR = "1" }
+
+[package.metadata.raze.crates.axum.'*']
+compile_data_attr = "glob(['**/*.md'])"
 
 [package.metadata.raze.crates.rustfmt-nightly.'*']
 gen_buildrs = true

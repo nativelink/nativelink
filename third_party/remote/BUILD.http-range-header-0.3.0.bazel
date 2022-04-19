@@ -26,16 +26,16 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT OR Apache-2.0"
+    "notice",  # MIT from expression "MIT"
 ])
 
 # Generated Targets
 
+# Unsupported target "benchmark" with type "bench" omitted
+
 rust_library(
-    name = "dirs_sys_next",
+    name = "http_range_header",
     srcs = glob(["**/*.rs"]),
-    aliases = {
-    },
     crate_features = [
     ],
     crate_root = "src/lib.rs",
@@ -48,16 +48,8 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.1.2",
+    version = "0.3.0",
     # buildifier: leave-alone
     deps = [
-    ] + selects.with_or({
-        # cfg(unix)
-        (
-            "@rules_rust//rust/platform:x86_64-unknown-linux-gnu",
-        ): [
-            "@raze__libc__0_2_124//:libc",
-        ],
-        "//conditions:default": [],
-    }),
+    ],
 )

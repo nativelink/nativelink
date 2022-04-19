@@ -25,7 +25,7 @@ pub struct Action {
     /// The digest of the \[Command][build.bazel.remote.execution.v2.Command\]
     /// to run, which MUST be present in the
     /// \[ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage\].
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub command_digest: ::core::option::Option<Digest>,
     /// The digest of the root
     /// \[Directory][build.bazel.remote.execution.v2.Directory\] for the input
@@ -34,7 +34,7 @@ pub struct Action {
     /// directory, as well as every subdirectory and content blob referred to, MUST
     /// be in the
     /// \[ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage\].
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub input_root_digest: ::core::option::Option<Digest>,
     /// A timeout after which the execution should be killed. If the timeout is
     /// absent, then the client is specifying that the execution should continue
@@ -52,11 +52,11 @@ pub struct Action {
     /// timeout is too short. By encoding it directly in the `Action`, a lower
     /// timeout will result in a cache miss and the execution timeout will fail
     /// immediately, rather than whenever the cache entry gets evicted.
-    #[prost(message, optional, tag = "6")]
+    #[prost(message, optional, tag="6")]
     pub timeout: ::core::option::Option<::prost_types::Duration>,
     /// If true, then the `Action`'s result cannot be cached, and in-flight
     /// requests for the same `Action` may not be merged.
-    #[prost(bool, tag = "7")]
+    #[prost(bool, tag="7")]
     pub do_not_cache: bool,
     /// An optional additional salt value used to place this `Action` into a
     /// separate cache namespace from other instances having the same field
@@ -64,7 +64,7 @@ pub struct Action {
     /// specific to sources such as repo and service configuration,
     /// and allows disowning an entire set of ActionResults that might have been
     /// poisoned by buggy software or tool failures.
-    #[prost(bytes = "bytes", tag = "9")]
+    #[prost(bytes="bytes", tag="9")]
     pub salt: ::prost::bytes::Bytes,
     /// The optional platform requirements for the execution environment. The
     /// server MAY choose to execute the action on any worker satisfying the
@@ -74,7 +74,7 @@ pub struct Action {
     /// New in version 2.2: clients SHOULD set these platform properties as well
     /// as those in the \[Command][build.bazel.remote.execution.v2.Command\]. Servers
     /// SHOULD prefer those set here.
-    #[prost(message, optional, tag = "10")]
+    #[prost(message, optional, tag="10")]
     pub platform: ::core::option::Option<Platform>,
 }
 /// A `Command` is the actual command executed by a worker running an
@@ -89,7 +89,7 @@ pub struct Command {
     /// The arguments to the command. The first argument must be the path to the
     /// executable, which must be either a relative path, in which case it is
     /// evaluated with respect to the input root, or an absolute path.
-    #[prost(string, repeated, tag = "1")]
+    #[prost(string, repeated, tag="1")]
     pub arguments: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// The environment variables to set when running the program. The worker may
     /// provide its own default environment variables; these defaults can be
@@ -99,7 +99,7 @@ pub struct Command {
     /// \[Command][build.bazel.remote.execution.v2.Command\]s always hash to the same
     /// value, the environment variables MUST be lexicographically sorted by name.
     /// Sorting of strings is done by code point, equivalently, by the UTF-8 bytes.
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub environment_variables: ::prost::alloc::vec::Vec<command::EnvironmentVariable>,
     /// A list of the output files that the client expects to retrieve from the
     /// action. Only the listed files, as well as directories listed in
@@ -124,7 +124,7 @@ pub struct Command {
     /// to execution, even if they are not explicitly part of the input root.
     ///
     /// DEPRECATED since v2.1: Use `output_paths` instead.
-    #[prost(string, repeated, tag = "3")]
+    #[prost(string, repeated, tag="3")]
     pub output_files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// A list of the output directories that the client expects to retrieve from
     /// the action. Only the listed directories will be returned (an entire
@@ -155,7 +155,7 @@ pub struct Command {
     /// if they are not explicitly part of the input root.
     ///
     /// DEPRECATED since 2.1: Use `output_paths` instead.
-    #[prost(string, repeated, tag = "4")]
+    #[prost(string, repeated, tag="4")]
     pub output_directories: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// A list of the output paths that the client expects to retrieve from the
     /// action. Only the listed paths will be returned to the client as output.
@@ -185,7 +185,7 @@ pub struct Command {
     /// New in v2.1: this field supersedes the DEPRECATED `output_files` and
     /// `output_directories` fields. If `output_paths` is used, `output_files` and
     /// `output_directories` will be ignored!
-    #[prost(string, repeated, tag = "7")]
+    #[prost(string, repeated, tag="7")]
     pub output_paths: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// The platform requirements for the execution environment. The server MAY
     /// choose to execute the action on any worker satisfying the requirements, so
@@ -195,12 +195,12 @@ pub struct Command {
     /// DEPRECATED as of v2.2: platform properties are now specified directly in
     /// the action. See documentation note in the
     /// \[Action][build.bazel.remote.execution.v2.Action\] for migration.
-    #[prost(message, optional, tag = "5")]
+    #[prost(message, optional, tag="5")]
     pub platform: ::core::option::Option<Platform>,
     /// The working directory, relative to the input root, for the command to run
     /// in. It must be a directory which exists in the input tree. If it is left
     /// empty, then the action is run in the input root.
-    #[prost(string, tag = "6")]
+    #[prost(string, tag="6")]
     pub working_directory: ::prost::alloc::string::String,
     /// A list of keys for node properties the client expects to retrieve for
     /// output files and directories. Keys are either names of string-based
@@ -213,7 +213,7 @@ pub struct Command {
     /// The interpretation of string-based properties is server-dependent. If a
     /// property is not recognized by the server, the server will return an
     /// `INVALID_ARGUMENT`.
-    #[prost(string, repeated, tag = "8")]
+    #[prost(string, repeated, tag="8")]
     pub output_node_properties: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Nested message and enum types in `Command`.
@@ -223,10 +223,10 @@ pub mod command {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct EnvironmentVariable {
         /// The variable name.
-        #[prost(string, tag = "1")]
+        #[prost(string, tag="1")]
         pub name: ::prost::alloc::string::String,
         /// The variable value.
-        #[prost(string, tag = "2")]
+        #[prost(string, tag="2")]
         pub value: ::prost::alloc::string::String,
     }
 }
@@ -241,7 +241,7 @@ pub struct Platform {
     /// equivalent `Platform`s always hash to the same value, the properties MUST
     /// be lexicographically sorted by name, and then by value. Sorting of strings
     /// is done by code point, equivalently, by the UTF-8 bytes.
-    #[prost(message, repeated, tag = "1")]
+    #[prost(message, repeated, tag="1")]
     pub properties: ::prost::alloc::vec::Vec<platform::Property>,
 }
 /// Nested message and enum types in `Platform`.
@@ -271,10 +271,10 @@ pub mod platform {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Property {
         /// The property name.
-        #[prost(string, tag = "1")]
+        #[prost(string, tag="1")]
         pub name: ::prost::alloc::string::String,
         /// The property value.
-        #[prost(string, tag = "2")]
+        #[prost(string, tag="2")]
         pub value: ::prost::alloc::string::String,
     }
 }
@@ -357,15 +357,15 @@ pub mod platform {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Directory {
     /// The files in the directory.
-    #[prost(message, repeated, tag = "1")]
+    #[prost(message, repeated, tag="1")]
     pub files: ::prost::alloc::vec::Vec<FileNode>,
     /// The subdirectories in the directory.
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub directories: ::prost::alloc::vec::Vec<DirectoryNode>,
     /// The symlinks in the directory.
-    #[prost(message, repeated, tag = "3")]
+    #[prost(message, repeated, tag="3")]
     pub symlinks: ::prost::alloc::vec::Vec<SymlinkNode>,
-    #[prost(message, optional, tag = "5")]
+    #[prost(message, optional, tag="5")]
     pub node_properties: ::core::option::Option<NodeProperties>,
 }
 /// A single property for \[FileNodes][build.bazel.remote.execution.v2.FileNode\],
@@ -376,10 +376,10 @@ pub struct Directory {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NodeProperty {
     /// The property name.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub name: ::prost::alloc::string::String,
     /// The property value.
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub value: ::prost::alloc::string::String,
 }
 /// Node properties for \[FileNodes][build.bazel.remote.execution.v2.FileNode\],
@@ -391,28 +391,28 @@ pub struct NodeProperty {
 pub struct NodeProperties {
     /// A list of string-based
     /// \[NodeProperties][build.bazel.remote.execution.v2.NodeProperty\].
-    #[prost(message, repeated, tag = "1")]
+    #[prost(message, repeated, tag="1")]
     pub properties: ::prost::alloc::vec::Vec<NodeProperty>,
     /// The file's last modification timestamp.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub mtime: ::core::option::Option<::prost_types::Timestamp>,
     /// The UNIX file mode, e.g., 0755.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag="3")]
     pub unix_mode: ::core::option::Option<u32>,
 }
 /// A `FileNode` represents a single file and associated metadata.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileNode {
     /// The name of the file.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub name: ::prost::alloc::string::String,
     /// The digest of the file's content.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub digest: ::core::option::Option<Digest>,
     /// True if file is executable, false otherwise.
-    #[prost(bool, tag = "4")]
+    #[prost(bool, tag="4")]
     pub is_executable: bool,
-    #[prost(message, optional, tag = "6")]
+    #[prost(message, optional, tag="6")]
     pub node_properties: ::core::option::Option<NodeProperties>,
 }
 /// A `DirectoryNode` represents a child of a
@@ -421,20 +421,20 @@ pub struct FileNode {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct DirectoryNode {
     /// The name of the directory.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub name: ::prost::alloc::string::String,
     /// The digest of the
     /// \[Directory][build.bazel.remote.execution.v2.Directory\] object
     /// represented. See \[Digest][build.bazel.remote.execution.v2.Digest\]
     /// for information about how to take the digest of a proto message.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub digest: ::core::option::Option<Digest>,
 }
 /// A `SymlinkNode` represents a symbolic link.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct SymlinkNode {
     /// The name of the symlink.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub name: ::prost::alloc::string::String,
     /// The target path of the symlink. The path separator is a forward slash `/`.
     /// The target path can be relative to the parent directory of the symlink or
@@ -445,9 +445,9 @@ pub struct SymlinkNode {
     /// directory symlinks (e.g. `foo/../bar` may not be the same as `bar`).
     /// To reduce potential cache misses, canonicalization is still recommended
     /// where this is possible without impacting correctness.
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub target: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "4")]
+    #[prost(message, optional, tag="4")]
     pub node_properties: ::core::option::Option<NodeProperties>,
 }
 /// A content digest. A digest for a given blob consists of the size of the blob
@@ -485,49 +485,49 @@ pub struct SymlinkNode {
 pub struct Digest {
     /// The hash. In the case of SHA-256, it will always be a lowercase hex string
     /// exactly 64 characters long.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub hash: ::prost::alloc::string::String,
     /// The size of the blob, in bytes.
-    #[prost(int64, tag = "2")]
+    #[prost(int64, tag="2")]
     pub size_bytes: i64,
 }
 /// ExecutedActionMetadata contains details about a completed execution.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecutedActionMetadata {
     /// The name of the worker which ran the execution.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub worker: ::prost::alloc::string::String,
     /// When was the action added to the queue.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub queued_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// When the worker received the action.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag="3")]
     pub worker_start_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// When the worker completed the action, including all stages.
-    #[prost(message, optional, tag = "4")]
+    #[prost(message, optional, tag="4")]
     pub worker_completed_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// When the worker started fetching action inputs.
-    #[prost(message, optional, tag = "5")]
+    #[prost(message, optional, tag="5")]
     pub input_fetch_start_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// When the worker finished fetching action inputs.
-    #[prost(message, optional, tag = "6")]
+    #[prost(message, optional, tag="6")]
     pub input_fetch_completed_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// When the worker started executing the action command.
-    #[prost(message, optional, tag = "7")]
+    #[prost(message, optional, tag="7")]
     pub execution_start_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// When the worker completed executing the action command.
-    #[prost(message, optional, tag = "8")]
+    #[prost(message, optional, tag="8")]
     pub execution_completed_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// When the worker started uploading action outputs.
-    #[prost(message, optional, tag = "9")]
+    #[prost(message, optional, tag="9")]
     pub output_upload_start_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// When the worker finished uploading action outputs.
-    #[prost(message, optional, tag = "10")]
+    #[prost(message, optional, tag="10")]
     pub output_upload_completed_timestamp: ::core::option::Option<::prost_types::Timestamp>,
     /// Details that are specific to the kind of worker used. For example,
     /// on POSIX-like systems this could contain a message with
     /// getrusage(2) statistics.
-    #[prost(message, repeated, tag = "11")]
+    #[prost(message, repeated, tag="11")]
     pub auxiliary_metadata: ::prost::alloc::vec::Vec<::prost_types::Any>,
 }
 /// An ActionResult represents the result of an
@@ -550,7 +550,7 @@ pub struct ActionResult {
     /// If the action does not produce the requested output, then that output
     /// will be omitted from the list. The server is free to arrange the output
     /// list as desired; clients MUST NOT assume that the output list is sorted.
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub output_files: ::prost::alloc::vec::Vec<OutputFile>,
     /// The output files of the action that are symbolic links to other files. Those
     /// may be links to other output files, or input files, or even absolute paths
@@ -570,7 +570,7 @@ pub struct ActionResult {
     ///
     /// DEPRECATED as of v2.1. Servers that wish to be compatible with v2.0 API
     /// should still populate this field in addition to `output_symlinks`.
-    #[prost(message, repeated, tag = "10")]
+    #[prost(message, repeated, tag="10")]
     pub output_file_symlinks: ::prost::alloc::vec::Vec<OutputSymlink>,
     /// New in v2.1: this field will only be populated if the command
     /// `output_paths` field was used, and not the pre v2.1 `output_files` or
@@ -586,7 +586,7 @@ pub struct ActionResult {
     /// If the action does not produce a requested output, then that output
     /// will be omitted from the list. The server is free to arrange the output
     /// list as desired; clients MUST NOT assume that the output list is sorted.
-    #[prost(message, repeated, tag = "12")]
+    #[prost(message, repeated, tag="12")]
     pub output_symlinks: ::prost::alloc::vec::Vec<OutputSymlink>,
     /// The output directories of the action. For each output directory requested
     /// in the `output_directories` or `output_paths` field of the Action, if the
@@ -650,7 +650,7 @@ pub struct ActionResult {
     /// If an output of the same name as listed in `output_files` of
     /// the Command was found in `output_directories`, but was not a directory, the
     /// server will return a FAILED_PRECONDITION.
-    #[prost(message, repeated, tag = "3")]
+    #[prost(message, repeated, tag="3")]
     pub output_directories: ::prost::alloc::vec::Vec<OutputDirectory>,
     /// The output directories of the action that are symbolic links to other
     /// directories. Those may be links to other output directories, or input
@@ -670,37 +670,37 @@ pub struct ActionResult {
     ///
     /// DEPRECATED as of v2.1. Servers that wish to be compatible with v2.0 API
     /// should still populate this field in addition to `output_symlinks`.
-    #[prost(message, repeated, tag = "11")]
+    #[prost(message, repeated, tag="11")]
     pub output_directory_symlinks: ::prost::alloc::vec::Vec<OutputSymlink>,
     /// The exit code of the command.
-    #[prost(int32, tag = "4")]
+    #[prost(int32, tag="4")]
     pub exit_code: i32,
     /// The standard output buffer of the action. The server SHOULD NOT inline
     /// stdout unless requested by the client in the
     /// \[GetActionResultRequest][build.bazel.remote.execution.v2.GetActionResultRequest\]
     /// message. The server MAY omit inlining, even if requested, and MUST do so if inlining
     /// would cause the response to exceed message size limits.
-    #[prost(bytes = "bytes", tag = "5")]
+    #[prost(bytes="bytes", tag="5")]
     pub stdout_raw: ::prost::bytes::Bytes,
     /// The digest for a blob containing the standard output of the action, which
     /// can be retrieved from the
     /// \[ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage\].
-    #[prost(message, optional, tag = "6")]
+    #[prost(message, optional, tag="6")]
     pub stdout_digest: ::core::option::Option<Digest>,
     /// The standard error buffer of the action. The server SHOULD NOT inline
     /// stderr unless requested by the client in the
     /// \[GetActionResultRequest][build.bazel.remote.execution.v2.GetActionResultRequest\]
     /// message. The server MAY omit inlining, even if requested, and MUST do so if inlining
     /// would cause the response to exceed message size limits.
-    #[prost(bytes = "bytes", tag = "7")]
+    #[prost(bytes="bytes", tag="7")]
     pub stderr_raw: ::prost::bytes::Bytes,
     /// The digest for a blob containing the standard error of the action, which
     /// can be retrieved from the
     /// \[ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage\].
-    #[prost(message, optional, tag = "8")]
+    #[prost(message, optional, tag="8")]
     pub stderr_digest: ::core::option::Option<Digest>,
     /// The details of the execution that originally produced this result.
-    #[prost(message, optional, tag = "9")]
+    #[prost(message, optional, tag="9")]
     pub execution_metadata: ::core::option::Option<ExecutedActionMetadata>,
 }
 /// An `OutputFile` is similar to a
@@ -712,22 +712,22 @@ pub struct OutputFile {
     /// The full path of the file relative to the working directory, including the
     /// filename. The path separator is a forward slash `/`. Since this is a
     /// relative path, it MUST NOT begin with a leading forward slash.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub path: ::prost::alloc::string::String,
     /// The digest of the file's content.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub digest: ::core::option::Option<Digest>,
     /// True if file is executable, false otherwise.
-    #[prost(bool, tag = "4")]
+    #[prost(bool, tag="4")]
     pub is_executable: bool,
     /// The contents of the file if inlining was requested. The server SHOULD NOT inline
     /// file contents unless requested by the client in the
     /// \[GetActionResultRequest][build.bazel.remote.execution.v2.GetActionResultRequest\]
     /// message. The server MAY omit inlining, even if requested, and MUST do so if inlining
     /// would cause the response to exceed message size limits.
-    #[prost(bytes = "bytes", tag = "5")]
+    #[prost(bytes="bytes", tag="5")]
     pub contents: ::prost::bytes::Bytes,
-    #[prost(message, optional, tag = "7")]
+    #[prost(message, optional, tag="7")]
     pub node_properties: ::core::option::Option<NodeProperties>,
 }
 /// A `Tree` contains all the
@@ -736,13 +736,13 @@ pub struct OutputFile {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Tree {
     /// The root directory in the tree.
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub root: ::core::option::Option<Directory>,
     /// All the child directories: the directories referred to by the root and,
     /// recursively, all its children. In order to reconstruct the directory tree,
     /// the client must take the digests of each of the child directories and then
     /// build up a tree starting from the `root`.
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub children: ::prost::alloc::vec::Vec<Directory>,
 }
 /// An `OutputDirectory` is the output in an `ActionResult` corresponding to a
@@ -753,12 +753,12 @@ pub struct OutputDirectory {
     /// separator is a forward slash `/`. Since this is a relative path, it MUST
     /// NOT begin with a leading forward slash. The empty string value is allowed,
     /// and it denotes the entire working directory.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub path: ::prost::alloc::string::String,
     /// The digest of the encoded
     /// \[Tree][build.bazel.remote.execution.v2.Tree\] proto containing the
     /// directory's contents.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag="3")]
     pub tree_digest: ::core::option::Option<Digest>,
 }
 /// An `OutputSymlink` is similar to a
@@ -771,16 +771,16 @@ pub struct OutputSymlink {
     /// The full path of the symlink relative to the working directory, including the
     /// filename. The path separator is a forward slash `/`. Since this is a
     /// relative path, it MUST NOT begin with a leading forward slash.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub path: ::prost::alloc::string::String,
     /// The target path of the symlink. The path separator is a forward slash `/`.
     /// The target path can be relative to the parent directory of the symlink or
     /// it can be an absolute path starting with `/`. Support for absolute paths
     /// can be checked using the \[Capabilities][build.bazel.remote.execution.v2.Capabilities\]
     /// API. `..` components are allowed anywhere in the target path.
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub target: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "4")]
+    #[prost(message, optional, tag="4")]
     pub node_properties: ::core::option::Option<NodeProperties>,
 }
 /// An `ExecutionPolicy` can be used to control the scheduling of the action.
@@ -795,7 +795,7 @@ pub struct ExecutionPolicy {
     /// of this field is up to the server. In particular, every server will have
     /// their own supported range of priorities, and will decide how these map into
     /// scheduling policy.
-    #[prost(int32, tag = "1")]
+    #[prost(int32, tag="1")]
     pub priority: i32,
 }
 /// A `ResultsCachePolicy` is used for fine-grained control over how action
@@ -810,7 +810,7 @@ pub struct ResultsCachePolicy {
     /// The particular semantics of this field is up to the server. In particular,
     /// every server will have their own supported range of priorities, and will
     /// decide how these map into retention/eviction policy.
-    #[prost(int32, tag = "1")]
+    #[prost(int32, tag="1")]
     pub priority: i32,
 }
 /// A request message for
@@ -822,7 +822,7 @@ pub struct ExecuteRequest {
     /// storage, caches, etc.). The server MAY require use of this field to select
     /// between them in an implementation-defined fashion, otherwise it can be
     /// omitted.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub instance_name: ::prost::alloc::string::String,
     /// If true, the action will be executed even if its result is already
     /// present in the \[ActionCache][build.bazel.remote.execution.v2.ActionCache\].
@@ -837,34 +837,34 @@ pub struct ExecuteRequest {
     /// cache entries that reference outputs no longer available or that are
     /// poisoned in any way.
     /// If false, the result may be served from the action cache.
-    #[prost(bool, tag = "3")]
+    #[prost(bool, tag="3")]
     pub skip_cache_lookup: bool,
     /// The digest of the \[Action][build.bazel.remote.execution.v2.Action\] to
     /// execute.
-    #[prost(message, optional, tag = "6")]
+    #[prost(message, optional, tag="6")]
     pub action_digest: ::core::option::Option<Digest>,
     /// An optional policy for execution of the action.
     /// The server will have a default policy if this is not provided.
-    #[prost(message, optional, tag = "7")]
+    #[prost(message, optional, tag="7")]
     pub execution_policy: ::core::option::Option<ExecutionPolicy>,
     /// An optional policy for the results of this execution in the remote cache.
     /// The server will have a default policy if this is not provided.
     /// This may be applied to both the ActionResult and the associated blobs.
-    #[prost(message, optional, tag = "8")]
+    #[prost(message, optional, tag="8")]
     pub results_cache_policy: ::core::option::Option<ResultsCachePolicy>,
 }
 /// A `LogFile` is a log stored in the CAS.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct LogFile {
     /// The digest of the log contents.
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub digest: ::core::option::Option<Digest>,
     /// This is a hint as to the purpose of the log, and is set to true if the log
     /// is human-readable text that can be usefully displayed to a user, and false
     /// otherwise. For instance, if a command-line client wishes to print the
     /// server logs to the terminal for a failed action, this allows it to avoid
     /// displaying a binary file.
-    #[prost(bool, tag = "2")]
+    #[prost(bool, tag="2")]
     pub human_readable: bool,
 }
 /// The response message for
@@ -875,10 +875,10 @@ pub struct LogFile {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecuteResponse {
     /// The result of the action.
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub result: ::core::option::Option<ActionResult>,
     /// True if the result was served from cache, false if it was executed.
-    #[prost(bool, tag = "2")]
+    #[prost(bool, tag="2")]
     pub cached_result: bool,
     /// If the status has a code other than `OK`, it indicates that the action did
     /// not finish execution. For example, if the operation times out during
@@ -890,7 +890,7 @@ pub struct ExecuteResponse {
     /// For an error status, the `result` field is optional; the server may
     /// populate the output-, stdout-, and stderr-related fields if it has any
     /// information available, such as the stdout and stderr of a timed-out action.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag="3")]
     pub status: ::core::option::Option<super::super::super::super::super::google::rpc::Status>,
     /// An optional list of additional log outputs the server wishes to provide. A
     /// server can use this to return execution-specific logs however it wishes.
@@ -899,16 +899,17 @@ pub struct ExecuteResponse {
     /// worker executing the action or by providing logs from the worker's setup
     /// phase. The keys SHOULD be human readable so that a client can display them
     /// to a user.
-    #[prost(map = "string, message", tag = "4")]
+    #[prost(map="string, message", tag="4")]
     pub server_logs: ::std::collections::HashMap<::prost::alloc::string::String, LogFile>,
     /// Freeform informational message with details on the execution of the action
     /// that may be displayed to the user upon failure or when requested explicitly.
-    #[prost(string, tag = "5")]
+    #[prost(string, tag="5")]
     pub message: ::prost::alloc::string::String,
 }
 /// The current stage of action execution.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ExecutionStage {}
+pub struct ExecutionStage {
+}
 /// Nested message and enum types in `ExecutionStage`.
 pub mod execution_stage {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -934,21 +935,21 @@ pub mod execution_stage {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecuteOperationMetadata {
     /// The current stage of execution.
-    #[prost(enumeration = "execution_stage::Value", tag = "1")]
+    #[prost(enumeration="execution_stage::Value", tag="1")]
     pub stage: i32,
     /// The digest of the \[Action][build.bazel.remote.execution.v2.Action\]
     /// being executed.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub action_digest: ::core::option::Option<Digest>,
     /// If set, the client can use this resource name with
     /// \[ByteStream.Read][google.bytestream.ByteStream.Read\] to stream the
     /// standard output from the endpoint hosting streamed responses.
-    #[prost(string, tag = "3")]
+    #[prost(string, tag="3")]
     pub stdout_stream_name: ::prost::alloc::string::String,
     /// If set, the client can use this resource name with
     /// \[ByteStream.Read][google.bytestream.ByteStream.Read\] to stream the
     /// standard error from the endpoint hosting streamed responses.
-    #[prost(string, tag = "4")]
+    #[prost(string, tag="4")]
     pub stderr_stream_name: ::prost::alloc::string::String,
 }
 /// A request message for
@@ -957,7 +958,7 @@ pub struct ExecuteOperationMetadata {
 pub struct WaitExecutionRequest {
     /// The name of the \[Operation][google.longrunning.Operation\]
     /// returned by \[Execute][build.bazel.remote.execution.v2.Execution.Execute\].
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub name: ::prost::alloc::string::String,
 }
 /// A request message for
@@ -969,25 +970,25 @@ pub struct GetActionResultRequest {
     /// storage, caches, etc.). The server MAY require use of this field to select
     /// between them in an implementation-defined fashion, otherwise it can be
     /// omitted.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub instance_name: ::prost::alloc::string::String,
     /// The digest of the \[Action][build.bazel.remote.execution.v2.Action\]
     /// whose result is requested.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub action_digest: ::core::option::Option<Digest>,
     /// A hint to the server to request inlining stdout in the
     /// \[ActionResult][build.bazel.remote.execution.v2.ActionResult\] message.
-    #[prost(bool, tag = "3")]
+    #[prost(bool, tag="3")]
     pub inline_stdout: bool,
     /// A hint to the server to request inlining stderr in the
     /// \[ActionResult][build.bazel.remote.execution.v2.ActionResult\] message.
-    #[prost(bool, tag = "4")]
+    #[prost(bool, tag="4")]
     pub inline_stderr: bool,
     /// A hint to the server to inline the contents of the listed output files.
     /// Each path needs to exactly match one file path in either `output_paths` or
     /// `output_files` (DEPRECATED since v2.1) in the
     /// \[Command][build.bazel.remote.execution.v2.Command\] message.
-    #[prost(string, repeated, tag = "5")]
+    #[prost(string, repeated, tag="5")]
     pub inline_output_files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// A request message for
@@ -999,20 +1000,20 @@ pub struct UpdateActionResultRequest {
     /// storage, caches, etc.). The server MAY require use of this field to select
     /// between them in an implementation-defined fashion, otherwise it can be
     /// omitted.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub instance_name: ::prost::alloc::string::String,
     /// The digest of the \[Action][build.bazel.remote.execution.v2.Action\]
     /// whose result is being uploaded.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub action_digest: ::core::option::Option<Digest>,
     /// The \[ActionResult][build.bazel.remote.execution.v2.ActionResult\]
     /// to store in the cache.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag="3")]
     pub action_result: ::core::option::Option<ActionResult>,
     /// An optional policy for the results of this execution in the remote cache.
     /// The server will have a default policy if this is not provided.
     /// This may be applied to both the ActionResult and the associated blobs.
-    #[prost(message, optional, tag = "4")]
+    #[prost(message, optional, tag="4")]
     pub results_cache_policy: ::core::option::Option<ResultsCachePolicy>,
 }
 /// A request message for
@@ -1024,10 +1025,10 @@ pub struct FindMissingBlobsRequest {
     /// storage, caches, etc.). The server MAY require use of this field to select
     /// between them in an implementation-defined fashion, otherwise it can be
     /// omitted.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub instance_name: ::prost::alloc::string::String,
     /// A list of the blobs to check.
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub blob_digests: ::prost::alloc::vec::Vec<Digest>,
 }
 /// A response message for
@@ -1035,7 +1036,7 @@ pub struct FindMissingBlobsRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FindMissingBlobsResponse {
     /// A list of the blobs requested *not* present in the storage.
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub missing_blob_digests: ::prost::alloc::vec::Vec<Digest>,
 }
 /// A request message for
@@ -1047,10 +1048,10 @@ pub struct BatchUpdateBlobsRequest {
     /// storage, caches, etc.). The server MAY require use of this field to select
     /// between them in an implementation-defined fashion, otherwise it can be
     /// omitted.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub instance_name: ::prost::alloc::string::String,
     /// The individual upload requests.
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub requests: ::prost::alloc::vec::Vec<batch_update_blobs_request::Request>,
 }
 /// Nested message and enum types in `BatchUpdateBlobsRequest`.
@@ -1059,10 +1060,10 @@ pub mod batch_update_blobs_request {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Request {
         /// The digest of the blob. This MUST be the digest of `data`.
-        #[prost(message, optional, tag = "1")]
+        #[prost(message, optional, tag="1")]
         pub digest: ::core::option::Option<super::Digest>,
         /// The raw binary data.
-        #[prost(bytes = "bytes", tag = "2")]
+        #[prost(bytes="bytes", tag="2")]
         pub data: ::prost::bytes::Bytes,
     }
 }
@@ -1071,7 +1072,7 @@ pub mod batch_update_blobs_request {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BatchUpdateBlobsResponse {
     /// The responses to the requests.
-    #[prost(message, repeated, tag = "1")]
+    #[prost(message, repeated, tag="1")]
     pub responses: ::prost::alloc::vec::Vec<batch_update_blobs_response::Response>,
 }
 /// Nested message and enum types in `BatchUpdateBlobsResponse`.
@@ -1080,12 +1081,11 @@ pub mod batch_update_blobs_response {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Response {
         /// The blob digest to which this response corresponds.
-        #[prost(message, optional, tag = "1")]
+        #[prost(message, optional, tag="1")]
         pub digest: ::core::option::Option<super::Digest>,
         /// The result of attempting to upload that blob.
-        #[prost(message, optional, tag = "2")]
-        pub status:
-            ::core::option::Option<super::super::super::super::super::super::google::rpc::Status>,
+        #[prost(message, optional, tag="2")]
+        pub status: ::core::option::Option<super::super::super::super::super::super::google::rpc::Status>,
     }
 }
 /// A request message for
@@ -1097,10 +1097,10 @@ pub struct BatchReadBlobsRequest {
     /// storage, caches, etc.). The server MAY require use of this field to select
     /// between them in an implementation-defined fashion, otherwise it can be
     /// omitted.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub instance_name: ::prost::alloc::string::String,
     /// The individual blob digests.
-    #[prost(message, repeated, tag = "2")]
+    #[prost(message, repeated, tag="2")]
     pub digests: ::prost::alloc::vec::Vec<Digest>,
 }
 /// A response message for
@@ -1108,7 +1108,7 @@ pub struct BatchReadBlobsRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BatchReadBlobsResponse {
     /// The responses to the requests.
-    #[prost(message, repeated, tag = "1")]
+    #[prost(message, repeated, tag="1")]
     pub responses: ::prost::alloc::vec::Vec<batch_read_blobs_response::Response>,
 }
 /// Nested message and enum types in `BatchReadBlobsResponse`.
@@ -1117,15 +1117,14 @@ pub mod batch_read_blobs_response {
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct Response {
         /// The digest to which this response corresponds.
-        #[prost(message, optional, tag = "1")]
+        #[prost(message, optional, tag="1")]
         pub digest: ::core::option::Option<super::Digest>,
         /// The raw binary data.
-        #[prost(bytes = "bytes", tag = "2")]
+        #[prost(bytes="bytes", tag="2")]
         pub data: ::prost::bytes::Bytes,
         /// The result of attempting to download that blob.
-        #[prost(message, optional, tag = "3")]
-        pub status:
-            ::core::option::Option<super::super::super::super::super::super::google::rpc::Status>,
+        #[prost(message, optional, tag="3")]
+        pub status: ::core::option::Option<super::super::super::super::super::super::google::rpc::Status>,
     }
 }
 /// A request message for
@@ -1137,25 +1136,25 @@ pub struct GetTreeRequest {
     /// storage, caches, etc.). The server MAY require use of this field to select
     /// between them in an implementation-defined fashion, otherwise it can be
     /// omitted.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub instance_name: ::prost::alloc::string::String,
     /// The digest of the root, which must be an encoded
     /// \[Directory][build.bazel.remote.execution.v2.Directory\] message
     /// stored in the
     /// \[ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage\].
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub root_digest: ::core::option::Option<Digest>,
     /// A maximum page size to request. If present, the server will request no more
     /// than this many items. Regardless of whether a page size is specified, the
     /// server may place its own limit on the number of items to be returned and
     /// require the client to retrieve more items using a subsequent request.
-    #[prost(int32, tag = "3")]
+    #[prost(int32, tag="3")]
     pub page_size: i32,
     /// A page token, which must be a value received in a previous
     /// \[GetTreeResponse][build.bazel.remote.execution.v2.GetTreeResponse\].
     /// If present, the server will use that token as an offset, returning only
     /// that page and the ones that succeed it.
-    #[prost(string, tag = "4")]
+    #[prost(string, tag="4")]
     pub page_token: ::prost::alloc::string::String,
 }
 /// A response message for
@@ -1163,13 +1162,13 @@ pub struct GetTreeRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetTreeResponse {
     /// The directories descended from the requested root.
-    #[prost(message, repeated, tag = "1")]
+    #[prost(message, repeated, tag="1")]
     pub directories: ::prost::alloc::vec::Vec<Directory>,
     /// If present, signifies that there are more results which the client can
     /// retrieve by passing this as the page_token in a subsequent
     /// \[request][build.bazel.remote.execution.v2.GetTreeRequest\].
     /// If empty, signifies that this is the last page of results.
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub next_page_token: ::prost::alloc::string::String,
 }
 /// A request message for
@@ -1181,7 +1180,7 @@ pub struct GetCapabilitiesRequest {
     /// storage, caches, etc.). The server MAY require use of this field to select
     /// between them in an implementation-defined fashion, otherwise it can be
     /// omitted.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub instance_name: ::prost::alloc::string::String,
 }
 /// A response message for
@@ -1189,25 +1188,26 @@ pub struct GetCapabilitiesRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ServerCapabilities {
     /// Capabilities of the remote cache system.
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub cache_capabilities: ::core::option::Option<CacheCapabilities>,
     /// Capabilities of the remote execution system.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub execution_capabilities: ::core::option::Option<ExecutionCapabilities>,
     /// Earliest RE API version supported, including deprecated versions.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag="3")]
     pub deprecated_api_version: ::core::option::Option<super::super::super::semver::SemVer>,
     /// Earliest non-deprecated RE API version supported.
-    #[prost(message, optional, tag = "4")]
+    #[prost(message, optional, tag="4")]
     pub low_api_version: ::core::option::Option<super::super::super::semver::SemVer>,
     /// Latest RE API version supported.
-    #[prost(message, optional, tag = "5")]
+    #[prost(message, optional, tag="5")]
     pub high_api_version: ::core::option::Option<super::super::super::semver::SemVer>,
 }
 /// The digest function used for converting values into keys for CAS and Action
 /// Cache.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DigestFunction {}
+pub struct DigestFunction {
+}
 /// Nested message and enum types in `DigestFunction`.
 pub mod digest_function {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -1237,7 +1237,7 @@ pub mod digest_function {
 /// Describes the server/instance capabilities for updating the action cache.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ActionCacheUpdateCapabilities {
-    #[prost(bool, tag = "1")]
+    #[prost(bool, tag="1")]
     pub update_enabled: bool,
 }
 /// Allowed values for priority in
@@ -1246,7 +1246,7 @@ pub struct ActionCacheUpdateCapabilities {
 /// Used for querying both cache and execution valid priority ranges.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PriorityCapabilities {
-    #[prost(message, repeated, tag = "1")]
+    #[prost(message, repeated, tag="1")]
     pub priorities: ::prost::alloc::vec::Vec<priority_capabilities::PriorityRange>,
 }
 /// Nested message and enum types in `PriorityCapabilities`.
@@ -1256,17 +1256,18 @@ pub mod priority_capabilities {
     pub struct PriorityRange {
         /// The minimum numeric value for this priority range, which represents the
         /// most urgent task or longest retained item.
-        #[prost(int32, tag = "1")]
+        #[prost(int32, tag="1")]
         pub min_priority: i32,
         /// The maximum numeric value for this priority range, which represents the
         /// least urgent task or shortest retained item.
-        #[prost(int32, tag = "2")]
+        #[prost(int32, tag="2")]
         pub max_priority: i32,
     }
 }
 /// Describes how the server treats absolute symlink targets.
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SymlinkAbsolutePathStrategy {}
+pub struct SymlinkAbsolutePathStrategy {
+}
 /// Nested message and enum types in `SymlinkAbsolutePathStrategy`.
 pub mod symlink_absolute_path_strategy {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -1289,48 +1290,48 @@ pub mod symlink_absolute_path_strategy {
 pub struct CacheCapabilities {
     /// All the digest functions supported by the remote cache.
     /// Remote cache may support multiple digest functions simultaneously.
-    #[prost(enumeration = "digest_function::Value", repeated, tag = "1")]
+    #[prost(enumeration="digest_function::Value", repeated, tag="1")]
     pub digest_function: ::prost::alloc::vec::Vec<i32>,
     /// Capabilities for updating the action cache.
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag="2")]
     pub action_cache_update_capabilities: ::core::option::Option<ActionCacheUpdateCapabilities>,
     /// Supported cache priority range for both CAS and ActionCache.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag="3")]
     pub cache_priority_capabilities: ::core::option::Option<PriorityCapabilities>,
     /// Maximum total size of blobs to be uploaded/downloaded using
     /// batch methods. A value of 0 means no limit is set, although
     /// in practice there will always be a message size limitation
     /// of the protocol in use, e.g. GRPC.
-    #[prost(int64, tag = "4")]
+    #[prost(int64, tag="4")]
     pub max_batch_total_size_bytes: i64,
     /// Whether absolute symlink targets are supported.
-    #[prost(enumeration = "symlink_absolute_path_strategy::Value", tag = "5")]
+    #[prost(enumeration="symlink_absolute_path_strategy::Value", tag="5")]
     pub symlink_absolute_path_strategy: i32,
 }
 /// Capabilities of the remote execution system.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecutionCapabilities {
     /// Remote execution may only support a single digest function.
-    #[prost(enumeration = "digest_function::Value", tag = "1")]
+    #[prost(enumeration="digest_function::Value", tag="1")]
     pub digest_function: i32,
     /// Whether remote execution is enabled for the particular server/instance.
-    #[prost(bool, tag = "2")]
+    #[prost(bool, tag="2")]
     pub exec_enabled: bool,
     /// Supported execution priority range.
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag="3")]
     pub execution_priority_capabilities: ::core::option::Option<PriorityCapabilities>,
     /// Supported node properties.
-    #[prost(string, repeated, tag = "4")]
+    #[prost(string, repeated, tag="4")]
     pub supported_node_properties: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Details for the tool used to call the API.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ToolDetails {
     /// Name of the tool, e.g. bazel.
-    #[prost(string, tag = "1")]
+    #[prost(string, tag="1")]
     pub tool_name: ::prost::alloc::string::String,
     /// Version of the tool used for the request, e.g. 5.0.3.
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub tool_version: ::prost::alloc::string::String,
 }
 /// An optional Metadata to attach to any RPC request to tell the server about an
@@ -1348,40 +1349,40 @@ pub struct ToolDetails {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct RequestMetadata {
     /// The details for the tool invoking the requests.
-    #[prost(message, optional, tag = "1")]
+    #[prost(message, optional, tag="1")]
     pub tool_details: ::core::option::Option<ToolDetails>,
     /// An identifier that ties multiple requests to the same action.
     /// For example, multiple requests to the CAS, Action Cache, and Execution
     /// API are used in order to compile foo.cc.
-    #[prost(string, tag = "2")]
+    #[prost(string, tag="2")]
     pub action_id: ::prost::alloc::string::String,
     /// An identifier that ties multiple actions together to a final result.
     /// For example, multiple actions are required to build and run foo_test.
-    #[prost(string, tag = "3")]
+    #[prost(string, tag="3")]
     pub tool_invocation_id: ::prost::alloc::string::String,
     /// An identifier to tie multiple tool invocations together. For example,
     /// runs of foo_test, bar_test and baz_test on a post-submit of a given patch.
-    #[prost(string, tag = "4")]
+    #[prost(string, tag="4")]
     pub correlated_invocations_id: ::prost::alloc::string::String,
 }
-#[doc = r" Generated client implementations."]
+/// Generated client implementations.
 pub mod execution_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = " The Remote Execution API is used to execute an"]
-    #[doc = " [Action][build.bazel.remote.execution.v2.Action] on the remote"]
-    #[doc = " workers."]
-    #[doc = ""]
-    #[doc = " As with other services in the Remote Execution API, any call may return an"]
-    #[doc = " error with a [RetryInfo][google.rpc.RetryInfo] error detail providing"]
-    #[doc = " information about when the client should retry the request; clients SHOULD"]
-    #[doc = " respect the information provided."]
+    /// The Remote Execution API is used to execute an
+    /// [Action][build.bazel.remote.execution.v2.Action] on the remote
+    /// workers.
+    ///
+    /// As with other services in the Remote Execution API, any call may return an
+    /// error with a [RetryInfo][google.rpc.RetryInfo] error detail providing
+    /// information about when the client should retry the request; clients SHOULD
+    /// respect the information provided.
     #[derive(Debug, Clone)]
     pub struct ExecutionClient<T> {
         inner: tonic::client::Grpc<T>,
     }
     impl ExecutionClient<tonic::transport::Channel> {
-        #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
+        /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
             D: std::convert::TryInto<tonic::transport::Endpoint>,
@@ -1394,8 +1395,8 @@ pub mod execution_client {
     impl<T> ExecutionClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::ResponseBody: Body + Send + 'static,
         T::Error: Into<StdError>,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -1414,176 +1415,181 @@ pub mod execution_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             ExecutionClient::new(InterceptedService::new(inner, interceptor))
         }
-        #[doc = r" Compress requests with `gzip`."]
-        #[doc = r""]
-        #[doc = r" This requires the server to support it otherwise it might respond with an"]
-        #[doc = r" error."]
+        /// Compress requests with `gzip`.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
         pub fn send_gzip(mut self) -> Self {
             self.inner = self.inner.send_gzip();
             self
         }
-        #[doc = r" Enable decompressing responses with `gzip`."]
+        /// Enable decompressing responses with `gzip`.
+        #[must_use]
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
         }
-        #[doc = " Execute an action remotely."]
-        #[doc = ""]
-        #[doc = " In order to execute an action, the client must first upload all of the"]
-        #[doc = " inputs, the"]
-        #[doc = " [Command][build.bazel.remote.execution.v2.Command] to run, and the"]
-        #[doc = " [Action][build.bazel.remote.execution.v2.Action] into the"]
-        #[doc = " [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]."]
-        #[doc = " It then calls `Execute` with an `action_digest` referring to them. The"]
-        #[doc = " server will run the action and eventually return the result."]
-        #[doc = ""]
-        #[doc = " The input `Action`'s fields MUST meet the various canonicalization"]
-        #[doc = " requirements specified in the documentation for their types so that it has"]
-        #[doc = " the same digest as other logically equivalent `Action`s. The server MAY"]
-        #[doc = " enforce the requirements and return errors if a non-canonical input is"]
-        #[doc = " received. It MAY also proceed without verifying some or all of the"]
-        #[doc = " requirements, such as for performance reasons. If the server does not"]
-        #[doc = " verify the requirement, then it will treat the `Action` as distinct from"]
-        #[doc = " another logically equivalent action if they hash differently."]
-        #[doc = ""]
-        #[doc = " Returns a stream of"]
-        #[doc = " [google.longrunning.Operation][google.longrunning.Operation] messages"]
-        #[doc = " describing the resulting execution, with eventual `response`"]
-        #[doc = " [ExecuteResponse][build.bazel.remote.execution.v2.ExecuteResponse]. The"]
-        #[doc = " `metadata` on the operation is of type"]
-        #[doc = " [ExecuteOperationMetadata][build.bazel.remote.execution.v2.ExecuteOperationMetadata]."]
-        #[doc = ""]
-        #[doc = " If the client remains connected after the first response is returned after"]
-        #[doc = " the server, then updates are streamed as if the client had called"]
-        #[doc = " [WaitExecution][build.bazel.remote.execution.v2.Execution.WaitExecution]"]
-        #[doc = " until the execution completes or the request reaches an error. The"]
-        #[doc = " operation can also be queried using [Operations"]
-        #[doc = " API][google.longrunning.Operations.GetOperation]."]
-        #[doc = ""]
-        #[doc = " The server NEED NOT implement other methods or functionality of the"]
-        #[doc = " Operations API."]
-        #[doc = ""]
-        #[doc = " Errors discovered during creation of the `Operation` will be reported"]
-        #[doc = " as gRPC Status errors, while errors that occurred while running the"]
-        #[doc = " action will be reported in the `status` field of the `ExecuteResponse`. The"]
-        #[doc = " server MUST NOT set the `error` field of the `Operation` proto."]
-        #[doc = " The possible errors include:"]
-        #[doc = ""]
-        #[doc = " * `INVALID_ARGUMENT`: One or more arguments are invalid."]
-        #[doc = " * `FAILED_PRECONDITION`: One or more errors occurred in setting up the"]
-        #[doc = "   action requested, such as a missing input or command or no worker being"]
-        #[doc = "   available. The client may be able to fix the errors and retry."]
-        #[doc = " * `RESOURCE_EXHAUSTED`: There is insufficient quota of some resource to run"]
-        #[doc = "   the action."]
-        #[doc = " * `UNAVAILABLE`: Due to a transient condition, such as all workers being"]
-        #[doc = "   occupied (and the server does not support a queue), the action could not"]
-        #[doc = "   be started. The client should retry."]
-        #[doc = " * `INTERNAL`: An internal error occurred in the execution engine or the"]
-        #[doc = "   worker."]
-        #[doc = " * `DEADLINE_EXCEEDED`: The execution timed out."]
-        #[doc = " * `CANCELLED`: The operation was cancelled by the client. This status is"]
-        #[doc = "   only possible if the server implements the Operations API CancelOperation"]
-        #[doc = "   method, and it was called for the current execution."]
-        #[doc = ""]
-        #[doc = " In the case of a missing input or command, the server SHOULD additionally"]
-        #[doc = " send a [PreconditionFailure][google.rpc.PreconditionFailure] error detail"]
-        #[doc = " where, for each requested blob not present in the CAS, there is a"]
-        #[doc = " `Violation` with a `type` of `MISSING` and a `subject` of"]
-        #[doc = " `\"blobs/{hash}/{size}\"` indicating the digest of the missing blob."]
-        #[doc = ""]
-        #[doc = " The server does not need to guarantee that a call to this method leads to"]
-        #[doc = " at most one execution of the action. The server MAY execute the action"]
-        #[doc = " multiple times, potentially in parallel. These redundant executions MAY"]
-        #[doc = " continue to run, even if the operation is completed."]
+        /// Execute an action remotely.
+        ///
+        /// In order to execute an action, the client must first upload all of the
+        /// inputs, the
+        /// [Command][build.bazel.remote.execution.v2.Command] to run, and the
+        /// [Action][build.bazel.remote.execution.v2.Action] into the
+        /// [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage].
+        /// It then calls `Execute` with an `action_digest` referring to them. The
+        /// server will run the action and eventually return the result.
+        ///
+        /// The input `Action`'s fields MUST meet the various canonicalization
+        /// requirements specified in the documentation for their types so that it has
+        /// the same digest as other logically equivalent `Action`s. The server MAY
+        /// enforce the requirements and return errors if a non-canonical input is
+        /// received. It MAY also proceed without verifying some or all of the
+        /// requirements, such as for performance reasons. If the server does not
+        /// verify the requirement, then it will treat the `Action` as distinct from
+        /// another logically equivalent action if they hash differently.
+        ///
+        /// Returns a stream of
+        /// [google.longrunning.Operation][google.longrunning.Operation] messages
+        /// describing the resulting execution, with eventual `response`
+        /// [ExecuteResponse][build.bazel.remote.execution.v2.ExecuteResponse]. The
+        /// `metadata` on the operation is of type
+        /// [ExecuteOperationMetadata][build.bazel.remote.execution.v2.ExecuteOperationMetadata].
+        ///
+        /// If the client remains connected after the first response is returned after
+        /// the server, then updates are streamed as if the client had called
+        /// [WaitExecution][build.bazel.remote.execution.v2.Execution.WaitExecution]
+        /// until the execution completes or the request reaches an error. The
+        /// operation can also be queried using [Operations
+        /// API][google.longrunning.Operations.GetOperation].
+        ///
+        /// The server NEED NOT implement other methods or functionality of the
+        /// Operations API.
+        ///
+        /// Errors discovered during creation of the `Operation` will be reported
+        /// as gRPC Status errors, while errors that occurred while running the
+        /// action will be reported in the `status` field of the `ExecuteResponse`. The
+        /// server MUST NOT set the `error` field of the `Operation` proto.
+        /// The possible errors include:
+        ///
+        /// * `INVALID_ARGUMENT`: One or more arguments are invalid.
+        /// * `FAILED_PRECONDITION`: One or more errors occurred in setting up the
+        ///   action requested, such as a missing input or command or no worker being
+        ///   available. The client may be able to fix the errors and retry.
+        /// * `RESOURCE_EXHAUSTED`: There is insufficient quota of some resource to run
+        ///   the action.
+        /// * `UNAVAILABLE`: Due to a transient condition, such as all workers being
+        ///   occupied (and the server does not support a queue), the action could not
+        ///   be started. The client should retry.
+        /// * `INTERNAL`: An internal error occurred in the execution engine or the
+        ///   worker.
+        /// * `DEADLINE_EXCEEDED`: The execution timed out.
+        /// * `CANCELLED`: The operation was cancelled by the client. This status is
+        ///   only possible if the server implements the Operations API CancelOperation
+        ///   method, and it was called for the current execution.
+        ///
+        /// In the case of a missing input or command, the server SHOULD additionally
+        /// send a [PreconditionFailure][google.rpc.PreconditionFailure] error detail
+        /// where, for each requested blob not present in the CAS, there is a
+        /// `Violation` with a `type` of `MISSING` and a `subject` of
+        /// `"blobs/{hash}/{size}"` indicating the digest of the missing blob.
+        ///
+        /// The server does not need to guarantee that a call to this method leads to
+        /// at most one execution of the action. The server MAY execute the action
+        /// multiple times, potentially in parallel. These redundant executions MAY
+        /// continue to run, even if the operation is completed.
         pub async fn execute(
             &mut self,
             request: impl tonic::IntoRequest<super::ExecuteRequest>,
         ) -> Result<
-            tonic::Response<
-                tonic::codec::Streaming<
-                    super::super::super::super::super::super::google::longrunning::Operation,
+                tonic::Response<
+                    tonic::codec::Streaming<
+                        super::super::super::super::super::super::google::longrunning::Operation,
+                    >,
                 >,
-            >,
-            tonic::Status,
-        > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.Execution/Execute",
             );
-            self.inner
-                .server_streaming(request.into_request(), path, codec)
-                .await
+            self.inner.server_streaming(request.into_request(), path, codec).await
         }
-        #[doc = " Wait for an execution operation to complete. When the client initially"]
-        #[doc = " makes the request, the server immediately responds with the current status"]
-        #[doc = " of the execution. The server will leave the request stream open until the"]
-        #[doc = " operation completes, and then respond with the completed operation. The"]
-        #[doc = " server MAY choose to stream additional updates as execution progresses,"]
-        #[doc = " such as to provide an update as to the state of the execution."]
+        /// Wait for an execution operation to complete. When the client initially
+        /// makes the request, the server immediately responds with the current status
+        /// of the execution. The server will leave the request stream open until the
+        /// operation completes, and then respond with the completed operation. The
+        /// server MAY choose to stream additional updates as execution progresses,
+        /// such as to provide an update as to the state of the execution.
         pub async fn wait_execution(
             &mut self,
             request: impl tonic::IntoRequest<super::WaitExecutionRequest>,
         ) -> Result<
-            tonic::Response<
-                tonic::codec::Streaming<
-                    super::super::super::super::super::super::google::longrunning::Operation,
+                tonic::Response<
+                    tonic::codec::Streaming<
+                        super::super::super::super::super::super::google::longrunning::Operation,
+                    >,
                 >,
-            >,
-            tonic::Status,
-        > {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.Execution/WaitExecution",
             );
-            self.inner
-                .server_streaming(request.into_request(), path, codec)
-                .await
+            self.inner.server_streaming(request.into_request(), path, codec).await
         }
     }
 }
-#[doc = r" Generated client implementations."]
+/// Generated client implementations.
 pub mod action_cache_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = " The action cache API is used to query whether a given action has already been"]
-    #[doc = " performed and, if so, retrieve its result. Unlike the"]
-    #[doc = " [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage],"]
-    #[doc = " which addresses blobs by their own content, the action cache addresses the"]
-    #[doc = " [ActionResult][build.bazel.remote.execution.v2.ActionResult] by a"]
-    #[doc = " digest of the encoded [Action][build.bazel.remote.execution.v2.Action]"]
-    #[doc = " which produced them."]
-    #[doc = ""]
-    #[doc = " The lifetime of entries in the action cache is implementation-specific, but"]
-    #[doc = " the server SHOULD assume that more recently used entries are more likely to"]
-    #[doc = " be used again."]
-    #[doc = ""]
-    #[doc = " As with other services in the Remote Execution API, any call may return an"]
-    #[doc = " error with a [RetryInfo][google.rpc.RetryInfo] error detail providing"]
-    #[doc = " information about when the client should retry the request; clients SHOULD"]
-    #[doc = " respect the information provided."]
+    /// The action cache API is used to query whether a given action has already been
+    /// performed and, if so, retrieve its result. Unlike the
+    /// [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage],
+    /// which addresses blobs by their own content, the action cache addresses the
+    /// [ActionResult][build.bazel.remote.execution.v2.ActionResult] by a
+    /// digest of the encoded [Action][build.bazel.remote.execution.v2.Action]
+    /// which produced them.
+    ///
+    /// The lifetime of entries in the action cache is implementation-specific, but
+    /// the server SHOULD assume that more recently used entries are more likely to
+    /// be used again.
+    ///
+    /// As with other services in the Remote Execution API, any call may return an
+    /// error with a [RetryInfo][google.rpc.RetryInfo] error detail providing
+    /// information about when the client should retry the request; clients SHOULD
+    /// respect the information provided.
     #[derive(Debug, Clone)]
     pub struct ActionCacheClient<T> {
         inner: tonic::client::Grpc<T>,
     }
     impl ActionCacheClient<tonic::transport::Channel> {
-        #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
+        /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
             D: std::convert::TryInto<tonic::transport::Endpoint>,
@@ -1596,8 +1602,8 @@ pub mod action_cache_client {
     impl<T> ActionCacheClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::ResponseBody: Body + Send + 'static,
         T::Error: Into<StdError>,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -1616,81 +1622,90 @@ pub mod action_cache_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             ActionCacheClient::new(InterceptedService::new(inner, interceptor))
         }
-        #[doc = r" Compress requests with `gzip`."]
-        #[doc = r""]
-        #[doc = r" This requires the server to support it otherwise it might respond with an"]
-        #[doc = r" error."]
+        /// Compress requests with `gzip`.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
         pub fn send_gzip(mut self) -> Self {
             self.inner = self.inner.send_gzip();
             self
         }
-        #[doc = r" Enable decompressing responses with `gzip`."]
+        /// Enable decompressing responses with `gzip`.
+        #[must_use]
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
         }
-        #[doc = " Retrieve a cached execution result."]
-        #[doc = ""]
-        #[doc = " Implementations SHOULD ensure that any blobs referenced from the"]
-        #[doc = " [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]"]
-        #[doc = " are available at the time of returning the"]
-        #[doc = " [ActionResult][build.bazel.remote.execution.v2.ActionResult] and will be"]
-        #[doc = " for some period of time afterwards. The lifetimes of the referenced blobs SHOULD be increased"]
-        #[doc = " if necessary and applicable."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `NOT_FOUND`: The requested `ActionResult` is not in the cache."]
+        /// Retrieve a cached execution result.
+        ///
+        /// Implementations SHOULD ensure that any blobs referenced from the
+        /// [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]
+        /// are available at the time of returning the
+        /// [ActionResult][build.bazel.remote.execution.v2.ActionResult] and will be
+        /// for some period of time afterwards. The lifetimes of the referenced blobs SHOULD be increased
+        /// if necessary and applicable.
+        ///
+        /// Errors:
+        ///
+        /// * `NOT_FOUND`: The requested `ActionResult` is not in the cache.
         pub async fn get_action_result(
             &mut self,
             request: impl tonic::IntoRequest<super::GetActionResultRequest>,
         ) -> Result<tonic::Response<super::ActionResult>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.ActionCache/GetActionResult",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = " Upload a new execution result."]
-        #[doc = ""]
-        #[doc = " In order to allow the server to perform access control based on the type of"]
-        #[doc = " action, and to assist with client debugging, the client MUST first upload"]
-        #[doc = " the [Action][build.bazel.remote.execution.v2.Execution] that produced the"]
-        #[doc = " result, along with its"]
-        #[doc = " [Command][build.bazel.remote.execution.v2.Command], into the"]
-        #[doc = " `ContentAddressableStorage`."]
-        #[doc = ""]
-        #[doc = " Server implementations MAY modify the"]
-        #[doc = " `UpdateActionResultRequest.action_result` and return an equivalent value."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `INVALID_ARGUMENT`: One or more arguments are invalid."]
-        #[doc = " * `FAILED_PRECONDITION`: One or more errors occurred in updating the"]
-        #[doc = "   action result, such as a missing command or action."]
-        #[doc = " * `RESOURCE_EXHAUSTED`: There is insufficient storage space to add the"]
-        #[doc = "   entry to the cache."]
+        /// Upload a new execution result.
+        ///
+        /// In order to allow the server to perform access control based on the type of
+        /// action, and to assist with client debugging, the client MUST first upload
+        /// the [Action][build.bazel.remote.execution.v2.Execution] that produced the
+        /// result, along with its
+        /// [Command][build.bazel.remote.execution.v2.Command], into the
+        /// `ContentAddressableStorage`.
+        ///
+        /// Server implementations MAY modify the
+        /// `UpdateActionResultRequest.action_result` and return an equivalent value.
+        ///
+        /// Errors:
+        ///
+        /// * `INVALID_ARGUMENT`: One or more arguments are invalid.
+        /// * `FAILED_PRECONDITION`: One or more errors occurred in updating the
+        ///   action result, such as a missing command or action.
+        /// * `RESOURCE_EXHAUSTED`: There is insufficient storage space to add the
+        ///   entry to the cache.
         pub async fn update_action_result(
             &mut self,
             request: impl tonic::IntoRequest<super::UpdateActionResultRequest>,
         ) -> Result<tonic::Response<super::ActionResult>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult",
@@ -1699,88 +1714,88 @@ pub mod action_cache_client {
         }
     }
 }
-#[doc = r" Generated client implementations."]
+/// Generated client implementations.
 pub mod content_addressable_storage_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = " The CAS (content-addressable storage) is used to store the inputs to and"]
-    #[doc = " outputs from the execution service. Each piece of content is addressed by the"]
-    #[doc = " digest of its binary data."]
-    #[doc = ""]
-    #[doc = " Most of the binary data stored in the CAS is opaque to the execution engine,"]
-    #[doc = " and is only used as a communication medium. In order to build an"]
-    #[doc = " [Action][build.bazel.remote.execution.v2.Action],"]
-    #[doc = " however, the client will need to also upload the"]
-    #[doc = " [Command][build.bazel.remote.execution.v2.Command] and input root"]
-    #[doc = " [Directory][build.bazel.remote.execution.v2.Directory] for the Action."]
-    #[doc = " The Command and Directory messages must be marshalled to wire format and then"]
-    #[doc = " uploaded under the hash as with any other piece of content. In practice, the"]
-    #[doc = " input root directory is likely to refer to other Directories in its"]
-    #[doc = " hierarchy, which must also each be uploaded on their own."]
-    #[doc = ""]
-    #[doc = " For small file uploads the client should group them together and call"]
-    #[doc = " [BatchUpdateBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchUpdateBlobs]."]
-    #[doc = " For large uploads, the client must use the"]
-    #[doc = " [Write method][google.bytestream.ByteStream.Write] of the ByteStream API. The"]
-    #[doc = " `resource_name` is `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}`,"]
-    #[doc = " where `instance_name` is as described in the next paragraph, `uuid` is a"]
-    #[doc = " version 4 UUID generated by the client, and `hash` and `size` are the"]
-    #[doc = " [Digest][build.bazel.remote.execution.v2.Digest] of the blob. The"]
-    #[doc = " `uuid` is used only to avoid collisions when multiple clients try to upload"]
-    #[doc = " the same file (or the same client tries to upload the file multiple times at"]
-    #[doc = " once on different threads), so the client MAY reuse the `uuid` for uploading"]
-    #[doc = " different blobs. The `resource_name` may optionally have a trailing filename"]
-    #[doc = " (or other metadata) for a client to use if it is storing URLs, as in"]
-    #[doc = " `{instance}/uploads/{uuid}/blobs/{hash}/{size}/foo/bar/baz.cc`. Anything"]
-    #[doc = " after the `size` is ignored."]
-    #[doc = ""]
-    #[doc = " A single server MAY support multiple instances of the execution system, each"]
-    #[doc = " with their own workers, storage, cache, etc. The exact relationship between"]
-    #[doc = " instances is up to the server. If the server does, then the `instance_name`"]
-    #[doc = " is an identifier, possibly containing multiple path segments, used to"]
-    #[doc = " distinguish between the various instances on the server, in a manner defined"]
-    #[doc = " by the server. For servers which do not support multiple instances, then the"]
-    #[doc = " `instance_name` is the empty path and the leading slash is omitted, so that"]
-    #[doc = " the `resource_name` becomes `uploads/{uuid}/blobs/{hash}/{size}`."]
-    #[doc = " To simplify parsing, a path segment cannot equal any of the following"]
-    #[doc = " keywords: `blobs`, `uploads`, `actions`, `actionResults`, `operations` and"]
-    #[doc = " `capabilities`."]
-    #[doc = ""]
-    #[doc = " When attempting an upload, if another client has already completed the upload"]
-    #[doc = " (which may occur in the middle of a single upload if another client uploads"]
-    #[doc = " the same blob concurrently), the request will terminate immediately with"]
-    #[doc = " a response whose `committed_size` is the full size of the uploaded file"]
-    #[doc = " (regardless of how much data was transmitted by the client). If the client"]
-    #[doc = " completes the upload but the"]
-    #[doc = " [Digest][build.bazel.remote.execution.v2.Digest] does not match, an"]
-    #[doc = " `INVALID_ARGUMENT` error will be returned. In either case, the client should"]
-    #[doc = " not attempt to retry the upload."]
-    #[doc = ""]
-    #[doc = " For downloading blobs, the client must use the"]
-    #[doc = " [Read method][google.bytestream.ByteStream.Read] of the ByteStream API, with"]
-    #[doc = " a `resource_name` of `\"{instance_name}/blobs/{hash}/{size}\"`, where"]
-    #[doc = " `instance_name` is the instance name (see above), and `hash` and `size` are"]
-    #[doc = " the [Digest][build.bazel.remote.execution.v2.Digest] of the blob."]
-    #[doc = ""]
-    #[doc = " The lifetime of entries in the CAS is implementation specific, but it SHOULD"]
-    #[doc = " be long enough to allow for newly-added and recently looked-up entries to be"]
-    #[doc = " used in subsequent calls (e.g. to"]
-    #[doc = " [Execute][build.bazel.remote.execution.v2.Execution.Execute])."]
-    #[doc = ""]
-    #[doc = " Servers MUST behave as though empty blobs are always available, even if they"]
-    #[doc = " have not been uploaded. Clients MAY optimize away the uploading or"]
-    #[doc = " downloading of empty blobs."]
-    #[doc = ""]
-    #[doc = " As with other services in the Remote Execution API, any call may return an"]
-    #[doc = " error with a [RetryInfo][google.rpc.RetryInfo] error detail providing"]
-    #[doc = " information about when the client should retry the request; clients SHOULD"]
-    #[doc = " respect the information provided."]
+    /// The CAS (content-addressable storage) is used to store the inputs to and
+    /// outputs from the execution service. Each piece of content is addressed by the
+    /// digest of its binary data.
+    ///
+    /// Most of the binary data stored in the CAS is opaque to the execution engine,
+    /// and is only used as a communication medium. In order to build an
+    /// [Action][build.bazel.remote.execution.v2.Action],
+    /// however, the client will need to also upload the
+    /// [Command][build.bazel.remote.execution.v2.Command] and input root
+    /// [Directory][build.bazel.remote.execution.v2.Directory] for the Action.
+    /// The Command and Directory messages must be marshalled to wire format and then
+    /// uploaded under the hash as with any other piece of content. In practice, the
+    /// input root directory is likely to refer to other Directories in its
+    /// hierarchy, which must also each be uploaded on their own.
+    ///
+    /// For small file uploads the client should group them together and call
+    /// [BatchUpdateBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchUpdateBlobs].
+    /// For large uploads, the client must use the
+    /// [Write method][google.bytestream.ByteStream.Write] of the ByteStream API. The
+    /// `resource_name` is `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}`,
+    /// where `instance_name` is as described in the next paragraph, `uuid` is a
+    /// version 4 UUID generated by the client, and `hash` and `size` are the
+    /// [Digest][build.bazel.remote.execution.v2.Digest] of the blob. The
+    /// `uuid` is used only to avoid collisions when multiple clients try to upload
+    /// the same file (or the same client tries to upload the file multiple times at
+    /// once on different threads), so the client MAY reuse the `uuid` for uploading
+    /// different blobs. The `resource_name` may optionally have a trailing filename
+    /// (or other metadata) for a client to use if it is storing URLs, as in
+    /// `{instance}/uploads/{uuid}/blobs/{hash}/{size}/foo/bar/baz.cc`. Anything
+    /// after the `size` is ignored.
+    ///
+    /// A single server MAY support multiple instances of the execution system, each
+    /// with their own workers, storage, cache, etc. The exact relationship between
+    /// instances is up to the server. If the server does, then the `instance_name`
+    /// is an identifier, possibly containing multiple path segments, used to
+    /// distinguish between the various instances on the server, in a manner defined
+    /// by the server. For servers which do not support multiple instances, then the
+    /// `instance_name` is the empty path and the leading slash is omitted, so that
+    /// the `resource_name` becomes `uploads/{uuid}/blobs/{hash}/{size}`.
+    /// To simplify parsing, a path segment cannot equal any of the following
+    /// keywords: `blobs`, `uploads`, `actions`, `actionResults`, `operations` and
+    /// `capabilities`.
+    ///
+    /// When attempting an upload, if another client has already completed the upload
+    /// (which may occur in the middle of a single upload if another client uploads
+    /// the same blob concurrently), the request will terminate immediately with
+    /// a response whose `committed_size` is the full size of the uploaded file
+    /// (regardless of how much data was transmitted by the client). If the client
+    /// completes the upload but the
+    /// [Digest][build.bazel.remote.execution.v2.Digest] does not match, an
+    /// `INVALID_ARGUMENT` error will be returned. In either case, the client should
+    /// not attempt to retry the upload.
+    ///
+    /// For downloading blobs, the client must use the
+    /// [Read method][google.bytestream.ByteStream.Read] of the ByteStream API, with
+    /// a `resource_name` of `"{instance_name}/blobs/{hash}/{size}"`, where
+    /// `instance_name` is the instance name (see above), and `hash` and `size` are
+    /// the [Digest][build.bazel.remote.execution.v2.Digest] of the blob.
+    ///
+    /// The lifetime of entries in the CAS is implementation specific, but it SHOULD
+    /// be long enough to allow for newly-added and recently looked-up entries to be
+    /// used in subsequent calls (e.g. to
+    /// [Execute][build.bazel.remote.execution.v2.Execution.Execute]).
+    ///
+    /// Servers MUST behave as though empty blobs are always available, even if they
+    /// have not been uploaded. Clients MAY optimize away the uploading or
+    /// downloading of empty blobs.
+    ///
+    /// As with other services in the Remote Execution API, any call may return an
+    /// error with a [RetryInfo][google.rpc.RetryInfo] error detail providing
+    /// information about when the client should retry the request; clients SHOULD
+    /// respect the information provided.
     #[derive(Debug, Clone)]
     pub struct ContentAddressableStorageClient<T> {
         inner: tonic::client::Grpc<T>,
     }
     impl ContentAddressableStorageClient<tonic::transport::Channel> {
-        #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
+        /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
             D: std::convert::TryInto<tonic::transport::Endpoint>,
@@ -1793,8 +1808,8 @@ pub mod content_addressable_storage_client {
     impl<T> ContentAddressableStorageClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::ResponseBody: Body + Send + 'static,
         T::Error: Into<StdError>,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -1813,185 +1828,202 @@ pub mod content_addressable_storage_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
-            ContentAddressableStorageClient::new(InterceptedService::new(inner, interceptor))
+            ContentAddressableStorageClient::new(
+                InterceptedService::new(inner, interceptor),
+            )
         }
-        #[doc = r" Compress requests with `gzip`."]
-        #[doc = r""]
-        #[doc = r" This requires the server to support it otherwise it might respond with an"]
-        #[doc = r" error."]
+        /// Compress requests with `gzip`.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
         pub fn send_gzip(mut self) -> Self {
             self.inner = self.inner.send_gzip();
             self
         }
-        #[doc = r" Enable decompressing responses with `gzip`."]
+        /// Enable decompressing responses with `gzip`.
+        #[must_use]
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
         }
-        #[doc = " Determine if blobs are present in the CAS."]
-        #[doc = ""]
-        #[doc = " Clients can use this API before uploading blobs to determine which ones are"]
-        #[doc = " already present in the CAS and do not need to be uploaded again."]
-        #[doc = ""]
-        #[doc = " Servers SHOULD increase the lifetimes of the referenced blobs if necessary and"]
-        #[doc = " applicable."]
-        #[doc = ""]
-        #[doc = " There are no method-specific errors."]
+        /// Determine if blobs are present in the CAS.
+        ///
+        /// Clients can use this API before uploading blobs to determine which ones are
+        /// already present in the CAS and do not need to be uploaded again.
+        ///
+        /// Servers SHOULD increase the lifetimes of the referenced blobs if necessary and
+        /// applicable.
+        ///
+        /// There are no method-specific errors.
         pub async fn find_missing_blobs(
             &mut self,
             request: impl tonic::IntoRequest<super::FindMissingBlobsRequest>,
         ) -> Result<tonic::Response<super::FindMissingBlobsResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.ContentAddressableStorage/FindMissingBlobs",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = " Upload many blobs at once."]
-        #[doc = ""]
-        #[doc = " The server may enforce a limit of the combined total size of blobs"]
-        #[doc = " to be uploaded using this API. This limit may be obtained using the"]
-        #[doc = " [Capabilities][build.bazel.remote.execution.v2.Capabilities] API."]
-        #[doc = " Requests exceeding the limit should either be split into smaller"]
-        #[doc = " chunks or uploaded using the"]
-        #[doc = " [ByteStream API][google.bytestream.ByteStream], as appropriate."]
-        #[doc = ""]
-        #[doc = " This request is equivalent to calling a Bytestream `Write` request"]
-        #[doc = " on each individual blob, in parallel. The requests may succeed or fail"]
-        #[doc = " independently."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `INVALID_ARGUMENT`: The client attempted to upload more than the"]
-        #[doc = "   server supported limit."]
-        #[doc = ""]
-        #[doc = " Individual requests may return the following errors, additionally:"]
-        #[doc = ""]
-        #[doc = " * `RESOURCE_EXHAUSTED`: There is insufficient disk quota to store the blob."]
-        #[doc = " * `INVALID_ARGUMENT`: The"]
-        #[doc = " [Digest][build.bazel.remote.execution.v2.Digest] does not match the"]
-        #[doc = " provided data."]
+        /// Upload many blobs at once.
+        ///
+        /// The server may enforce a limit of the combined total size of blobs
+        /// to be uploaded using this API. This limit may be obtained using the
+        /// [Capabilities][build.bazel.remote.execution.v2.Capabilities] API.
+        /// Requests exceeding the limit should either be split into smaller
+        /// chunks or uploaded using the
+        /// [ByteStream API][google.bytestream.ByteStream], as appropriate.
+        ///
+        /// This request is equivalent to calling a Bytestream `Write` request
+        /// on each individual blob, in parallel. The requests may succeed or fail
+        /// independently.
+        ///
+        /// Errors:
+        ///
+        /// * `INVALID_ARGUMENT`: The client attempted to upload more than the
+        ///   server supported limit.
+        ///
+        /// Individual requests may return the following errors, additionally:
+        ///
+        /// * `RESOURCE_EXHAUSTED`: There is insufficient disk quota to store the blob.
+        /// * `INVALID_ARGUMENT`: The
+        /// [Digest][build.bazel.remote.execution.v2.Digest] does not match the
+        /// provided data.
         pub async fn batch_update_blobs(
             &mut self,
             request: impl tonic::IntoRequest<super::BatchUpdateBlobsRequest>,
         ) -> Result<tonic::Response<super::BatchUpdateBlobsResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = " Download many blobs at once."]
-        #[doc = ""]
-        #[doc = " The server may enforce a limit of the combined total size of blobs"]
-        #[doc = " to be downloaded using this API. This limit may be obtained using the"]
-        #[doc = " [Capabilities][build.bazel.remote.execution.v2.Capabilities] API."]
-        #[doc = " Requests exceeding the limit should either be split into smaller"]
-        #[doc = " chunks or downloaded using the"]
-        #[doc = " [ByteStream API][google.bytestream.ByteStream], as appropriate."]
-        #[doc = ""]
-        #[doc = " This request is equivalent to calling a Bytestream `Read` request"]
-        #[doc = " on each individual blob, in parallel. The requests may succeed or fail"]
-        #[doc = " independently."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `INVALID_ARGUMENT`: The client attempted to read more than the"]
-        #[doc = "   server supported limit."]
-        #[doc = ""]
-        #[doc = " Every error on individual read will be returned in the corresponding digest"]
-        #[doc = " status."]
+        /// Download many blobs at once.
+        ///
+        /// The server may enforce a limit of the combined total size of blobs
+        /// to be downloaded using this API. This limit may be obtained using the
+        /// [Capabilities][build.bazel.remote.execution.v2.Capabilities] API.
+        /// Requests exceeding the limit should either be split into smaller
+        /// chunks or downloaded using the
+        /// [ByteStream API][google.bytestream.ByteStream], as appropriate.
+        ///
+        /// This request is equivalent to calling a Bytestream `Read` request
+        /// on each individual blob, in parallel. The requests may succeed or fail
+        /// independently.
+        ///
+        /// Errors:
+        ///
+        /// * `INVALID_ARGUMENT`: The client attempted to read more than the
+        ///   server supported limit.
+        ///
+        /// Every error on individual read will be returned in the corresponding digest
+        /// status.
         pub async fn batch_read_blobs(
             &mut self,
             request: impl tonic::IntoRequest<super::BatchReadBlobsRequest>,
         ) -> Result<tonic::Response<super::BatchReadBlobsResponse>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchReadBlobs",
             );
             self.inner.unary(request.into_request(), path, codec).await
         }
-        #[doc = " Fetch the entire directory tree rooted at a node."]
-        #[doc = ""]
-        #[doc = " This request must be targeted at a"]
-        #[doc = " [Directory][build.bazel.remote.execution.v2.Directory] stored in the"]
-        #[doc = " [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]"]
-        #[doc = " (CAS). The server will enumerate the `Directory` tree recursively and"]
-        #[doc = " return every node descended from the root."]
-        #[doc = ""]
-        #[doc = " The GetTreeRequest.page_token parameter can be used to skip ahead in"]
-        #[doc = " the stream (e.g. when retrying a partially completed and aborted request),"]
-        #[doc = " by setting it to a value taken from GetTreeResponse.next_page_token of the"]
-        #[doc = " last successfully processed GetTreeResponse)."]
-        #[doc = ""]
-        #[doc = " The exact traversal order is unspecified and, unless retrieving subsequent"]
-        #[doc = " pages from an earlier request, is not guaranteed to be stable across"]
-        #[doc = " multiple invocations of `GetTree`."]
-        #[doc = ""]
-        #[doc = " If part of the tree is missing from the CAS, the server will return the"]
-        #[doc = " portion present and omit the rest."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `NOT_FOUND`: The requested tree root is not present in the CAS."]
+        /// Fetch the entire directory tree rooted at a node.
+        ///
+        /// This request must be targeted at a
+        /// [Directory][build.bazel.remote.execution.v2.Directory] stored in the
+        /// [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]
+        /// (CAS). The server will enumerate the `Directory` tree recursively and
+        /// return every node descended from the root.
+        ///
+        /// The GetTreeRequest.page_token parameter can be used to skip ahead in
+        /// the stream (e.g. when retrying a partially completed and aborted request),
+        /// by setting it to a value taken from GetTreeResponse.next_page_token of the
+        /// last successfully processed GetTreeResponse).
+        ///
+        /// The exact traversal order is unspecified and, unless retrieving subsequent
+        /// pages from an earlier request, is not guaranteed to be stable across
+        /// multiple invocations of `GetTree`.
+        ///
+        /// If part of the tree is missing from the CAS, the server will return the
+        /// portion present and omit the rest.
+        ///
+        /// Errors:
+        ///
+        /// * `NOT_FOUND`: The requested tree root is not present in the CAS.
         pub async fn get_tree(
             &mut self,
             request: impl tonic::IntoRequest<super::GetTreeRequest>,
-        ) -> Result<tonic::Response<tonic::codec::Streaming<super::GetTreeResponse>>, tonic::Status>
-        {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+        ) -> Result<
+                tonic::Response<tonic::codec::Streaming<super::GetTreeResponse>>,
+                tonic::Status,
+            > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.ContentAddressableStorage/GetTree",
             );
-            self.inner
-                .server_streaming(request.into_request(), path, codec)
-                .await
+            self.inner.server_streaming(request.into_request(), path, codec).await
         }
     }
 }
-#[doc = r" Generated client implementations."]
+/// Generated client implementations.
 pub mod capabilities_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = " The Capabilities service may be used by remote execution clients to query"]
-    #[doc = " various server properties, in order to self-configure or return meaningful"]
-    #[doc = " error messages."]
-    #[doc = ""]
-    #[doc = " The query may include a particular `instance_name`, in which case the values"]
-    #[doc = " returned will pertain to that instance."]
+    /// The Capabilities service may be used by remote execution clients to query
+    /// various server properties, in order to self-configure or return meaningful
+    /// error messages.
+    ///
+    /// The query may include a particular `instance_name`, in which case the values
+    /// returned will pertain to that instance.
     #[derive(Debug, Clone)]
     pub struct CapabilitiesClient<T> {
         inner: tonic::client::Grpc<T>,
     }
     impl CapabilitiesClient<tonic::transport::Channel> {
-        #[doc = r" Attempt to create a new client by connecting to a given endpoint."]
+        /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
             D: std::convert::TryInto<tonic::transport::Endpoint>,
@@ -2004,8 +2036,8 @@ pub mod capabilities_client {
     impl<T> CapabilitiesClient<T>
     where
         T: tonic::client::GrpcService<tonic::body::BoxBody>,
-        T::ResponseBody: Body + Send + 'static,
         T::Error: Into<StdError>,
+        T::ResponseBody: Default + Body<Data = Bytes> + Send + 'static,
         <T::ResponseBody as Body>::Error: Into<StdError> + Send,
     {
         pub fn new(inner: T) -> Self {
@@ -2024,42 +2056,48 @@ pub mod capabilities_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
-                Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<
+                http::Request<tonic::body::BoxBody>,
+            >>::Error: Into<StdError> + Send + Sync,
         {
             CapabilitiesClient::new(InterceptedService::new(inner, interceptor))
         }
-        #[doc = r" Compress requests with `gzip`."]
-        #[doc = r""]
-        #[doc = r" This requires the server to support it otherwise it might respond with an"]
-        #[doc = r" error."]
+        /// Compress requests with `gzip`.
+        ///
+        /// This requires the server to support it otherwise it might respond with an
+        /// error.
+        #[must_use]
         pub fn send_gzip(mut self) -> Self {
             self.inner = self.inner.send_gzip();
             self
         }
-        #[doc = r" Enable decompressing responses with `gzip`."]
+        /// Enable decompressing responses with `gzip`.
+        #[must_use]
         pub fn accept_gzip(mut self) -> Self {
             self.inner = self.inner.accept_gzip();
             self
         }
-        #[doc = " GetCapabilities returns the server capabilities configuration of the"]
-        #[doc = " remote endpoint."]
-        #[doc = " Only the capabilities of the services supported by the endpoint will"]
-        #[doc = " be returned:"]
-        #[doc = " * Execution + CAS + Action Cache endpoints should return both"]
-        #[doc = "   CacheCapabilities and ExecutionCapabilities."]
-        #[doc = " * Execution only endpoints should return ExecutionCapabilities."]
-        #[doc = " * CAS + Action Cache only endpoints should return CacheCapabilities."]
+        /// GetCapabilities returns the server capabilities configuration of the
+        /// remote endpoint.
+        /// Only the capabilities of the services supported by the endpoint will
+        /// be returned:
+        /// * Execution + CAS + Action Cache endpoints should return both
+        ///   CacheCapabilities and ExecutionCapabilities.
+        /// * Execution only endpoints should return ExecutionCapabilities.
+        /// * CAS + Action Cache only endpoints should return CacheCapabilities.
         pub async fn get_capabilities(
             &mut self,
             request: impl tonic::IntoRequest<super::GetCapabilitiesRequest>,
         ) -> Result<tonic::Response<super::ServerCapabilities>, tonic::Status> {
-            self.inner.ready().await.map_err(|e| {
-                tonic::Status::new(
-                    tonic::Code::Unknown,
-                    format!("Service was not ready: {}", e.into()),
-                )
-            })?;
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities",
@@ -2068,120 +2106,122 @@ pub mod capabilities_client {
         }
     }
 }
-#[doc = r" Generated server implementations."]
+/// Generated server implementations.
 pub mod execution_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with ExecutionServer."]
+    ///Generated trait containing gRPC methods that should be implemented for use with ExecutionServer.
     #[async_trait]
     pub trait Execution: Send + Sync + 'static {
-        #[doc = "Server streaming response type for the Execute method."]
+        ///Server streaming response type for the Execute method.
         type ExecuteStream: futures_core::Stream<
                 Item = Result<
                     super::super::super::super::super::super::google::longrunning::Operation,
                     tonic::Status,
                 >,
-            > + Send
+            >
+            + Send
             + 'static;
-        #[doc = " Execute an action remotely."]
-        #[doc = ""]
-        #[doc = " In order to execute an action, the client must first upload all of the"]
-        #[doc = " inputs, the"]
-        #[doc = " [Command][build.bazel.remote.execution.v2.Command] to run, and the"]
-        #[doc = " [Action][build.bazel.remote.execution.v2.Action] into the"]
-        #[doc = " [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]."]
-        #[doc = " It then calls `Execute` with an `action_digest` referring to them. The"]
-        #[doc = " server will run the action and eventually return the result."]
-        #[doc = ""]
-        #[doc = " The input `Action`'s fields MUST meet the various canonicalization"]
-        #[doc = " requirements specified in the documentation for their types so that it has"]
-        #[doc = " the same digest as other logically equivalent `Action`s. The server MAY"]
-        #[doc = " enforce the requirements and return errors if a non-canonical input is"]
-        #[doc = " received. It MAY also proceed without verifying some or all of the"]
-        #[doc = " requirements, such as for performance reasons. If the server does not"]
-        #[doc = " verify the requirement, then it will treat the `Action` as distinct from"]
-        #[doc = " another logically equivalent action if they hash differently."]
-        #[doc = ""]
-        #[doc = " Returns a stream of"]
-        #[doc = " [google.longrunning.Operation][google.longrunning.Operation] messages"]
-        #[doc = " describing the resulting execution, with eventual `response`"]
-        #[doc = " [ExecuteResponse][build.bazel.remote.execution.v2.ExecuteResponse]. The"]
-        #[doc = " `metadata` on the operation is of type"]
-        #[doc = " [ExecuteOperationMetadata][build.bazel.remote.execution.v2.ExecuteOperationMetadata]."]
-        #[doc = ""]
-        #[doc = " If the client remains connected after the first response is returned after"]
-        #[doc = " the server, then updates are streamed as if the client had called"]
-        #[doc = " [WaitExecution][build.bazel.remote.execution.v2.Execution.WaitExecution]"]
-        #[doc = " until the execution completes or the request reaches an error. The"]
-        #[doc = " operation can also be queried using [Operations"]
-        #[doc = " API][google.longrunning.Operations.GetOperation]."]
-        #[doc = ""]
-        #[doc = " The server NEED NOT implement other methods or functionality of the"]
-        #[doc = " Operations API."]
-        #[doc = ""]
-        #[doc = " Errors discovered during creation of the `Operation` will be reported"]
-        #[doc = " as gRPC Status errors, while errors that occurred while running the"]
-        #[doc = " action will be reported in the `status` field of the `ExecuteResponse`. The"]
-        #[doc = " server MUST NOT set the `error` field of the `Operation` proto."]
-        #[doc = " The possible errors include:"]
-        #[doc = ""]
-        #[doc = " * `INVALID_ARGUMENT`: One or more arguments are invalid."]
-        #[doc = " * `FAILED_PRECONDITION`: One or more errors occurred in setting up the"]
-        #[doc = "   action requested, such as a missing input or command or no worker being"]
-        #[doc = "   available. The client may be able to fix the errors and retry."]
-        #[doc = " * `RESOURCE_EXHAUSTED`: There is insufficient quota of some resource to run"]
-        #[doc = "   the action."]
-        #[doc = " * `UNAVAILABLE`: Due to a transient condition, such as all workers being"]
-        #[doc = "   occupied (and the server does not support a queue), the action could not"]
-        #[doc = "   be started. The client should retry."]
-        #[doc = " * `INTERNAL`: An internal error occurred in the execution engine or the"]
-        #[doc = "   worker."]
-        #[doc = " * `DEADLINE_EXCEEDED`: The execution timed out."]
-        #[doc = " * `CANCELLED`: The operation was cancelled by the client. This status is"]
-        #[doc = "   only possible if the server implements the Operations API CancelOperation"]
-        #[doc = "   method, and it was called for the current execution."]
-        #[doc = ""]
-        #[doc = " In the case of a missing input or command, the server SHOULD additionally"]
-        #[doc = " send a [PreconditionFailure][google.rpc.PreconditionFailure] error detail"]
-        #[doc = " where, for each requested blob not present in the CAS, there is a"]
-        #[doc = " `Violation` with a `type` of `MISSING` and a `subject` of"]
-        #[doc = " `\"blobs/{hash}/{size}\"` indicating the digest of the missing blob."]
-        #[doc = ""]
-        #[doc = " The server does not need to guarantee that a call to this method leads to"]
-        #[doc = " at most one execution of the action. The server MAY execute the action"]
-        #[doc = " multiple times, potentially in parallel. These redundant executions MAY"]
-        #[doc = " continue to run, even if the operation is completed."]
+        /// Execute an action remotely.
+        ///
+        /// In order to execute an action, the client must first upload all of the
+        /// inputs, the
+        /// [Command][build.bazel.remote.execution.v2.Command] to run, and the
+        /// [Action][build.bazel.remote.execution.v2.Action] into the
+        /// [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage].
+        /// It then calls `Execute` with an `action_digest` referring to them. The
+        /// server will run the action and eventually return the result.
+        ///
+        /// The input `Action`'s fields MUST meet the various canonicalization
+        /// requirements specified in the documentation for their types so that it has
+        /// the same digest as other logically equivalent `Action`s. The server MAY
+        /// enforce the requirements and return errors if a non-canonical input is
+        /// received. It MAY also proceed without verifying some or all of the
+        /// requirements, such as for performance reasons. If the server does not
+        /// verify the requirement, then it will treat the `Action` as distinct from
+        /// another logically equivalent action if they hash differently.
+        ///
+        /// Returns a stream of
+        /// [google.longrunning.Operation][google.longrunning.Operation] messages
+        /// describing the resulting execution, with eventual `response`
+        /// [ExecuteResponse][build.bazel.remote.execution.v2.ExecuteResponse]. The
+        /// `metadata` on the operation is of type
+        /// [ExecuteOperationMetadata][build.bazel.remote.execution.v2.ExecuteOperationMetadata].
+        ///
+        /// If the client remains connected after the first response is returned after
+        /// the server, then updates are streamed as if the client had called
+        /// [WaitExecution][build.bazel.remote.execution.v2.Execution.WaitExecution]
+        /// until the execution completes or the request reaches an error. The
+        /// operation can also be queried using [Operations
+        /// API][google.longrunning.Operations.GetOperation].
+        ///
+        /// The server NEED NOT implement other methods or functionality of the
+        /// Operations API.
+        ///
+        /// Errors discovered during creation of the `Operation` will be reported
+        /// as gRPC Status errors, while errors that occurred while running the
+        /// action will be reported in the `status` field of the `ExecuteResponse`. The
+        /// server MUST NOT set the `error` field of the `Operation` proto.
+        /// The possible errors include:
+        ///
+        /// * `INVALID_ARGUMENT`: One or more arguments are invalid.
+        /// * `FAILED_PRECONDITION`: One or more errors occurred in setting up the
+        ///   action requested, such as a missing input or command or no worker being
+        ///   available. The client may be able to fix the errors and retry.
+        /// * `RESOURCE_EXHAUSTED`: There is insufficient quota of some resource to run
+        ///   the action.
+        /// * `UNAVAILABLE`: Due to a transient condition, such as all workers being
+        ///   occupied (and the server does not support a queue), the action could not
+        ///   be started. The client should retry.
+        /// * `INTERNAL`: An internal error occurred in the execution engine or the
+        ///   worker.
+        /// * `DEADLINE_EXCEEDED`: The execution timed out.
+        /// * `CANCELLED`: The operation was cancelled by the client. This status is
+        ///   only possible if the server implements the Operations API CancelOperation
+        ///   method, and it was called for the current execution.
+        ///
+        /// In the case of a missing input or command, the server SHOULD additionally
+        /// send a [PreconditionFailure][google.rpc.PreconditionFailure] error detail
+        /// where, for each requested blob not present in the CAS, there is a
+        /// `Violation` with a `type` of `MISSING` and a `subject` of
+        /// `"blobs/{hash}/{size}"` indicating the digest of the missing blob.
+        ///
+        /// The server does not need to guarantee that a call to this method leads to
+        /// at most one execution of the action. The server MAY execute the action
+        /// multiple times, potentially in parallel. These redundant executions MAY
+        /// continue to run, even if the operation is completed.
         async fn execute(
             &self,
             request: tonic::Request<super::ExecuteRequest>,
         ) -> Result<tonic::Response<Self::ExecuteStream>, tonic::Status>;
-        #[doc = "Server streaming response type for the WaitExecution method."]
+        ///Server streaming response type for the WaitExecution method.
         type WaitExecutionStream: futures_core::Stream<
                 Item = Result<
                     super::super::super::super::super::super::google::longrunning::Operation,
                     tonic::Status,
                 >,
-            > + Send
+            >
+            + Send
             + 'static;
-        #[doc = " Wait for an execution operation to complete. When the client initially"]
-        #[doc = " makes the request, the server immediately responds with the current status"]
-        #[doc = " of the execution. The server will leave the request stream open until the"]
-        #[doc = " operation completes, and then respond with the completed operation. The"]
-        #[doc = " server MAY choose to stream additional updates as execution progresses,"]
-        #[doc = " such as to provide an update as to the state of the execution."]
+        /// Wait for an execution operation to complete. When the client initially
+        /// makes the request, the server immediately responds with the current status
+        /// of the execution. The server will leave the request stream open until the
+        /// operation completes, and then respond with the completed operation. The
+        /// server MAY choose to stream additional updates as execution progresses,
+        /// such as to provide an update as to the state of the execution.
         async fn wait_execution(
             &self,
             request: tonic::Request<super::WaitExecutionRequest>,
         ) -> Result<tonic::Response<Self::WaitExecutionStream>, tonic::Status>;
     }
-    #[doc = " The Remote Execution API is used to execute an"]
-    #[doc = " [Action][build.bazel.remote.execution.v2.Action] on the remote"]
-    #[doc = " workers."]
-    #[doc = ""]
-    #[doc = " As with other services in the Remote Execution API, any call may return an"]
-    #[doc = " error with a [RetryInfo][google.rpc.RetryInfo] error detail providing"]
-    #[doc = " information about when the client should retry the request; clients SHOULD"]
-    #[doc = " respect the information provided."]
+    /// The Remote Execution API is used to execute an
+    /// [Action][build.bazel.remote.execution.v2.Action] on the remote
+    /// workers.
+    ///
+    /// As with other services in the Remote Execution API, any call may return an
+    /// error with a [RetryInfo][google.rpc.RetryInfo] error detail providing
+    /// information about when the client should retry the request; clients SHOULD
+    /// respect the information provided.
     #[derive(Debug)]
     pub struct ExecutionServer<T: Execution> {
         inner: _Inner<T>,
@@ -2191,7 +2231,9 @@ pub mod execution_server {
     struct _Inner<T>(Arc<T>);
     impl<T: Execution> ExecutionServer<T> {
         pub fn new(inner: T) -> Self {
-            let inner = Arc::new(inner);
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
             let inner = _Inner(inner);
             Self {
                 inner,
@@ -2199,7 +2241,10 @@ pub mod execution_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -2213,9 +2258,12 @@ pub mod execution_server {
         B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
-        type Error = Never;
+        type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -2224,11 +2272,16 @@ pub mod execution_server {
                 "/build.bazel.remote.execution.v2.Execution/Execute" => {
                     #[allow(non_camel_case_types)]
                     struct ExecuteSvc<T: Execution>(pub Arc<T>);
-                    impl<T: Execution> tonic::server::ServerStreamingService<super::ExecuteRequest> for ExecuteSvc<T> {
-                        type Response = super :: super :: super :: super :: super :: super :: google :: longrunning :: Operation ;
+                    impl<
+                        T: Execution,
+                    > tonic::server::ServerStreamingService<super::ExecuteRequest>
+                    for ExecuteSvc<T> {
+                        type Response = super::super::super::super::super::super::google::longrunning::Operation;
                         type ResponseStream = T::ExecuteStream;
-                        type Future =
-                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::ExecuteRequest>,
@@ -2245,10 +2298,11 @@ pub mod execution_server {
                         let inner = inner.0;
                         let method = ExecuteSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
@@ -2257,20 +2311,24 @@ pub mod execution_server {
                 "/build.bazel.remote.execution.v2.Execution/WaitExecution" => {
                     #[allow(non_camel_case_types)]
                     struct WaitExecutionSvc<T: Execution>(pub Arc<T>);
-                    impl<T: Execution>
-                        tonic::server::ServerStreamingService<super::WaitExecutionRequest>
-                        for WaitExecutionSvc<T>
-                    {
-                        type Response = super :: super :: super :: super :: super :: super :: google :: longrunning :: Operation ;
+                    impl<
+                        T: Execution,
+                    > tonic::server::ServerStreamingService<super::WaitExecutionRequest>
+                    for WaitExecutionSvc<T> {
+                        type Response = super::super::super::super::super::super::google::longrunning::Operation;
                         type ResponseStream = T::WaitExecutionStream;
-                        type Future =
-                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::WaitExecutionRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).wait_execution(request).await };
+                            let fut = async move {
+                                (*inner).wait_execution(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -2281,23 +2339,28 @@ pub mod execution_server {
                         let inner = inner.0;
                         let method = WaitExecutionSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -2325,69 +2388,69 @@ pub mod execution_server {
         const NAME: &'static str = "build.bazel.remote.execution.v2.Execution";
     }
 }
-#[doc = r" Generated server implementations."]
+/// Generated server implementations.
 pub mod action_cache_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with ActionCacheServer."]
+    ///Generated trait containing gRPC methods that should be implemented for use with ActionCacheServer.
     #[async_trait]
     pub trait ActionCache: Send + Sync + 'static {
-        #[doc = " Retrieve a cached execution result."]
-        #[doc = ""]
-        #[doc = " Implementations SHOULD ensure that any blobs referenced from the"]
-        #[doc = " [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]"]
-        #[doc = " are available at the time of returning the"]
-        #[doc = " [ActionResult][build.bazel.remote.execution.v2.ActionResult] and will be"]
-        #[doc = " for some period of time afterwards. The lifetimes of the referenced blobs SHOULD be increased"]
-        #[doc = " if necessary and applicable."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `NOT_FOUND`: The requested `ActionResult` is not in the cache."]
+        /// Retrieve a cached execution result.
+        ///
+        /// Implementations SHOULD ensure that any blobs referenced from the
+        /// [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]
+        /// are available at the time of returning the
+        /// [ActionResult][build.bazel.remote.execution.v2.ActionResult] and will be
+        /// for some period of time afterwards. The lifetimes of the referenced blobs SHOULD be increased
+        /// if necessary and applicable.
+        ///
+        /// Errors:
+        ///
+        /// * `NOT_FOUND`: The requested `ActionResult` is not in the cache.
         async fn get_action_result(
             &self,
             request: tonic::Request<super::GetActionResultRequest>,
         ) -> Result<tonic::Response<super::ActionResult>, tonic::Status>;
-        #[doc = " Upload a new execution result."]
-        #[doc = ""]
-        #[doc = " In order to allow the server to perform access control based on the type of"]
-        #[doc = " action, and to assist with client debugging, the client MUST first upload"]
-        #[doc = " the [Action][build.bazel.remote.execution.v2.Execution] that produced the"]
-        #[doc = " result, along with its"]
-        #[doc = " [Command][build.bazel.remote.execution.v2.Command], into the"]
-        #[doc = " `ContentAddressableStorage`."]
-        #[doc = ""]
-        #[doc = " Server implementations MAY modify the"]
-        #[doc = " `UpdateActionResultRequest.action_result` and return an equivalent value."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `INVALID_ARGUMENT`: One or more arguments are invalid."]
-        #[doc = " * `FAILED_PRECONDITION`: One or more errors occurred in updating the"]
-        #[doc = "   action result, such as a missing command or action."]
-        #[doc = " * `RESOURCE_EXHAUSTED`: There is insufficient storage space to add the"]
-        #[doc = "   entry to the cache."]
+        /// Upload a new execution result.
+        ///
+        /// In order to allow the server to perform access control based on the type of
+        /// action, and to assist with client debugging, the client MUST first upload
+        /// the [Action][build.bazel.remote.execution.v2.Execution] that produced the
+        /// result, along with its
+        /// [Command][build.bazel.remote.execution.v2.Command], into the
+        /// `ContentAddressableStorage`.
+        ///
+        /// Server implementations MAY modify the
+        /// `UpdateActionResultRequest.action_result` and return an equivalent value.
+        ///
+        /// Errors:
+        ///
+        /// * `INVALID_ARGUMENT`: One or more arguments are invalid.
+        /// * `FAILED_PRECONDITION`: One or more errors occurred in updating the
+        ///   action result, such as a missing command or action.
+        /// * `RESOURCE_EXHAUSTED`: There is insufficient storage space to add the
+        ///   entry to the cache.
         async fn update_action_result(
             &self,
             request: tonic::Request<super::UpdateActionResultRequest>,
         ) -> Result<tonic::Response<super::ActionResult>, tonic::Status>;
     }
-    #[doc = " The action cache API is used to query whether a given action has already been"]
-    #[doc = " performed and, if so, retrieve its result. Unlike the"]
-    #[doc = " [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage],"]
-    #[doc = " which addresses blobs by their own content, the action cache addresses the"]
-    #[doc = " [ActionResult][build.bazel.remote.execution.v2.ActionResult] by a"]
-    #[doc = " digest of the encoded [Action][build.bazel.remote.execution.v2.Action]"]
-    #[doc = " which produced them."]
-    #[doc = ""]
-    #[doc = " The lifetime of entries in the action cache is implementation-specific, but"]
-    #[doc = " the server SHOULD assume that more recently used entries are more likely to"]
-    #[doc = " be used again."]
-    #[doc = ""]
-    #[doc = " As with other services in the Remote Execution API, any call may return an"]
-    #[doc = " error with a [RetryInfo][google.rpc.RetryInfo] error detail providing"]
-    #[doc = " information about when the client should retry the request; clients SHOULD"]
-    #[doc = " respect the information provided."]
+    /// The action cache API is used to query whether a given action has already been
+    /// performed and, if so, retrieve its result. Unlike the
+    /// [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage],
+    /// which addresses blobs by their own content, the action cache addresses the
+    /// [ActionResult][build.bazel.remote.execution.v2.ActionResult] by a
+    /// digest of the encoded [Action][build.bazel.remote.execution.v2.Action]
+    /// which produced them.
+    ///
+    /// The lifetime of entries in the action cache is implementation-specific, but
+    /// the server SHOULD assume that more recently used entries are more likely to
+    /// be used again.
+    ///
+    /// As with other services in the Remote Execution API, any call may return an
+    /// error with a [RetryInfo][google.rpc.RetryInfo] error detail providing
+    /// information about when the client should retry the request; clients SHOULD
+    /// respect the information provided.
     #[derive(Debug)]
     pub struct ActionCacheServer<T: ActionCache> {
         inner: _Inner<T>,
@@ -2397,7 +2460,9 @@ pub mod action_cache_server {
     struct _Inner<T>(Arc<T>);
     impl<T: ActionCache> ActionCacheServer<T> {
         pub fn new(inner: T) -> Self {
-            let inner = Arc::new(inner);
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
             let inner = _Inner(inner);
             Self {
                 inner,
@@ -2405,7 +2470,10 @@ pub mod action_cache_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -2419,9 +2487,12 @@ pub mod action_cache_server {
         B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
-        type Error = Never;
+        type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -2430,17 +2501,23 @@ pub mod action_cache_server {
                 "/build.bazel.remote.execution.v2.ActionCache/GetActionResult" => {
                     #[allow(non_camel_case_types)]
                     struct GetActionResultSvc<T: ActionCache>(pub Arc<T>);
-                    impl<T: ActionCache> tonic::server::UnaryService<super::GetActionResultRequest>
-                        for GetActionResultSvc<T>
-                    {
+                    impl<
+                        T: ActionCache,
+                    > tonic::server::UnaryService<super::GetActionResultRequest>
+                    for GetActionResultSvc<T> {
                         type Response = super::ActionResult;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::GetActionResultRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).get_action_result(request).await };
+                            let fut = async move {
+                                (*inner).get_action_result(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -2451,10 +2528,11 @@ pub mod action_cache_server {
                         let inner = inner.0;
                         let method = GetActionResultSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2463,18 +2541,23 @@ pub mod action_cache_server {
                 "/build.bazel.remote.execution.v2.ActionCache/UpdateActionResult" => {
                     #[allow(non_camel_case_types)]
                     struct UpdateActionResultSvc<T: ActionCache>(pub Arc<T>);
-                    impl<T: ActionCache>
-                        tonic::server::UnaryService<super::UpdateActionResultRequest>
-                        for UpdateActionResultSvc<T>
-                    {
+                    impl<
+                        T: ActionCache,
+                    > tonic::server::UnaryService<super::UpdateActionResultRequest>
+                    for UpdateActionResultSvc<T> {
                         type Response = super::ActionResult;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::UpdateActionResultRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).update_action_result(request).await };
+                            let fut = async move {
+                                (*inner).update_action_result(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -2485,23 +2568,28 @@ pub mod action_cache_server {
                         let inner = inner.0;
                         let method = UpdateActionResultSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -2529,182 +2617,184 @@ pub mod action_cache_server {
         const NAME: &'static str = "build.bazel.remote.execution.v2.ActionCache";
     }
 }
-#[doc = r" Generated server implementations."]
+/// Generated server implementations.
 pub mod content_addressable_storage_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with ContentAddressableStorageServer."]
+    ///Generated trait containing gRPC methods that should be implemented for use with ContentAddressableStorageServer.
     #[async_trait]
     pub trait ContentAddressableStorage: Send + Sync + 'static {
-        #[doc = " Determine if blobs are present in the CAS."]
-        #[doc = ""]
-        #[doc = " Clients can use this API before uploading blobs to determine which ones are"]
-        #[doc = " already present in the CAS and do not need to be uploaded again."]
-        #[doc = ""]
-        #[doc = " Servers SHOULD increase the lifetimes of the referenced blobs if necessary and"]
-        #[doc = " applicable."]
-        #[doc = ""]
-        #[doc = " There are no method-specific errors."]
+        /// Determine if blobs are present in the CAS.
+        ///
+        /// Clients can use this API before uploading blobs to determine which ones are
+        /// already present in the CAS and do not need to be uploaded again.
+        ///
+        /// Servers SHOULD increase the lifetimes of the referenced blobs if necessary and
+        /// applicable.
+        ///
+        /// There are no method-specific errors.
         async fn find_missing_blobs(
             &self,
             request: tonic::Request<super::FindMissingBlobsRequest>,
         ) -> Result<tonic::Response<super::FindMissingBlobsResponse>, tonic::Status>;
-        #[doc = " Upload many blobs at once."]
-        #[doc = ""]
-        #[doc = " The server may enforce a limit of the combined total size of blobs"]
-        #[doc = " to be uploaded using this API. This limit may be obtained using the"]
-        #[doc = " [Capabilities][build.bazel.remote.execution.v2.Capabilities] API."]
-        #[doc = " Requests exceeding the limit should either be split into smaller"]
-        #[doc = " chunks or uploaded using the"]
-        #[doc = " [ByteStream API][google.bytestream.ByteStream], as appropriate."]
-        #[doc = ""]
-        #[doc = " This request is equivalent to calling a Bytestream `Write` request"]
-        #[doc = " on each individual blob, in parallel. The requests may succeed or fail"]
-        #[doc = " independently."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `INVALID_ARGUMENT`: The client attempted to upload more than the"]
-        #[doc = "   server supported limit."]
-        #[doc = ""]
-        #[doc = " Individual requests may return the following errors, additionally:"]
-        #[doc = ""]
-        #[doc = " * `RESOURCE_EXHAUSTED`: There is insufficient disk quota to store the blob."]
-        #[doc = " * `INVALID_ARGUMENT`: The"]
-        #[doc = " [Digest][build.bazel.remote.execution.v2.Digest] does not match the"]
-        #[doc = " provided data."]
+        /// Upload many blobs at once.
+        ///
+        /// The server may enforce a limit of the combined total size of blobs
+        /// to be uploaded using this API. This limit may be obtained using the
+        /// [Capabilities][build.bazel.remote.execution.v2.Capabilities] API.
+        /// Requests exceeding the limit should either be split into smaller
+        /// chunks or uploaded using the
+        /// [ByteStream API][google.bytestream.ByteStream], as appropriate.
+        ///
+        /// This request is equivalent to calling a Bytestream `Write` request
+        /// on each individual blob, in parallel. The requests may succeed or fail
+        /// independently.
+        ///
+        /// Errors:
+        ///
+        /// * `INVALID_ARGUMENT`: The client attempted to upload more than the
+        ///   server supported limit.
+        ///
+        /// Individual requests may return the following errors, additionally:
+        ///
+        /// * `RESOURCE_EXHAUSTED`: There is insufficient disk quota to store the blob.
+        /// * `INVALID_ARGUMENT`: The
+        /// [Digest][build.bazel.remote.execution.v2.Digest] does not match the
+        /// provided data.
         async fn batch_update_blobs(
             &self,
             request: tonic::Request<super::BatchUpdateBlobsRequest>,
         ) -> Result<tonic::Response<super::BatchUpdateBlobsResponse>, tonic::Status>;
-        #[doc = " Download many blobs at once."]
-        #[doc = ""]
-        #[doc = " The server may enforce a limit of the combined total size of blobs"]
-        #[doc = " to be downloaded using this API. This limit may be obtained using the"]
-        #[doc = " [Capabilities][build.bazel.remote.execution.v2.Capabilities] API."]
-        #[doc = " Requests exceeding the limit should either be split into smaller"]
-        #[doc = " chunks or downloaded using the"]
-        #[doc = " [ByteStream API][google.bytestream.ByteStream], as appropriate."]
-        #[doc = ""]
-        #[doc = " This request is equivalent to calling a Bytestream `Read` request"]
-        #[doc = " on each individual blob, in parallel. The requests may succeed or fail"]
-        #[doc = " independently."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `INVALID_ARGUMENT`: The client attempted to read more than the"]
-        #[doc = "   server supported limit."]
-        #[doc = ""]
-        #[doc = " Every error on individual read will be returned in the corresponding digest"]
-        #[doc = " status."]
+        /// Download many blobs at once.
+        ///
+        /// The server may enforce a limit of the combined total size of blobs
+        /// to be downloaded using this API. This limit may be obtained using the
+        /// [Capabilities][build.bazel.remote.execution.v2.Capabilities] API.
+        /// Requests exceeding the limit should either be split into smaller
+        /// chunks or downloaded using the
+        /// [ByteStream API][google.bytestream.ByteStream], as appropriate.
+        ///
+        /// This request is equivalent to calling a Bytestream `Read` request
+        /// on each individual blob, in parallel. The requests may succeed or fail
+        /// independently.
+        ///
+        /// Errors:
+        ///
+        /// * `INVALID_ARGUMENT`: The client attempted to read more than the
+        ///   server supported limit.
+        ///
+        /// Every error on individual read will be returned in the corresponding digest
+        /// status.
         async fn batch_read_blobs(
             &self,
             request: tonic::Request<super::BatchReadBlobsRequest>,
         ) -> Result<tonic::Response<super::BatchReadBlobsResponse>, tonic::Status>;
-        #[doc = "Server streaming response type for the GetTree method."]
-        type GetTreeStream: futures_core::Stream<Item = Result<super::GetTreeResponse, tonic::Status>>
+        ///Server streaming response type for the GetTree method.
+        type GetTreeStream: futures_core::Stream<
+                Item = Result<super::GetTreeResponse, tonic::Status>,
+            >
             + Send
             + 'static;
-        #[doc = " Fetch the entire directory tree rooted at a node."]
-        #[doc = ""]
-        #[doc = " This request must be targeted at a"]
-        #[doc = " [Directory][build.bazel.remote.execution.v2.Directory] stored in the"]
-        #[doc = " [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]"]
-        #[doc = " (CAS). The server will enumerate the `Directory` tree recursively and"]
-        #[doc = " return every node descended from the root."]
-        #[doc = ""]
-        #[doc = " The GetTreeRequest.page_token parameter can be used to skip ahead in"]
-        #[doc = " the stream (e.g. when retrying a partially completed and aborted request),"]
-        #[doc = " by setting it to a value taken from GetTreeResponse.next_page_token of the"]
-        #[doc = " last successfully processed GetTreeResponse)."]
-        #[doc = ""]
-        #[doc = " The exact traversal order is unspecified and, unless retrieving subsequent"]
-        #[doc = " pages from an earlier request, is not guaranteed to be stable across"]
-        #[doc = " multiple invocations of `GetTree`."]
-        #[doc = ""]
-        #[doc = " If part of the tree is missing from the CAS, the server will return the"]
-        #[doc = " portion present and omit the rest."]
-        #[doc = ""]
-        #[doc = " Errors:"]
-        #[doc = ""]
-        #[doc = " * `NOT_FOUND`: The requested tree root is not present in the CAS."]
+        /// Fetch the entire directory tree rooted at a node.
+        ///
+        /// This request must be targeted at a
+        /// [Directory][build.bazel.remote.execution.v2.Directory] stored in the
+        /// [ContentAddressableStorage][build.bazel.remote.execution.v2.ContentAddressableStorage]
+        /// (CAS). The server will enumerate the `Directory` tree recursively and
+        /// return every node descended from the root.
+        ///
+        /// The GetTreeRequest.page_token parameter can be used to skip ahead in
+        /// the stream (e.g. when retrying a partially completed and aborted request),
+        /// by setting it to a value taken from GetTreeResponse.next_page_token of the
+        /// last successfully processed GetTreeResponse).
+        ///
+        /// The exact traversal order is unspecified and, unless retrieving subsequent
+        /// pages from an earlier request, is not guaranteed to be stable across
+        /// multiple invocations of `GetTree`.
+        ///
+        /// If part of the tree is missing from the CAS, the server will return the
+        /// portion present and omit the rest.
+        ///
+        /// Errors:
+        ///
+        /// * `NOT_FOUND`: The requested tree root is not present in the CAS.
         async fn get_tree(
             &self,
             request: tonic::Request<super::GetTreeRequest>,
         ) -> Result<tonic::Response<Self::GetTreeStream>, tonic::Status>;
     }
-    #[doc = " The CAS (content-addressable storage) is used to store the inputs to and"]
-    #[doc = " outputs from the execution service. Each piece of content is addressed by the"]
-    #[doc = " digest of its binary data."]
-    #[doc = ""]
-    #[doc = " Most of the binary data stored in the CAS is opaque to the execution engine,"]
-    #[doc = " and is only used as a communication medium. In order to build an"]
-    #[doc = " [Action][build.bazel.remote.execution.v2.Action],"]
-    #[doc = " however, the client will need to also upload the"]
-    #[doc = " [Command][build.bazel.remote.execution.v2.Command] and input root"]
-    #[doc = " [Directory][build.bazel.remote.execution.v2.Directory] for the Action."]
-    #[doc = " The Command and Directory messages must be marshalled to wire format and then"]
-    #[doc = " uploaded under the hash as with any other piece of content. In practice, the"]
-    #[doc = " input root directory is likely to refer to other Directories in its"]
-    #[doc = " hierarchy, which must also each be uploaded on their own."]
-    #[doc = ""]
-    #[doc = " For small file uploads the client should group them together and call"]
-    #[doc = " [BatchUpdateBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchUpdateBlobs]."]
-    #[doc = " For large uploads, the client must use the"]
-    #[doc = " [Write method][google.bytestream.ByteStream.Write] of the ByteStream API. The"]
-    #[doc = " `resource_name` is `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}`,"]
-    #[doc = " where `instance_name` is as described in the next paragraph, `uuid` is a"]
-    #[doc = " version 4 UUID generated by the client, and `hash` and `size` are the"]
-    #[doc = " [Digest][build.bazel.remote.execution.v2.Digest] of the blob. The"]
-    #[doc = " `uuid` is used only to avoid collisions when multiple clients try to upload"]
-    #[doc = " the same file (or the same client tries to upload the file multiple times at"]
-    #[doc = " once on different threads), so the client MAY reuse the `uuid` for uploading"]
-    #[doc = " different blobs. The `resource_name` may optionally have a trailing filename"]
-    #[doc = " (or other metadata) for a client to use if it is storing URLs, as in"]
-    #[doc = " `{instance}/uploads/{uuid}/blobs/{hash}/{size}/foo/bar/baz.cc`. Anything"]
-    #[doc = " after the `size` is ignored."]
-    #[doc = ""]
-    #[doc = " A single server MAY support multiple instances of the execution system, each"]
-    #[doc = " with their own workers, storage, cache, etc. The exact relationship between"]
-    #[doc = " instances is up to the server. If the server does, then the `instance_name`"]
-    #[doc = " is an identifier, possibly containing multiple path segments, used to"]
-    #[doc = " distinguish between the various instances on the server, in a manner defined"]
-    #[doc = " by the server. For servers which do not support multiple instances, then the"]
-    #[doc = " `instance_name` is the empty path and the leading slash is omitted, so that"]
-    #[doc = " the `resource_name` becomes `uploads/{uuid}/blobs/{hash}/{size}`."]
-    #[doc = " To simplify parsing, a path segment cannot equal any of the following"]
-    #[doc = " keywords: `blobs`, `uploads`, `actions`, `actionResults`, `operations` and"]
-    #[doc = " `capabilities`."]
-    #[doc = ""]
-    #[doc = " When attempting an upload, if another client has already completed the upload"]
-    #[doc = " (which may occur in the middle of a single upload if another client uploads"]
-    #[doc = " the same blob concurrently), the request will terminate immediately with"]
-    #[doc = " a response whose `committed_size` is the full size of the uploaded file"]
-    #[doc = " (regardless of how much data was transmitted by the client). If the client"]
-    #[doc = " completes the upload but the"]
-    #[doc = " [Digest][build.bazel.remote.execution.v2.Digest] does not match, an"]
-    #[doc = " `INVALID_ARGUMENT` error will be returned. In either case, the client should"]
-    #[doc = " not attempt to retry the upload."]
-    #[doc = ""]
-    #[doc = " For downloading blobs, the client must use the"]
-    #[doc = " [Read method][google.bytestream.ByteStream.Read] of the ByteStream API, with"]
-    #[doc = " a `resource_name` of `\"{instance_name}/blobs/{hash}/{size}\"`, where"]
-    #[doc = " `instance_name` is the instance name (see above), and `hash` and `size` are"]
-    #[doc = " the [Digest][build.bazel.remote.execution.v2.Digest] of the blob."]
-    #[doc = ""]
-    #[doc = " The lifetime of entries in the CAS is implementation specific, but it SHOULD"]
-    #[doc = " be long enough to allow for newly-added and recently looked-up entries to be"]
-    #[doc = " used in subsequent calls (e.g. to"]
-    #[doc = " [Execute][build.bazel.remote.execution.v2.Execution.Execute])."]
-    #[doc = ""]
-    #[doc = " Servers MUST behave as though empty blobs are always available, even if they"]
-    #[doc = " have not been uploaded. Clients MAY optimize away the uploading or"]
-    #[doc = " downloading of empty blobs."]
-    #[doc = ""]
-    #[doc = " As with other services in the Remote Execution API, any call may return an"]
-    #[doc = " error with a [RetryInfo][google.rpc.RetryInfo] error detail providing"]
-    #[doc = " information about when the client should retry the request; clients SHOULD"]
-    #[doc = " respect the information provided."]
+    /// The CAS (content-addressable storage) is used to store the inputs to and
+    /// outputs from the execution service. Each piece of content is addressed by the
+    /// digest of its binary data.
+    ///
+    /// Most of the binary data stored in the CAS is opaque to the execution engine,
+    /// and is only used as a communication medium. In order to build an
+    /// [Action][build.bazel.remote.execution.v2.Action],
+    /// however, the client will need to also upload the
+    /// [Command][build.bazel.remote.execution.v2.Command] and input root
+    /// [Directory][build.bazel.remote.execution.v2.Directory] for the Action.
+    /// The Command and Directory messages must be marshalled to wire format and then
+    /// uploaded under the hash as with any other piece of content. In practice, the
+    /// input root directory is likely to refer to other Directories in its
+    /// hierarchy, which must also each be uploaded on their own.
+    ///
+    /// For small file uploads the client should group them together and call
+    /// [BatchUpdateBlobs][build.bazel.remote.execution.v2.ContentAddressableStorage.BatchUpdateBlobs].
+    /// For large uploads, the client must use the
+    /// [Write method][google.bytestream.ByteStream.Write] of the ByteStream API. The
+    /// `resource_name` is `{instance_name}/uploads/{uuid}/blobs/{hash}/{size}`,
+    /// where `instance_name` is as described in the next paragraph, `uuid` is a
+    /// version 4 UUID generated by the client, and `hash` and `size` are the
+    /// [Digest][build.bazel.remote.execution.v2.Digest] of the blob. The
+    /// `uuid` is used only to avoid collisions when multiple clients try to upload
+    /// the same file (or the same client tries to upload the file multiple times at
+    /// once on different threads), so the client MAY reuse the `uuid` for uploading
+    /// different blobs. The `resource_name` may optionally have a trailing filename
+    /// (or other metadata) for a client to use if it is storing URLs, as in
+    /// `{instance}/uploads/{uuid}/blobs/{hash}/{size}/foo/bar/baz.cc`. Anything
+    /// after the `size` is ignored.
+    ///
+    /// A single server MAY support multiple instances of the execution system, each
+    /// with their own workers, storage, cache, etc. The exact relationship between
+    /// instances is up to the server. If the server does, then the `instance_name`
+    /// is an identifier, possibly containing multiple path segments, used to
+    /// distinguish between the various instances on the server, in a manner defined
+    /// by the server. For servers which do not support multiple instances, then the
+    /// `instance_name` is the empty path and the leading slash is omitted, so that
+    /// the `resource_name` becomes `uploads/{uuid}/blobs/{hash}/{size}`.
+    /// To simplify parsing, a path segment cannot equal any of the following
+    /// keywords: `blobs`, `uploads`, `actions`, `actionResults`, `operations` and
+    /// `capabilities`.
+    ///
+    /// When attempting an upload, if another client has already completed the upload
+    /// (which may occur in the middle of a single upload if another client uploads
+    /// the same blob concurrently), the request will terminate immediately with
+    /// a response whose `committed_size` is the full size of the uploaded file
+    /// (regardless of how much data was transmitted by the client). If the client
+    /// completes the upload but the
+    /// [Digest][build.bazel.remote.execution.v2.Digest] does not match, an
+    /// `INVALID_ARGUMENT` error will be returned. In either case, the client should
+    /// not attempt to retry the upload.
+    ///
+    /// For downloading blobs, the client must use the
+    /// [Read method][google.bytestream.ByteStream.Read] of the ByteStream API, with
+    /// a `resource_name` of `"{instance_name}/blobs/{hash}/{size}"`, where
+    /// `instance_name` is the instance name (see above), and `hash` and `size` are
+    /// the [Digest][build.bazel.remote.execution.v2.Digest] of the blob.
+    ///
+    /// The lifetime of entries in the CAS is implementation specific, but it SHOULD
+    /// be long enough to allow for newly-added and recently looked-up entries to be
+    /// used in subsequent calls (e.g. to
+    /// [Execute][build.bazel.remote.execution.v2.Execution.Execute]).
+    ///
+    /// Servers MUST behave as though empty blobs are always available, even if they
+    /// have not been uploaded. Clients MAY optimize away the uploading or
+    /// downloading of empty blobs.
+    ///
+    /// As with other services in the Remote Execution API, any call may return an
+    /// error with a [RetryInfo][google.rpc.RetryInfo] error detail providing
+    /// information about when the client should retry the request; clients SHOULD
+    /// respect the information provided.
     #[derive(Debug)]
     pub struct ContentAddressableStorageServer<T: ContentAddressableStorage> {
         inner: _Inner<T>,
@@ -2714,7 +2804,9 @@ pub mod content_addressable_storage_server {
     struct _Inner<T>(Arc<T>);
     impl<T: ContentAddressableStorage> ContentAddressableStorageServer<T> {
         pub fn new(inner: T) -> Self {
-            let inner = Arc::new(inner);
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
             let inner = _Inner(inner);
             Self {
                 inner,
@@ -2722,23 +2814,30 @@ pub mod content_addressable_storage_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>> for ContentAddressableStorageServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>>
+    for ContentAddressableStorageServer<T>
     where
         T: ContentAddressableStorage,
         B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
-        type Error = Never;
+        type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -2747,18 +2846,23 @@ pub mod content_addressable_storage_server {
                 "/build.bazel.remote.execution.v2.ContentAddressableStorage/FindMissingBlobs" => {
                     #[allow(non_camel_case_types)]
                     struct FindMissingBlobsSvc<T: ContentAddressableStorage>(pub Arc<T>);
-                    impl<T: ContentAddressableStorage>
-                        tonic::server::UnaryService<super::FindMissingBlobsRequest>
-                        for FindMissingBlobsSvc<T>
-                    {
+                    impl<
+                        T: ContentAddressableStorage,
+                    > tonic::server::UnaryService<super::FindMissingBlobsRequest>
+                    for FindMissingBlobsSvc<T> {
                         type Response = super::FindMissingBlobsResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::FindMissingBlobsRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).find_missing_blobs(request).await };
+                            let fut = async move {
+                                (*inner).find_missing_blobs(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -2769,10 +2873,11 @@ pub mod content_addressable_storage_server {
                         let inner = inner.0;
                         let method = FindMissingBlobsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2781,18 +2886,23 @@ pub mod content_addressable_storage_server {
                 "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchUpdateBlobs" => {
                     #[allow(non_camel_case_types)]
                     struct BatchUpdateBlobsSvc<T: ContentAddressableStorage>(pub Arc<T>);
-                    impl<T: ContentAddressableStorage>
-                        tonic::server::UnaryService<super::BatchUpdateBlobsRequest>
-                        for BatchUpdateBlobsSvc<T>
-                    {
+                    impl<
+                        T: ContentAddressableStorage,
+                    > tonic::server::UnaryService<super::BatchUpdateBlobsRequest>
+                    for BatchUpdateBlobsSvc<T> {
                         type Response = super::BatchUpdateBlobsResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::BatchUpdateBlobsRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).batch_update_blobs(request).await };
+                            let fut = async move {
+                                (*inner).batch_update_blobs(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -2803,10 +2913,11 @@ pub mod content_addressable_storage_server {
                         let inner = inner.0;
                         let method = BatchUpdateBlobsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2815,18 +2926,23 @@ pub mod content_addressable_storage_server {
                 "/build.bazel.remote.execution.v2.ContentAddressableStorage/BatchReadBlobs" => {
                     #[allow(non_camel_case_types)]
                     struct BatchReadBlobsSvc<T: ContentAddressableStorage>(pub Arc<T>);
-                    impl<T: ContentAddressableStorage>
-                        tonic::server::UnaryService<super::BatchReadBlobsRequest>
-                        for BatchReadBlobsSvc<T>
-                    {
+                    impl<
+                        T: ContentAddressableStorage,
+                    > tonic::server::UnaryService<super::BatchReadBlobsRequest>
+                    for BatchReadBlobsSvc<T> {
                         type Response = super::BatchReadBlobsResponse;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::BatchReadBlobsRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).batch_read_blobs(request).await };
+                            let fut = async move {
+                                (*inner).batch_read_blobs(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -2837,10 +2953,11 @@ pub mod content_addressable_storage_server {
                         let inner = inner.0;
                         let method = BatchReadBlobsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2849,14 +2966,16 @@ pub mod content_addressable_storage_server {
                 "/build.bazel.remote.execution.v2.ContentAddressableStorage/GetTree" => {
                     #[allow(non_camel_case_types)]
                     struct GetTreeSvc<T: ContentAddressableStorage>(pub Arc<T>);
-                    impl<T: ContentAddressableStorage>
-                        tonic::server::ServerStreamingService<super::GetTreeRequest>
-                        for GetTreeSvc<T>
-                    {
+                    impl<
+                        T: ContentAddressableStorage,
+                    > tonic::server::ServerStreamingService<super::GetTreeRequest>
+                    for GetTreeSvc<T> {
                         type Response = super::GetTreeResponse;
                         type ResponseStream = T::GetTreeStream;
-                        type Future =
-                            BoxFuture<tonic::Response<Self::ResponseStream>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::GetTreeRequest>,
@@ -2873,23 +2992,28 @@ pub mod content_addressable_storage_server {
                         let inner = inner.0;
                         let method = GetTreeSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }
@@ -2914,37 +3038,36 @@ pub mod content_addressable_storage_server {
         }
     }
     impl<T: ContentAddressableStorage> tonic::transport::NamedService
-        for ContentAddressableStorageServer<T>
-    {
+    for ContentAddressableStorageServer<T> {
         const NAME: &'static str = "build.bazel.remote.execution.v2.ContentAddressableStorage";
     }
 }
-#[doc = r" Generated server implementations."]
+/// Generated server implementations.
 pub mod capabilities_server {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
     use tonic::codegen::*;
-    #[doc = "Generated trait containing gRPC methods that should be implemented for use with CapabilitiesServer."]
+    ///Generated trait containing gRPC methods that should be implemented for use with CapabilitiesServer.
     #[async_trait]
     pub trait Capabilities: Send + Sync + 'static {
-        #[doc = " GetCapabilities returns the server capabilities configuration of the"]
-        #[doc = " remote endpoint."]
-        #[doc = " Only the capabilities of the services supported by the endpoint will"]
-        #[doc = " be returned:"]
-        #[doc = " * Execution + CAS + Action Cache endpoints should return both"]
-        #[doc = "   CacheCapabilities and ExecutionCapabilities."]
-        #[doc = " * Execution only endpoints should return ExecutionCapabilities."]
-        #[doc = " * CAS + Action Cache only endpoints should return CacheCapabilities."]
+        /// GetCapabilities returns the server capabilities configuration of the
+        /// remote endpoint.
+        /// Only the capabilities of the services supported by the endpoint will
+        /// be returned:
+        /// * Execution + CAS + Action Cache endpoints should return both
+        ///   CacheCapabilities and ExecutionCapabilities.
+        /// * Execution only endpoints should return ExecutionCapabilities.
+        /// * CAS + Action Cache only endpoints should return CacheCapabilities.
         async fn get_capabilities(
             &self,
             request: tonic::Request<super::GetCapabilitiesRequest>,
         ) -> Result<tonic::Response<super::ServerCapabilities>, tonic::Status>;
     }
-    #[doc = " The Capabilities service may be used by remote execution clients to query"]
-    #[doc = " various server properties, in order to self-configure or return meaningful"]
-    #[doc = " error messages."]
-    #[doc = ""]
-    #[doc = " The query may include a particular `instance_name`, in which case the values"]
-    #[doc = " returned will pertain to that instance."]
+    /// The Capabilities service may be used by remote execution clients to query
+    /// various server properties, in order to self-configure or return meaningful
+    /// error messages.
+    ///
+    /// The query may include a particular `instance_name`, in which case the values
+    /// returned will pertain to that instance.
     #[derive(Debug)]
     pub struct CapabilitiesServer<T: Capabilities> {
         inner: _Inner<T>,
@@ -2954,7 +3077,9 @@ pub mod capabilities_server {
     struct _Inner<T>(Arc<T>);
     impl<T: Capabilities> CapabilitiesServer<T> {
         pub fn new(inner: T) -> Self {
-            let inner = Arc::new(inner);
+            Self::from_arc(Arc::new(inner))
+        }
+        pub fn from_arc(inner: Arc<T>) -> Self {
             let inner = _Inner(inner);
             Self {
                 inner,
@@ -2962,7 +3087,10 @@ pub mod capabilities_server {
                 send_compression_encodings: Default::default(),
             }
         }
-        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
+        pub fn with_interceptor<F>(
+            inner: T,
+            interceptor: F,
+        ) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
@@ -2976,9 +3104,12 @@ pub mod capabilities_server {
         B::Error: Into<StdError> + Send + 'static,
     {
         type Response = http::Response<tonic::body::BoxBody>;
-        type Error = Never;
+        type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
-        fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        fn poll_ready(
+            &mut self,
+            _cx: &mut Context<'_>,
+        ) -> Poll<Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -2987,17 +3118,23 @@ pub mod capabilities_server {
                 "/build.bazel.remote.execution.v2.Capabilities/GetCapabilities" => {
                     #[allow(non_camel_case_types)]
                     struct GetCapabilitiesSvc<T: Capabilities>(pub Arc<T>);
-                    impl<T: Capabilities> tonic::server::UnaryService<super::GetCapabilitiesRequest>
-                        for GetCapabilitiesSvc<T>
-                    {
+                    impl<
+                        T: Capabilities,
+                    > tonic::server::UnaryService<super::GetCapabilitiesRequest>
+                    for GetCapabilitiesSvc<T> {
                         type Response = super::ServerCapabilities;
-                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
                         fn call(
                             &mut self,
                             request: tonic::Request<super::GetCapabilitiesRequest>,
                         ) -> Self::Future {
                             let inner = self.0.clone();
-                            let fut = async move { (*inner).get_capabilities(request).await };
+                            let fut = async move {
+                                (*inner).get_capabilities(request).await
+                            };
                             Box::pin(fut)
                         }
                     }
@@ -3008,23 +3145,28 @@ pub mod capabilities_server {
                         let inner = inner.0;
                         let method = GetCapabilitiesSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
-                        let mut grpc = tonic::server::Grpc::new(codec).apply_compression_config(
-                            accept_compression_encodings,
-                            send_compression_encodings,
-                        );
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
                 }
-                _ => Box::pin(async move {
-                    Ok(http::Response::builder()
-                        .status(200)
-                        .header("grpc-status", "12")
-                        .header("content-type", "application/grpc")
-                        .body(empty_body())
-                        .unwrap())
-                }),
+                _ => {
+                    Box::pin(async move {
+                        Ok(
+                            http::Response::builder()
+                                .status(200)
+                                .header("grpc-status", "12")
+                                .header("content-type", "application/grpc")
+                                .body(empty_body())
+                                .unwrap(),
+                        )
+                    })
+                }
             }
         }
     }

@@ -87,7 +87,7 @@ rust_library(
         (
             "@rules_rust//rust/platform:x86_64-unknown-linux-gnu",
         ): [
-            "@raze__libc__0_2_123//:libc",
+            "@raze__libc__0_2_124//:libc",
             "@raze__signal_hook_registry__1_4_0//:signal_hook_registry",
         ],
         "//conditions:default": [],
