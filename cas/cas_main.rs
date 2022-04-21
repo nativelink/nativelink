@@ -13,10 +13,11 @@ use ac_server::AcServer;
 use bytestream_server::ByteStreamServer;
 use capabilities_server::CapabilitiesServer;
 use cas_server::CasServer;
-use config::cas_server::CasConfig;
+use config::cas_server::{CasConfig, WorkerConfig};
 use default_store_factory::store_factory;
 use error::{make_err, Code, Error, ResultExt};
 use execution_server::ExecutionServer;
+use local_worker::new_local_worker;
 use scheduler::Scheduler;
 use store::StoreManager;
 use worker_api_server::WorkerApiServer;
@@ -76,6 +77,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let mut futures: Vec<BoxFuture<Result<(), Error>>> = Vec::new();
+    for worker_cfg in cfg.workers.unwrap_or(vec![]) {
+        let spawn_fut = match worker_cfg {
+            WorkerConfig::local(local_worker_cfg) => {
+                let cas_store = store_manager.get_store(&local_worker_cfg.cas_store).err_tip(|| {
+                    format!(
+                        "Failed to find store for cas_store_ref in worker config : {}",
+                        local_worker_cfg.cas_store
+                    )
+                })?;
+                tokio::spawn(new_local_worker(Arc::new(local_worker_cfg), cas_store.clone()).run())
+            }
+        };
+        futures.push(Box::pin(spawn_fut.map_ok_or_else(|e| Err(e.into()), |v| v)));
+    }
+
     for server_cfg in cfg.servers {
         let mut server = Server::builder();
         let services = server_cfg.services.ok_or_else(|| "'services' must be configured")?;

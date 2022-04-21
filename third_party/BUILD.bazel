@@ -58,6 +58,15 @@ alias(
 )
 
 alias(
+    name = "ctor",
+    actual = "@raze__ctor__0_1_22//:ctor",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
     name = "env_logger",
     actual = "@raze__env_logger__0_9_0//:env_logger",
     tags = [
@@ -114,6 +123,15 @@ alias(
 alias(
     name = "http",
     actual = "@raze__http__0_2_6//:http",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "hyper",
+    actual = "@raze__hyper__0_14_18//:hyper",
     tags = [
         "cargo-raze",
         "manual",

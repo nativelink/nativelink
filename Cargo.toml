@@ -53,6 +53,8 @@ rustfmt-nightly =  { git = "https://github.com/rust-lang/rustfmt", tag = "v1.4.3
 maplit = "1.0.2"
 mock_instant = "0.2.1"
 rusoto_mock = "=0.46.0"
+hyper = "0.14.18"
+ctor = "0.1.22"
 
 [patch.crates-io]
 rusoto_mock = { git = "https://github.com/allada/rusoto.git", rev = "cc9acca00dbafa41a37d75faeaf2a4baba33d42e" }

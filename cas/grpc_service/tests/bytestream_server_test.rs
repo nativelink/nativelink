@@ -7,11 +7,10 @@ use std::sync::Arc;
 use bytestream_server::ByteStreamServer;
 use futures::{pin_mut, poll, task::Poll};
 use maplit::hashmap;
-use prost::{bytes::Bytes, Message};
 use tokio::task::yield_now;
 use tonic::Request;
 
-use common::DigestInfo;
+use common::{encode_stream_proto, DigestInfo};
 use config;
 use default_store_factory::store_factory;
 use error::{make_err, Code, Error, ResultExt};
@@ -43,34 +42,6 @@ fn make_bytestream_server(store_manager: &StoreManager) -> Result<ByteStreamServ
         },
         store_manager,
     )
-}
-
-// Utility to encode our proto into GRPC stream format.
-fn encode<T: Message>(proto: &T) -> Result<Bytes, Box<dyn std::error::Error>> {
-    use prost::bytes::{BufMut, BytesMut};
-    let mut buf = BytesMut::new();
-    // See below comment on spec.
-    use std::mem::size_of;
-    const PREFIX_BYTES: usize = size_of::<u8>() + size_of::<u32>();
-    for _ in 0..PREFIX_BYTES {
-        // Advance our buffer first.
-        // We will backfill it once we know the size of the message.
-        buf.put_u8(0);
-    }
-    proto.encode(&mut buf)?;
-    let len = buf.len() - PREFIX_BYTES;
-    {
-        let mut buf = &mut buf[0..PREFIX_BYTES];
-        // See: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#:~:text=Compressed-Flag
-        // for more details on spec.
-        // Compressed-Flag -> 0 / 1 # encoded as 1 byte unsigned integer.
-        buf.put_u8(0);
-        // Message-Length -> {length of Message} # encoded as 4 byte unsigned integer (big endian).
-        buf.put_u32(len as u32);
-        // Message -> *{binary octet}.
-    }
-
-    Ok(buf.freeze())
 }
 
 #[cfg(test)]
@@ -134,18 +105,18 @@ pub mod write_tests {
             // Write first chunk of data.
             write_request.write_offset = 0;
             write_request.data = raw_data[..BYTE_SPLIT_OFFSET].into();
-            tx.send_data(encode(&write_request)?).await?;
+            tx.send_data(encode_stream_proto(&write_request)?).await?;
 
             // Write empty set of data (clients are allowed to do this.
             write_request.write_offset = BYTE_SPLIT_OFFSET as i64;
             write_request.data = vec![].into();
-            tx.send_data(encode(&write_request)?).await?;
+            tx.send_data(encode_stream_proto(&write_request)?).await?;
 
             // Write final bit of data.
             write_request.write_offset = BYTE_SPLIT_OFFSET as i64;
             write_request.data = raw_data[BYTE_SPLIT_OFFSET..].into();
             write_request.finish_write = true;
-            tx.send_data(encode(&write_request)?).await?;
+            tx.send_data(encode_stream_proto(&write_request)?).await?;
 
             raw_data
         };
@@ -387,7 +358,7 @@ pub mod query_tests {
         // Write first chunk of data.
         write_request.write_offset = 0;
         write_request.data = raw_data[..BYTE_SPLIT_OFFSET].into();
-        tx.send_data(encode(&write_request)?).await?;
+        tx.send_data(encode_stream_proto(&write_request)?).await?;
 
         {
             // Check to see if our request is active.
@@ -410,7 +381,7 @@ pub mod query_tests {
         write_request.write_offset = BYTE_SPLIT_OFFSET as i64;
         write_request.data = raw_data[BYTE_SPLIT_OFFSET..].into();
         write_request.finish_write = true;
-        tx.send_data(encode(&write_request)?).await?;
+        tx.send_data(encode_stream_proto(&write_request)?).await?;
 
         {
             // Now that it's done uploading, ensure it returns a success when requested again.

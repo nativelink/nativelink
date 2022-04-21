@@ -190,7 +190,7 @@ pub enum WrokerProperty {
 }
 
 /// Generic config for an endpoint and associated configs.
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct EndpointConfig {
     /// URI of the endpoint.
     pub uri: String,
@@ -200,7 +200,7 @@ pub struct EndpointConfig {
     pub timeout: Option<f32>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct LocalWorkerConfig {
     /// Endpoint which the worker will connect to the scheduler's WorkerApiService.
     pub worker_api_endpoint: EndpointConfig,
