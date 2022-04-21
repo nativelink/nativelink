@@ -28,6 +28,11 @@ rust_binary(
     ]
 )
 
+# /home/allada/.cache/bazel/_bazel_allada/e517a1783f1200885f787e5dea7e2a78/sandbox/linux-sandbox/4207/execroot/turbo-cache/bazel-out/k8-fastbuild/bin/proto/google.protobuf.rs
+# /home/allada/.cache/bazel/_bazel_allada/e517a1783f1200885f787e5dea7e2a78/sandbox/linux-sandbox/4207/execroot/turbo-cache/bazel-out/k8-fastbuild/bin/proto/google.protobuf.pb.rs
+# bazel-out/k8-fastbuild/bin/proto/google.rpc.rs
+# bazel-out/k8-fastbuild/bin/proto/google.rpc.pb.rs
+
 genrule(
     name = "gen_rs_protos",
     srcs = _proto_files,
@@ -76,6 +81,7 @@ rust_library(
         ":gen_lib_rs",
     ] + _genproto_files,
     deps = [
+        "//third_party:bytes",
         "//third_party:prost",
         "//third_party:prost_types",
         "//third_party:tonic",

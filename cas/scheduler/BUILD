@@ -52,6 +52,7 @@ rust_library(
         "//proto",
         "//third_party:prost",
         "//third_party:prost_types",
+        "//third_party:sha2",
         "//third_party:tonic",
         "//util:common",
         "//util:error",

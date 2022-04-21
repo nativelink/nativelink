@@ -7,14 +7,17 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use sha2::{Digest as _, Sha256};
+
 use common::{DigestInfo, HashMapExt, VecExt};
-use error::{Error, ResultExt};
+use error::{make_input_err, Error, ResultExt};
 use platform_property_manager::PlatformProperties;
 use prost::Message;
 use prost_types::Any;
 use proto::build::bazel::remote::execution::v2::{
-    execution_stage, ActionResult as ProtoActionResult, ExecuteOperationMetadata, ExecuteRequest, ExecuteResponse,
-    ExecutedActionMetadata, FileNode, LogFile, NodeProperties, OutputDirectory, OutputFile, OutputSymlink, SymlinkNode,
+    execution_stage, Action, ActionResult as ProtoActionResult, ExecuteOperationMetadata, ExecuteRequest,
+    ExecuteResponse, ExecutedActionMetadata, FileNode, LogFile, NodeProperties, OutputDirectory, OutputFile,
+    OutputSymlink, SymlinkNode,
 };
 use proto::google::longrunning::{operation::Result as LongRunningResult, Operation};
 
@@ -33,10 +36,23 @@ pub struct ActionInfoHashKey {
     pub salt: u64,
 }
 
+impl ActionInfoHashKey {
+    /// Utility function used to make a unique hash of the digest including the salt.
+    pub fn get_hash(&self) -> [u8; 32] {
+        Sha256::new()
+            .chain(&self.digest.packed_hash)
+            .chain(&self.digest.size_bytes.to_le_bytes())
+            .chain(&self.salt.to_le_bytes())
+            .finalize()
+            .into()
+    }
+}
+
 /// Information needed to execute an action. This struct is used over bazel's proto `Action`
 /// for simplicity and offers a `salt`, which is useful to ensure during hashing (for dicts)
 /// to ensure we never match against another `ActionInfo` (when a task should never be cached).
-/// This struct must be 100% compatible with `ExecuteRequest` struct in remote_execution.proto.
+/// This struct must be 100% compatible with `ExecuteRequest` struct in remote_execution.proto
+/// except for the salt field.
 #[derive(Clone, Debug)]
 pub struct ActionInfo {
     /// Instance name used to send the request.
@@ -77,6 +93,45 @@ impl ActionInfo {
     #[inline]
     pub fn salt(&self) -> &u64 {
         &self.unique_qualifier.salt
+    }
+
+    pub fn try_from_action_and_execute_request_with_salt(
+        execute_request: ExecuteRequest,
+        action: Action,
+        salt: u64,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            instance_name: execute_request.instance_name,
+            command_digest: action
+                .command_digest
+                .err_tip(|| "Expected command_digest to exist on Action")?
+                .try_into()?,
+            input_root_digest: action
+                .input_root_digest
+                .err_tip(|| "Expected input_root_digest to exist on Action")?
+                .try_into()?,
+            timeout: action
+                .timeout
+                .err_tip(|| "Expected timeout to exist on Action")?
+                .try_into()
+                .map_err(|_| make_input_err!("Failed convert proto duration to system duration"))?,
+            platform_properties: action
+                .platform
+                .err_tip(|| "Expected platform to exist on Action")?
+                .try_into()?,
+            priority: execute_request
+                .execution_policy
+                .err_tip(|| "Expected execution_policy to exist on ExecuteRequest")?
+                .priority,
+            insert_timestamp: SystemTime::UNIX_EPOCH, // We can't know it at this point.
+            unique_qualifier: ActionInfoHashKey {
+                digest: execute_request
+                    .action_digest
+                    .err_tip(|| "Expected action_digest to exist on ExecuteRequest")?
+                    .try_into()?,
+                salt,
+            },
+        })
     }
 }
 
@@ -478,6 +533,8 @@ pub enum ActionStage {
     CacheCheck,
     /// Action has been accepted and waiting for worker to take it.
     Queued,
+    // TODO(allada) We need a way to know if the job was sent to a worker, but hasn't begun
+    // execution yet.
     /// Worker is executing the action.
     Executing,
     /// Worker completed the work with result.

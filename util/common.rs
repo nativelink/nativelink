@@ -8,9 +8,11 @@ use std::hash::{Hash, Hasher};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use bytes::{BufMut, Bytes, BytesMut};
 use hex::FromHex;
 use lazy_init::LazyTransform;
 pub use log;
+use prost::Message;
 use proto::build::bazel::remote::execution::v2::Digest;
 use serde::{Deserialize, Serialize};
 use tokio::task::{JoinError, JoinHandle};
@@ -215,4 +217,31 @@ impl<K: std::cmp::Eq + std::hash::Hash, T> HashMapExt<K, T> for HashMap<K, T> {
         }
         Ok(output)
     }
+}
+
+// Utility to encode our proto into GRPC stream format.
+pub fn encode_stream_proto<T: Message>(proto: &T) -> Result<Bytes, Box<dyn std::error::Error>> {
+    let mut buf = BytesMut::new();
+    // See below comment on spec.
+    use std::mem::size_of;
+    const PREFIX_BYTES: usize = size_of::<u8>() + size_of::<u32>();
+    for _ in 0..PREFIX_BYTES {
+        // Advance our buffer first.
+        // We will backfill it once we know the size of the message.
+        buf.put_u8(0);
+    }
+    proto.encode(&mut buf)?;
+    let len = buf.len() - PREFIX_BYTES;
+    {
+        let mut buf = &mut buf[0..PREFIX_BYTES];
+        // See: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#:~:text=Compressed-Flag
+        // for more details on spec.
+        // Compressed-Flag -> 0 / 1 # encoded as 1 byte unsigned integer.
+        buf.put_u8(0);
+        // Message-Length -> {length of Message} # encoded as 4 byte unsigned integer (big endian).
+        buf.put_u32(len as u32);
+        // Message -> *{binary octet}.
+    }
+
+    Ok(buf.freeze())
 }

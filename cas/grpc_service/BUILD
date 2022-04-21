@@ -181,7 +181,6 @@ rust_test(
         "//third_party:futures",
         "//third_party:maplit",
         "//third_party:pretty_assertions",
-        "//third_party:prost",
         "//third_party:tokio",
         "//third_party:tokio_stream",
         "//third_party:tonic",

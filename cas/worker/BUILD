@@ -1,0 +1,105 @@
+# Copyright 2022 Nathan (Blaise) Bruer.  All rights reserved.
+
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(
+    name = "local_worker",
+    srcs = ["local_worker.rs"],
+    deps = [
+        "//cas/scheduler:action_messages",
+        "//cas/store",
+        "//config",
+        "//proto",
+        "//third_party:futures",
+        "//third_party:tokio",
+        "//third_party:tokio_stream",
+        "//third_party:tonic",
+        "//util:common",
+        "//util:error",
+        ":running_actions_manager",
+        ":worker_api_client_wrapper",
+        ":worker_utils",
+    ],
+    visibility = ["//cas:__pkg__"],
+)
+
+rust_library(
+    name = "running_actions_manager",
+    srcs = ["running_actions_manager.rs"],
+    deps = [
+        "//cas/scheduler:action_messages",
+        "//cas/store",
+        "//cas/store:ac_utils",
+        "//proto",
+        "//third_party:fast_async_mutex",
+        "//util:common",
+        "//util:error",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+)
+
+
+rust_library(
+    name = "worker_utils",
+    srcs = ["worker_utils.rs"],
+    deps = [
+        "//config",
+        "//proto",
+        "//third_party:futures",
+        "//third_party:shlex",
+        "//third_party:tokio",
+        "//third_party:tonic",
+        "//util:common",
+        "//util:error",
+    ],
+)
+
+rust_library(
+    name = "worker_api_client_wrapper",
+    srcs = ["worker_api_client_wrapper.rs"],
+    deps = [
+        "//proto",
+        "//third_party:tonic",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+)
+
+rust_library(
+    name = "local_worker_test_utils",
+    srcs = ["local_worker_test_utils.rs"],
+    testonly = True,
+    deps = [
+        "//config",
+        "//proto",
+        "//third_party:fast_async_mutex",
+        "//third_party:hyper",
+        "//third_party:tokio",
+        "//third_party:tonic",
+        "//util:common",
+        "//util:error",
+        ":local_worker",
+        ":running_actions_manager",
+        ":worker_api_client_wrapper",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+)
+
+rust_test(
+    name = "local_worker_test",
+    srcs = ["tests/local_worker_test.rs"],
+    deps = [
+        "//cas/scheduler:action_messages",
+        "//cas/scheduler:platform_property_manager",
+        "//config",
+        "//proto",
+        "//third_party:env_logger",
+        "//third_party:pretty_assertions",
+        "//third_party:prost",
+        "//third_party:tokio",
+        "//third_party:tonic",
+        "//util:common",
+        "//util:error",
+        ":local_worker_test_utils",
+    ],
+    proc_macro_deps = ["//third_party:async_trait", "//third_party:ctor"],
+)

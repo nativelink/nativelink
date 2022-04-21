@@ -16,6 +16,7 @@ rust_binary(
         "//cas/scheduler",
         "//cas/store",
         "//cas/store:default_store_factory",
+        "//cas/worker:local_worker",
         "//config",
         "//third_party:clap",
         "//third_party:env_logger",
