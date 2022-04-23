@@ -1,19 +1,123 @@
 // Copyright 2022 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::collections::HashMap;
+use std::fs::Permissions;
+use std::os::unix::fs::PermissionsExt;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 
 use fast_async_mutex::mutex::Mutex;
+use filetime::{set_file_mtime, FileTime};
+use futures::future::{try_join_all, BoxFuture, FutureExt, TryFutureExt};
+use futures::stream::{FuturesUnordered, TryStreamExt};
+use tokio::fs;
+use tokio::task::spawn_blocking;
 
 use ac_utils::get_and_decode_digest;
 use action_messages::ActionInfo;
 use async_trait::async_trait;
 use common::DigestInfo;
-use error::{Error, ResultExt};
-use proto::build::bazel::remote::execution::v2::Action;
+use error::{make_err, Code, Error, ResultExt};
+use fast_slow_store::FastSlowStore;
+use filesystem_store::FilesystemStore;
+use proto::build::bazel::remote::execution::v2::{Action, Command as ProtoCommand, Directory as ProtoDirectory};
 use proto::com::github::allada::turbo_cache::remote_execution::{ExecuteFinishedResult, StartExecute};
-use store::Store;
+
+// Sadly we cannot use `async fn` here because the rust compiler cannot determine the auto traits
+// of the future. So we need to force this function to return a dynamic future instead.
+// see: https://github.com/rust-lang/rust/issues/78649
+pub fn download_to_directory<'a>(
+    cas_store: Pin<&'a FastSlowStore>,
+    filesystem_store: Pin<&'a FilesystemStore>,
+    digest: &'a DigestInfo,
+    current_directory: &'a str,
+) -> BoxFuture<'a, Result<(), Error>> {
+    async move {
+        let directory = get_and_decode_digest::<ProtoDirectory>(cas_store, digest)
+            .await
+            .err_tip(|| "Converting digest to Directory")?;
+        let mut futures = FuturesUnordered::new();
+
+        for file in directory.files {
+            let digest: DigestInfo = file
+                .digest
+                .err_tip(|| "Expected Digest to exist in Directory::file::digest")?
+                .try_into()
+                .err_tip(|| "In Directory::file::digest")?;
+            let src = filesystem_store.get_file_for_digest(&digest);
+            let dest = format!("{}/{}", current_directory, file.name);
+            let mut mtime = None;
+            let mut unix_mode = None;
+            if let Some(properties) = file.node_properties {
+                mtime = properties.mtime;
+                unix_mode = properties.unix_mode;
+            }
+            futures.push(
+                cas_store
+                    .populate_fast_store(digest.clone())
+                    .and_then(move |_| async move {
+                        fs::hard_link(src, &dest)
+                            .await
+                            .map_err(|e| make_err!(Code::Internal, "Could not make hardlink, {:?} : {}", e, dest))?;
+                        if let Some(unix_mode) = unix_mode {
+                            fs::set_permissions(&dest, Permissions::from_mode(unix_mode))
+                                .await
+                                .err_tip(|| format!("Could not set unix mode in download_to_directory {}", dest))?;
+                        }
+                        if let Some(mtime) = mtime {
+                            spawn_blocking(move || {
+                                set_file_mtime(&dest, FileTime::from_unix_time(mtime.seconds, mtime.nanos as u32))
+                                    .err_tip(|| format!("Failed to set mtime in download_to_directory {}", dest))
+                            })
+                            .await
+                            .err_tip(|| "Failed to launch spawn_blocking in download_to_directory")??;
+                        }
+                        Ok(())
+                    })
+                    .map_err(move |e| e.append(format!("for digest {:?}", digest)))
+                    .boxed(),
+            );
+        }
+
+        for directory in directory.directories {
+            let digest: DigestInfo = directory
+                .digest
+                .err_tip(|| "Expected Digest to exist in Directory::directories::digest")?
+                .try_into()
+                .err_tip(|| "In Directory::file::digest")?;
+            let new_directory_path = format!("{}/{}", current_directory, directory.name);
+            futures.push(
+                async move {
+                    fs::create_dir(&new_directory_path)
+                        .await
+                        .err_tip(|| format!("Could not create directory {}", new_directory_path))?;
+                    download_to_directory(cas_store, filesystem_store, &digest, &new_directory_path)
+                        .await
+                        .err_tip(|| format!("in download_to_directory : {}", new_directory_path))?;
+                    Ok(())
+                }
+                .boxed(),
+            );
+        }
+
+        for symlink in directory.symlinks {
+            let dest = format!("{}/{}", current_directory, symlink.name);
+            futures.push(
+                async move {
+                    fs::symlink(&symlink.target, &dest)
+                        .await
+                        .err_tip(|| format!("Could not create symlink {} -> {}", symlink.target, dest))?;
+                    Ok(())
+                }
+                .boxed(),
+            );
+        }
+
+        while futures.try_next().await?.is_some() {}
+        Ok(())
+    }
+    .boxed()
+}
 
 #[async_trait]
 pub trait RunningAction: Sync + Send + Sized + Unpin + 'static {
@@ -35,18 +139,55 @@ pub trait RunningAction: Sync + Send + Sized + Unpin + 'static {
     async fn get_finished_result(self: Arc<Self>) -> Result<ExecuteFinishedResult, Error>;
 }
 
-pub struct RunningActionImpl {}
+pub struct RunningActionImpl {
+    action_info: ActionInfo,
+    cas_store: Pin<Arc<FastSlowStore>>,
+    filesystem_store: Pin<Arc<FilesystemStore>>,
+}
 
 impl RunningActionImpl {
-    fn new() -> Self {
-        Self {}
+    fn new(action_info: ActionInfo, cas_store: Arc<FastSlowStore>, filesystem_store: Arc<FilesystemStore>) -> Self {
+        Self {
+            action_info,
+            cas_store: Pin::new(cas_store),
+            filesystem_store: Pin::new(filesystem_store),
+        }
     }
 }
 
 #[async_trait]
 impl RunningAction for RunningActionImpl {
+    /// Prepares any actions needed to execution this action. This action will do the following:
+    /// * Download any files needed to execute the action
+    /// * Build a folder with all files needed to execute the action.
+    /// This function will aggressively download and spawn potentially thousands of futures. It is
+    /// up to the stores to rate limit if needed.
     async fn prepare_action(self: Arc<Self>) -> Result<Arc<Self>, Error> {
-        unimplemented!();
+        let mut command: Option<ProtoCommand> = None;
+        // let mut root_directory: Option<ProtoDirectory> = None;
+        // All of these futures will run in parallel.
+        let futures = vec![
+            // Download the Command object and decode it.
+            async {
+                command = Some(
+                    get_and_decode_digest::<ProtoCommand>(self.cas_store.as_ref(), &self.action_info.command_digest)
+                        .await
+                        .err_tip(|| "Converting command_digest to Command")?,
+                );
+                Result::<(), Error>::Ok(())
+            }
+            .boxed(),
+            // Download the input files/folder and place them into the temp directory.
+            download_to_directory(
+                self.cas_store.as_ref(),
+                self.filesystem_store.as_ref(),
+                &self.action_info.input_root_digest,
+                "/tmp/FILLME",
+            )
+            .boxed(),
+        ];
+        try_join_all(futures).await?;
+        Ok(self)
     }
 
     async fn execute(self: Arc<Self>) -> Result<Arc<Self>, Error> {
@@ -81,16 +222,26 @@ type ActionId = [u8; 32];
 /// Holds state info about what is being executed and the interface for interacting
 /// with actions while they are running.
 pub struct RunningActionsManagerImpl {
-    cas_store: Pin<Arc<dyn Store>>,
+    cas_store: Arc<FastSlowStore>,
+    filesystem_store: Arc<FilesystemStore>,
     running_actions: Mutex<HashMap<ActionId, Weak<RunningActionImpl>>>,
 }
 
 impl RunningActionsManagerImpl {
-    pub fn new(cas_store: Arc<dyn Store>) -> Self {
-        Self {
-            cas_store: Pin::new(cas_store),
+    pub fn new(cas_store: Arc<FastSlowStore>) -> Result<Self, Error> {
+        // Sadly because of some limitations of how Any works we need to clone more times than optimal.
+        let filesystem_store = cas_store
+            .fast_slow()
+            .clone()
+            .as_any()
+            .downcast_ref::<Arc<FilesystemStore>>()
+            .err_tip(|| "Expected fast slow store for cas_store in RunningActionsManagerImpl")?
+            .clone();
+        Ok(Self {
+            cas_store,
+            filesystem_store,
             running_actions: Mutex::new(HashMap::new()),
-        }
+        })
     }
 
     async fn create_action_info(&self, start_execute: StartExecute) -> Result<ActionInfo, Error> {
@@ -102,7 +253,7 @@ impl RunningActionsManagerImpl {
             .clone()
             .err_tip(|| "Expected action_digest to exist on StartExecute")?
             .try_into()?;
-        let action = get_and_decode_digest::<Action>(self.cas_store.as_ref(), &action_digest)
+        let action = get_and_decode_digest::<Action>(Pin::new(self.cas_store.as_ref()), &action_digest)
             .await
             .err_tip(|| "During start_action")?;
         Ok(
@@ -122,7 +273,11 @@ impl RunningActionsManager for RunningActionsManagerImpl {
     ) -> Result<Arc<RunningActionImpl>, Error> {
         let action_info = self.create_action_info(start_execute).await?;
         let action_id = action_info.unique_qualifier.get_hash();
-        let running_action = Arc::new(RunningActionImpl::new());
+        let running_action = Arc::new(RunningActionImpl::new(
+            action_info,
+            self.cas_store.clone(),
+            self.filesystem_store.clone(),
+        ));
         {
             let mut running_actions = self.running_actions.lock().await;
             running_actions.insert(action_id, Arc::downgrade(&running_action));

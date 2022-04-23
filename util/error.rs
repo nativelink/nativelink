@@ -45,6 +45,12 @@ impl Error {
         Error { code, messages: msgs }
     }
 
+    #[inline]
+    pub fn append<S: std::string::ToString>(mut self, msg: S) -> Error {
+        self.messages.push(msg.to_string());
+        self
+    }
+
     pub fn merge<E: Into<Error>>(mut self, other: E) -> Self {
         let mut other: Error = other.into();
         // This will help with knowing which messages are tied to different errors.

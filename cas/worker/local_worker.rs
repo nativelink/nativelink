@@ -13,6 +13,7 @@ use tonic::{transport::Channel as TonicChannel, Streaming};
 use common::log;
 use config::cas_server::LocalWorkerConfig;
 use error::{make_err, make_input_err, Code, Error, ResultExt};
+use fast_slow_store::FastSlowStore;
 use proto::com::github::allada::turbo_cache::remote_execution::{
     execute_result, update_for_worker::Update, worker_api_client::WorkerApiClient, ExecuteFinishedResult,
     ExecuteResult, KeepAliveRequest, UpdateForWorker,
@@ -177,12 +178,19 @@ pub struct LocalWorker<T: WorkerApiClientTrait, U: RunningActionsManager> {
     sleep_fn: Option<Box<dyn Fn(Duration) -> BoxFuture<'static, ()> + Send + Sync>>,
 }
 
+/// Creates a new LocalWorker. The `cas_store` must be an instance of FastSlowStore and will be
+/// checked at runtime.
 pub fn new_local_worker(
     config: Arc<LocalWorkerConfig>,
     cas_store: Arc<dyn Store>,
-) -> LocalWorker<WorkerApiClientWrapper, RunningActionsManagerImpl> {
-    let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(cas_store.clone()));
-    LocalWorker::new_with_connection_factory_and_actions_manager(
+) -> Result<LocalWorker<WorkerApiClientWrapper, RunningActionsManagerImpl>, Error> {
+    let fast_slow_store = cas_store
+        .as_any()
+        .downcast_ref::<Arc<FastSlowStore>>()
+        .err_tip(|| "Expected store for LocalWorker to be a FastSlowStore")?
+        .clone();
+    let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(fast_slow_store)?).clone();
+    Ok(LocalWorker::new_with_connection_factory_and_actions_manager(
         config.clone(),
         running_actions_manager,
         Box::new(move || {
@@ -204,7 +212,7 @@ pub fn new_local_worker(
             })
         }),
         Box::new(move |d| Box::pin(sleep(d))),
-    )
+    ))
 }
 
 impl<T: WorkerApiClientTrait, U: RunningActionsManager> LocalWorker<T, U> {

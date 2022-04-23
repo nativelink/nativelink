@@ -7,6 +7,7 @@ rust_library(
     srcs = ["local_worker.rs"],
     deps = [
         "//cas/store",
+        "//cas/store:fast_slow_store",
         "//config",
         "//proto",
         "//third_party:futures",
@@ -27,10 +28,14 @@ rust_library(
     srcs = ["running_actions_manager.rs"],
     deps = [
         "//cas/scheduler:action_messages",
-        "//cas/store",
         "//cas/store:ac_utils",
+        "//cas/store:fast_slow_store",
+        "//cas/store:filesystem_store",
         "//proto",
         "//third_party:fast_async_mutex",
+        "//third_party:futures",
+        "//third_party:tokio",
+        "//third_party:filetime",
         "//util:common",
         "//util:error",
     ],
@@ -108,6 +113,26 @@ rust_library(
         ":running_actions_manager",
     ],
     proc_macro_deps = ["//third_party:async_trait"],
+)
+
+rust_test(
+    name = "running_actions_manager_test",
+    srcs = ["tests/running_actions_manager_test.rs"],
+    deps = [
+        "//cas/store",
+        "//cas/store:fast_slow_store",
+        "//cas/store:filesystem_store",
+        "//cas/store:memory_store",
+        "//config",
+        "//proto",
+        "//third_party:pretty_assertions",
+        "//third_party:prost",
+        "//third_party:rand",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":running_actions_manager",
+    ],
 )
 
 rust_test(

@@ -105,7 +105,7 @@ rust_library(
         ":traits",
     ],
     proc_macro_deps = ["//third_party:async_trait"],
-    visibility = ["//cas:__pkg__"]
+    visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
 )
 
 rust_library(
@@ -137,7 +137,7 @@ rust_library(
         ":traits",
     ],
     proc_macro_deps = ["//third_party:async_trait"],
-    visibility = ["//cas:__pkg__"]
+    visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
 )
 
 rust_library(
@@ -226,7 +226,7 @@ rust_library(
         ":traits",
     ],
     proc_macro_deps = ["//third_party:async_trait"],
-    visibility = ["//cas:__pkg__"]
+    visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
 )
 
 rust_test(

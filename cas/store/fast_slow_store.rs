@@ -33,6 +33,27 @@ impl FastSlowStore {
         Self { fast_store, slow_store }
     }
 
+    pub fn fast_slow<'a>(&'a self) -> &'a Arc<dyn StoreTrait> {
+        &self.fast_store
+    }
+
+    /// Ensure our fast store is populated. This should be kept as a low
+    /// cost function. Since the data itself is shared and not copied it should be fairly
+    /// low cost to just discard the data, but does cost a few mutex locks while
+    /// streaming.
+    pub async fn populate_fast_store(self: Pin<&Self>, digest: DigestInfo) -> Result<(), Error> {
+        // TODO(blaise.bruer) This is extremely inefficient, since we are just trying
+        // to send the stream to /dev/null. Maybe we could instead make a version of
+        // the stream that can send to the drain more efficiently?
+        let (tx, mut rx) = make_buf_channel_pair();
+        let drain_fut = async move {
+            while !rx.recv().await?.is_empty() {}
+            Ok(())
+        };
+        let (drain_res, get_res) = join!(drain_fut, self.get(digest, tx));
+        get_res.err_tip(|| "Failed to populate()").merge(drain_res)
+    }
+
     fn pin_fast_store<'a>(&'a self) -> Pin<&'a dyn StoreTrait> {
         Pin::new(self.fast_store.as_ref())
     }
