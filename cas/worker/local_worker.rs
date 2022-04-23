@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::{future::BoxFuture, select, stream::FuturesUnordered, FutureExt, StreamExt};
+use futures::{future::BoxFuture, select, stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt};
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -17,7 +17,7 @@ use proto::com::github::allada::turbo_cache::remote_execution::{
     execute_result, update_for_worker::Update, worker_api_client::WorkerApiClient, ExecuteFinishedResult,
     ExecuteResult, KeepAliveRequest, UpdateForWorker,
 };
-use running_actions_manager::{RunningActionsManager, RunningActionsManagerImpl};
+use running_actions_manager::{RunningAction, RunningActionsManager, RunningActionsManagerImpl};
 use store::Store;
 use worker_api_client_wrapper::{WorkerApiClientTrait, WorkerApiClientWrapper};
 use worker_utils::make_supported_properties;
@@ -118,7 +118,15 @@ impl<'a, T: WorkerApiClientTrait, U: RunningActionsManager> LocalWorkerImpl<'a, 
                         Update::StartAction(start_execute) => {
                             let add_future_channel = add_future_channel.clone();
                             let mut grpc_client = self.grpc_client.clone();
-                            let start_action_fut = self.running_actions_manager.clone().start_action(start_execute);
+                            let start_action_fut = self
+                                .running_actions_manager
+                                .clone()
+                                .create_and_add_action(start_execute)
+                                .and_then(|action| action.prepare_action())
+                                .and_then(|action| action.execute())
+                                .and_then(|action| action.upload_results())
+                                .and_then(|action| action.cleanup())
+                                .and_then(|action| action.get_finished_result());
 
                             let make_publish_future = move |res: Result<ExecuteFinishedResult, Error>| async move {
                                 match res {
@@ -172,9 +180,9 @@ pub struct LocalWorker<T: WorkerApiClientTrait, U: RunningActionsManager> {
 pub fn new_local_worker(
     config: Arc<LocalWorkerConfig>,
     cas_store: Arc<dyn Store>,
-) -> LocalWorker<WorkerApiClientWrapper, RunningActionsManagerImpl> {
-    let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(cas_store.clone()));
-    LocalWorker::new_with_connection_factory_and_actions_manager(
+) -> Result<LocalWorker<WorkerApiClientWrapper, RunningActionsManagerImpl>, Error> {
+    let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(cas_store.clone())).clone();
+    Ok(LocalWorker::new_with_connection_factory_and_actions_manager(
         config.clone(),
         running_actions_manager,
         Box::new(move || {
@@ -196,7 +204,7 @@ pub fn new_local_worker(
             })
         }),
         Box::new(move |d| Box::pin(sleep(d))),
-    )
+    ))
 }
 
 impl<T: WorkerApiClientTrait, U: RunningActionsManager> LocalWorker<T, U> {

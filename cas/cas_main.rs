@@ -86,7 +86,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         local_worker_cfg.cas_store
                     )
                 })?;
-                tokio::spawn(new_local_worker(Arc::new(local_worker_cfg), cas_store.clone()).run())
+                let local_worker = new_local_worker(Arc::new(local_worker_cfg), cas_store.clone())
+                    .err_tip(|| "Could not make LocalWorker")?;
+                tokio::spawn(local_worker.run())
             }
         };
         futures.push(Box::pin(spawn_fut.map_ok_or_else(|e| Err(e.into()), |v| v)));
