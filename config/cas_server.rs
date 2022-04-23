@@ -216,6 +216,10 @@ pub struct LocalWorkerConfig {
     /// Reference to a filesystem store (runtime enforced). This store will be used
     /// to store a local cache of files for optimization purposes.
     /// Must be a reference to a store implementing backends::FilesystemStore.
+    /// Note: Internally we will combine `cas_store` and this store into a
+    /// FastSlowStore. This has two effects, there will be non-file objects (like
+    /// execution proto results) and filesystem will be the `fast` store. This
+    /// means you likely don't need a layer of caching for `cas_store`.
     pub local_filesystem_store_ref: StoreRefName,
 
     /// Underlying CAS store that the worker will use to download CAS artifacts.
@@ -223,6 +227,8 @@ pub struct LocalWorkerConfig {
     /// The scheduler will send job requests that will reference objects stored
     /// in this store. If the objects referenced in the job request don't exist
     /// in this store an error may be returned.
+    /// Note: We may combine this store with `local_filesystem_store_ref`.
+    /// See comment above for more info.
     pub cas_store: StoreRefName,
 
     /// Underlying AC store that the worker will use to publish execution results

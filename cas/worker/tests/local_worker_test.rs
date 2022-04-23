@@ -1,6 +1,7 @@
 // Copyright 2022 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use prost::Message;
@@ -10,14 +11,14 @@ use action_messages::{ActionInfo, ActionInfoHashKey};
 use common::{encode_stream_proto, DigestInfo};
 use config::cas_server::WrokerProperty;
 use error::{make_input_err, Error};
+use local_worker_test_utils::{setup_grpc_stream, setup_local_worker};
+use mock_running_actions_manager::MockRunningAction;
 use platform_property_manager::PlatformProperties;
 use proto::build::bazel::remote::execution::v2::platform::Property;
 use proto::com::github::allada::turbo_cache::remote_execution::{
     execute_result, update_for_worker::Update, ConnectionResult, ExecuteFinishedResult, ExecuteResult, StartExecute,
     SupportedProperties, UpdateForWorker,
 };
-
-use local_worker_test_utils::{setup_grpc_stream, setup_local_worker};
 
 #[cfg(test)]
 mod local_worker_tests {
@@ -47,7 +48,7 @@ mod local_worker_tests {
         let streaming_response = test_context.maybe_streaming_response.take().unwrap();
 
         // Now wait for our client to send `.connect_worker()` (which has our platform properties).
-        let mut supported_properties = test_context.expect_connect_worker(Ok(streaming_response)).await;
+        let mut supported_properties = test_context.client.expect_connect_worker(Ok(streaming_response)).await;
         // It is undefined which order these will be returned in, so we sort it.
         supported_properties
             .properties
@@ -86,7 +87,7 @@ mod local_worker_tests {
 
         {
             // Ensure our worker connects and properties were sent.
-            let props = test_context.expect_connect_worker(Ok(streaming_response)).await;
+            let props = test_context.client.expect_connect_worker(Ok(streaming_response)).await;
             assert_eq!(props, SupportedProperties::default());
         }
 
@@ -96,7 +97,7 @@ mod local_worker_tests {
         {
             // Client should try to auto reconnect and check our properties again.
             let (_, streaming_response) = setup_grpc_stream();
-            let props = test_context.expect_connect_worker(Ok(streaming_response)).await;
+            let props = test_context.client.expect_connect_worker(Ok(streaming_response)).await;
             assert_eq!(props, SupportedProperties::default());
         }
 
@@ -110,7 +111,7 @@ mod local_worker_tests {
 
         {
             // Ensure our worker connects and properties were sent.
-            let props = test_context.expect_connect_worker(Ok(streaming_response)).await;
+            let props = test_context.client.expect_connect_worker(Ok(streaming_response)).await;
             assert_eq!(props, SupportedProperties::default());
         }
 
@@ -162,10 +163,27 @@ mod local_worker_tests {
             salt: 123,
             execute_response: None,
         };
+        let running_action = Arc::new(MockRunningAction::new());
+
+        // Send and wait for response from create_and_add_action to RunningActionsManager.
         test_context
-            .am_expect_start_action(Ok(execute_finished_result.clone()))
+            .actions_manager
+            .expect_create_and_add_action(Ok(running_action.clone()))
             .await;
-        let execution_response = test_context.expect_execution_response(Ok(Response::new(()))).await;
+
+        // Now the RunningAction needs to send a series of state updates. This shortcuts them
+        // into a single call (shortcut for prepare, execute, upload, collect_results, cleanup).
+        running_action
+            .simple_expect_get_finished_result(Ok(execute_finished_result.clone()))
+            .await?;
+
+        // Now our client should be notified that our runner finished.
+        let execution_response = test_context
+            .client
+            .expect_execution_response(Ok(Response::new(())))
+            .await;
+
+        // Now ensure the final results match our expectations.
         assert_eq!(
             execution_response,
             ExecuteResult {

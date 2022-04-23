@@ -6,7 +6,7 @@ rust_library(
     name = "local_worker",
     srcs = ["local_worker.rs"],
     deps = [
-         "//cas/store",
+        "//cas/store",
         "//config",
         "//proto",
         "//third_party:futures",
@@ -65,20 +65,47 @@ rust_library(
 
 rust_library(
     name = "local_worker_test_utils",
-    srcs = ["local_worker_test_utils.rs"],
+    srcs = ["tests/utils/local_worker_test_utils.rs"],
     testonly = True,
     deps = [
         "//config",
         "//proto",
-        "//third_party:fast_async_mutex",
         "//third_party:hyper",
         "//third_party:tokio",
         "//third_party:tonic",
         "//util:common",
         "//util:error",
         ":local_worker",
-        ":running_actions_manager",
+        ":mock_running_actions_manager",
+        ":mock_worker_api_client",
+    ],
+)
+
+
+rust_library(
+    name = "mock_worker_api_client",
+    srcs = ["tests/utils/mock_worker_api_client.rs"],
+    testonly = True,
+    deps = [
+        "//proto",
+        "//third_party:fast_async_mutex",
+        "//third_party:tokio",
+        "//third_party:tonic",
         ":worker_api_client_wrapper",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+)
+
+rust_library(
+    name = "mock_running_actions_manager",
+    srcs = ["tests/utils/mock_running_actions_manager.rs"],
+    testonly = True,
+    deps = [
+        "//proto",
+        "//third_party:fast_async_mutex",
+        "//third_party:tokio",
+        "//util:error",
+        ":running_actions_manager",
     ],
     proc_macro_deps = ["//third_party:async_trait"],
 )
@@ -99,6 +126,7 @@ rust_test(
         "//util:common",
         "//util:error",
         ":local_worker_test_utils",
+        ":mock_running_actions_manager",
     ],
-    proc_macro_deps = ["//third_party:async_trait", "//third_party:ctor"],
+    proc_macro_deps = ["//third_party:ctor"],
 )
