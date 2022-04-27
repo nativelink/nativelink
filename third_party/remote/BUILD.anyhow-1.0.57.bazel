@@ -26,7 +26,7 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT"
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
 ])
 
 # Generated Targets
@@ -38,15 +38,15 @@ load(
 )
 
 cargo_build_script(
-    name = "rusoto_core_build_script",
+    name = "anyhow_build_script",
     srcs = glob(["**/*.rs"]),
     build_script_env = {
     },
     crate_features = [
-        "hyper-tls",
-        "native-tls",
+        "default",
+        "std",
     ],
-    crate_root = "rusoto/core/build.rs",
+    crate_root = "build.rs",
     data = glob(["**"]),
     edition = "2018",
     rustc_flags = [
@@ -56,26 +56,22 @@ cargo_build_script(
         "cargo-raze",
         "manual",
     ],
-    version = "0.46.0",
+    version = "1.0.57",
     visibility = ["//visibility:private"],
     deps = [
-        "@raze__rustc_version__0_2_3//:rustc_version",
     ],
 )
 
 rust_library(
-    name = "rusoto_core",
+    name = "anyhow",
     srcs = glob(["**/*.rs"]),
     crate_features = [
-        "hyper-tls",
-        "native-tls",
+        "default",
+        "std",
     ],
-    crate_root = "rusoto/core/src/lib.rs",
+    crate_root = "src/lib.rs",
     data = [],
     edition = "2018",
-    proc_macro_deps = [
-        "@raze__async_trait__0_1_53//:async_trait",
-    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -83,24 +79,37 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.46.0",
+    version = "1.0.57",
     # buildifier: leave-alone
     deps = [
-        ":rusoto_core_build_script",
-        "@raze__base64__0_13_0//:base64",
-        "@raze__bytes__1_1_0//:bytes",
-        "@raze__crc32fast__1_3_2//:crc32fast",
-        "@raze__futures__0_3_21//:futures",
-        "@raze__http__0_2_6//:http",
-        "@raze__hyper__0_14_18//:hyper",
-        "@raze__hyper_tls__0_5_0//:hyper_tls",
-        "@raze__lazy_static__1_4_0//:lazy_static",
-        "@raze__log__0_4_16//:log",
-        "@raze__rusoto_credential__0_46_0//:rusoto_credential",
-        "@raze__rusoto_signature__0_46_0//:rusoto_signature",
-        "@raze__serde__1_0_136//:serde",
-        "@raze__serde_json__1_0_79//:serde_json",
-        "@raze__tokio__1_18_0//:tokio",
-        "@raze__xml_rs__0_8_4//:xml_rs",
+        ":anyhow_build_script",
     ],
 )
+
+# Unsupported target "compiletest" with type "test" omitted
+
+# Unsupported target "test_autotrait" with type "test" omitted
+
+# Unsupported target "test_backtrace" with type "test" omitted
+
+# Unsupported target "test_boxed" with type "test" omitted
+
+# Unsupported target "test_chain" with type "test" omitted
+
+# Unsupported target "test_context" with type "test" omitted
+
+# Unsupported target "test_convert" with type "test" omitted
+
+# Unsupported target "test_downcast" with type "test" omitted
+
+# Unsupported target "test_ensure" with type "test" omitted
+
+# Unsupported target "test_ffi" with type "test" omitted
+
+# Unsupported target "test_fmt" with type "test" omitted
+
+# Unsupported target "test_macros" with type "test" omitted
+
+# Unsupported target "test_repr" with type "test" omitted
+
+# Unsupported target "test_source" with type "test" omitted

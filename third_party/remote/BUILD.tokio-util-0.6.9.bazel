@@ -57,8 +57,8 @@ rust_library(
         "@raze__futures_core__0_3_21//:futures_core",
         "@raze__futures_sink__0_3_21//:futures_sink",
         "@raze__log__0_4_16//:log",
-        "@raze__pin_project_lite__0_2_8//:pin_project_lite",
-        "@raze__tokio__1_17_0//:tokio",
+        "@raze__pin_project_lite__0_2_9//:pin_project_lite",
+        "@raze__tokio__1_18_0//:tokio",
     ],
 )
 

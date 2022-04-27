@@ -118,7 +118,7 @@ rust_library(
         "@raze__futures_sink__0_3_21//:futures_sink",
         "@raze__futures_task__0_3_21//:futures_task",
         "@raze__memchr__2_4_1//:memchr",
-        "@raze__pin_project_lite__0_2_8//:pin_project_lite",
+        "@raze__pin_project_lite__0_2_9//:pin_project_lite",
         "@raze__pin_utils__0_1_0//:pin_utils",
         "@raze__slab__0_4_6//:slab",
     ],

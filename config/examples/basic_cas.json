@@ -122,5 +122,8 @@
         "scheduler": "MAIN_SCHEDULER",
       }
     }
-  }]
+  }],
+  "global": {
+    "max_open_files": 512,
+  },
 }

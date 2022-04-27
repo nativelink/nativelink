@@ -74,7 +74,7 @@ rust_library(
     # buildifier: leave-alone
     deps = [
         "@raze__async_stream__0_3_3//:async_stream",
-        "@raze__axum__0_5_3//:axum",
+        "@raze__axum__0_5_4//:axum",
         "@raze__base64__0_13_0//:base64",
         "@raze__bytes__1_1_0//:bytes",
         "@raze__futures_core__0_3_21//:futures_core",
@@ -87,7 +87,7 @@ rust_library(
         "@raze__percent_encoding__2_1_0//:percent_encoding",
         "@raze__pin_project__1_0_10//:pin_project",
         "@raze__prost__0_10_1//:prost",
-        "@raze__tokio__1_17_0//:tokio",
+        "@raze__tokio__1_18_0//:tokio",
         "@raze__tokio_stream__0_1_8//:tokio_stream",
         "@raze__tokio_util__0_7_1//:tokio_util",
         "@raze__tower__0_4_12//:tower",

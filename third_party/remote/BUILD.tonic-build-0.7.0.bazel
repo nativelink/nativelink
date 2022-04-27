@@ -53,7 +53,7 @@ rust_library(
     version = "0.7.0",
     # buildifier: leave-alone
     deps = [
-        "@raze__prettyplease__0_1_9//:prettyplease",
+        "@raze__prettyplease__0_1_10//:prettyplease",
         "@raze__proc_macro2__1_0_37//:proc_macro2",
         "@raze__prost_build__0_10_1//:prost_build",
         "@raze__quote__1_0_18//:quote",

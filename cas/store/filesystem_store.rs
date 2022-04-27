@@ -12,13 +12,12 @@ use filetime::{set_file_atime, FileTime};
 use futures::stream::{StreamExt, TryStreamExt};
 use nix::fcntl::{renameat2, RenameFlags};
 use rand::{thread_rng, Rng};
-use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom, Take};
 use tokio::task::spawn_blocking;
 use tokio_stream::wrappers::ReadDirStream;
 
 use buf_channel::{DropCloserReadHalf, DropCloserWriteHalf};
-use common::{log, DigestInfo};
+use common::{fs, log, DigestInfo};
 use config;
 use error::{make_err, make_input_err, Code, Error, ResultExt};
 use evicting_map::{EvictingMap, LenEntry};
@@ -38,9 +37,9 @@ struct FileEntry {
 }
 
 impl FileEntry {
-    async fn read_file_part(&self, offset: u64, length: u64) -> Result<Take<File>, Error> {
+    async fn read_file_part(&self, offset: u64, length: u64) -> Result<Take<fs::FileSlot<'_>>, Error> {
         let full_content_path = to_full_path_from_digest(&self.content_path, &self.digest);
-        let mut file = fs::File::open(&full_content_path)
+        let mut file = fs::open_file(&full_content_path)
             .await
             .err_tip(|| format!("Failed to open file in filesystem store {}", full_content_path))?;
 
@@ -173,35 +172,40 @@ async fn add_files_to_cache(
         Ok(())
     }
 
-    let dir_handle = fs::read_dir(format!("{}/", content_path))
-        .await
-        .err_tip(|| "Failed opening content directory for iterating in filesystem store")?;
+    let mut file_infos: Vec<(String, SystemTime, u64)> = {
+        let (_permit, dir_handle) = fs::read_dir(format!("{}/", content_path))
+            .await
+            .err_tip(|| "Failed opening content directory for iterating in filesystem store")?
+            .into_inner();
 
-    let mut file_infos: Vec<(String, SystemTime, u64)> = ReadDirStream::new(dir_handle)
-        .then(|dir_entry| async move {
-            let dir_entry = dir_entry.unwrap();
-            let file_name = dir_entry.file_name().into_string().unwrap();
-            let metadata = dir_entry
-                .metadata()
-                .await
-                .err_tip(|| "Failed to get metadata in filesystem store")?;
-            let atime = match metadata.accessed() {
-                Ok(atime) => atime,
-                Err(err) => {
-                    panic!(
-                        "{}{}{} : {} {:?}",
-                        "It appears this filesystem does not support access time. ",
-                        "Please configure this program to run on a drive that supports ",
-                        "atime",
-                        file_name,
-                        err
-                    );
-                }
-            };
-            Result::<(String, SystemTime, u64), Error>::Ok((file_name, atime, metadata.len()))
-        })
-        .try_collect()
-        .await?;
+        let read_dir_stream = ReadDirStream::new(dir_handle);
+        read_dir_stream
+            .then(|dir_entry| async move {
+                let dir_entry = dir_entry.unwrap();
+                let file_name = dir_entry.file_name().into_string().unwrap();
+                let metadata = dir_entry
+                    .metadata()
+                    .await
+                    .err_tip(|| "Failed to get metadata in filesystem store")?;
+                let atime = match metadata.accessed() {
+                    Ok(atime) => atime,
+                    Err(err) => {
+                        panic!(
+                            "{}{}{} : {} {:?}",
+                            "It appears this filesystem does not support access time. ",
+                            "Please configure this program to run on a drive that supports ",
+                            "atime",
+                            file_name,
+                            err
+                        );
+                    }
+                };
+                Result::<(String, SystemTime, u64), Error>::Ok((file_name, atime, metadata.len()))
+            })
+            .try_collect()
+            .await?
+    };
+
     file_infos.sort_by(|a, b| a.1.cmp(&b.1));
     for (file_name, atime, file_size) in file_infos {
         let result = process_entry(
@@ -228,9 +232,10 @@ async fn add_files_to_cache(
 }
 
 async fn prune_temp_path(temp_path: &str) -> Result<(), Error> {
-    let dir_handle = fs::read_dir(temp_path)
+    let (_permit, dir_handle) = fs::read_dir(temp_path)
         .await
-        .err_tip(|| "Failed opening temp directory to prune partial downloads in filesystem store")?;
+        .err_tip(|| "Failed opening temp directory to prune partial downloads in filesystem store")?
+        .into_inner();
 
     let mut read_dir_stream = ReadDirStream::new(dir_handle);
     while let Some(dir_entry) = read_dir_stream.next().await {
@@ -287,10 +292,10 @@ impl FilesystemStore {
         to_full_path_from_digest(self.content_path.as_ref(), &digest)
     }
 
-    async fn update_file(
+    async fn update_file<'a>(
         self: Pin<&Self>,
         temp_loc: &str,
-        temp_file: &mut File,
+        temp_file: &mut fs::FileSlot<'a>,
         temp_name_num: u64,
         digest: DigestInfo,
         mut reader: DropCloserReadHalf,
@@ -375,7 +380,7 @@ impl StoreTrait for FilesystemStore {
         let temp_name_num = thread_rng().gen::<u64>();
         let temp_full_path = to_full_path(&self.temp_path, &temp_name_num.to_string());
 
-        let mut temp_file = fs::File::create(&temp_full_path)
+        let mut temp_file = fs::create_file(&temp_full_path)
             .await
             .err_tip(|| "Failed to create temp file in filesystem store")?;
 

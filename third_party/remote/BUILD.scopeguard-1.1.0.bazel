@@ -31,16 +31,16 @@ licenses([
 
 # Generated Targets
 
-# Unsupported target "client" with type "example" omitted
+# Unsupported target "readme" with type "example" omitted
 
 rust_library(
-    name = "hyper_timeout",
+    name = "scopeguard",
     srcs = glob(["**/*.rs"]),
     crate_features = [
     ],
     crate_root = "src/lib.rs",
     data = [],
-    edition = "2018",
+    edition = "2015",
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -48,12 +48,8 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.4.1",
+    version = "1.1.0",
     # buildifier: leave-alone
     deps = [
-        "@raze__hyper__0_14_18//:hyper",
-        "@raze__pin_project_lite__0_2_9//:pin_project_lite",
-        "@raze__tokio__1_18_0//:tokio",
-        "@raze__tokio_io_timeout__1_2_0//:tokio_io_timeout",
     ],
 )

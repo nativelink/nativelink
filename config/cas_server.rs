@@ -258,6 +258,21 @@ pub enum WorkerConfig {
 }
 
 #[derive(Deserialize, Debug)]
+pub struct GlobalConfig {
+    /// Maximum number of open files that can be opened at one time.
+    /// This value is not strictly enforced, it is a best effort. Some internal libraries
+    /// open files or read metadata from a files which do not obay this limit, however
+    /// the vast majority of cases will have this limit be honored.
+    /// As a rule of thumb this value should be less than half the value of `ulimit -n`.
+    /// Any network open file descriptors is not counted in this limit, but is counted
+    /// in the kernel limit. It is a good idea to set a very large `ulimit -n`.
+    /// Note: This value must be greater than 10.
+    ///
+    /// Default: 512
+    pub max_open_files: usize,
+}
+
+#[derive(Deserialize, Debug)]
 pub struct CasConfig {
     /// List of stores available to use in this config.
     /// The keys can be used in other configs when needing to reference a store.
@@ -273,4 +288,7 @@ pub struct CasConfig {
 
     /// Servers to setup for this process.
     pub servers: Vec<ServerConfig>,
+
+    /// Any global configurations that apply to all modules live here.
+    pub global: Option<GlobalConfig>,
 }

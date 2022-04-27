@@ -7,9 +7,8 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use rand::{thread_rng, Rng};
-use tokio::fs;
 
-use common::DigestInfo;
+use common::{fs, DigestInfo};
 use config;
 use error::{Error, ResultExt};
 use fast_slow_store::FastSlowStore;

@@ -30,11 +30,38 @@ licenses([
 ])
 
 # Generated Targets
+# buildifier: disable=out-of-order-load
+# buildifier: disable=load-on-top
+load(
+    "@rules_rust//cargo:cargo_build_script.bzl",
+    "cargo_build_script",
+)
 
-# Unsupported target "client" with type "example" omitted
+cargo_build_script(
+    name = "windows_i686_msvc_build_script",
+    srcs = glob(["**/*.rs"]),
+    build_script_env = {
+    },
+    crate_features = [
+    ],
+    crate_root = "build.rs",
+    data = glob(["**"]),
+    edition = "2018",
+    rustc_flags = [
+        "--cap-lints=allow",
+    ],
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+    version = "0.34.0",
+    visibility = ["//visibility:private"],
+    deps = [
+    ],
+)
 
 rust_library(
-    name = "hyper_timeout",
+    name = "windows_i686_msvc",
     srcs = glob(["**/*.rs"]),
     crate_features = [
     ],
@@ -48,12 +75,9 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.4.1",
+    version = "0.34.0",
     # buildifier: leave-alone
     deps = [
-        "@raze__hyper__0_14_18//:hyper",
-        "@raze__pin_project_lite__0_2_9//:pin_project_lite",
-        "@raze__tokio__1_18_0//:tokio",
-        "@raze__tokio_io_timeout__1_2_0//:tokio_io_timeout",
+        ":windows_i686_msvc_build_script",
     ],
 )

@@ -9,6 +9,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::{BufMut, Bytes, BytesMut};
+pub use fs;
 use hex::FromHex;
 use lazy_init::LazyTransform;
 pub use log;

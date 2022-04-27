@@ -26,21 +26,26 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT OR Apache-2.0"
+    "notice",  # MIT from expression "MIT"
 ])
 
 # Generated Targets
 
-# Unsupported target "client" with type "example" omitted
-
 rust_library(
-    name = "hyper_timeout",
+    name = "axum",
     srcs = glob(["**/*.rs"]),
+    aliases = {
+        "@raze__tower__0_4_12//:tower": "tower",
+    },
     crate_features = [
     ],
     crate_root = "src/lib.rs",
     data = [],
+    compile_data = glob(['**/*.md']),
     edition = "2018",
+    proc_macro_deps = [
+        "@raze__async_trait__0_1_53//:async_trait",
+    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -48,12 +53,28 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.4.1",
+    version = "0.5.4",
     # buildifier: leave-alone
     deps = [
+        "@raze__axum_core__0_2_3//:axum_core",
+        "@raze__bitflags__1_3_2//:bitflags",
+        "@raze__bytes__1_1_0//:bytes",
+        "@raze__futures_util__0_3_21//:futures_util",
+        "@raze__http__0_2_6//:http",
+        "@raze__http_body__0_4_4//:http_body",
         "@raze__hyper__0_14_18//:hyper",
+        "@raze__itoa__1_0_1//:itoa",
+        "@raze__matchit__0_5_0//:matchit",
+        "@raze__memchr__2_4_1//:memchr",
+        "@raze__mime__0_3_16//:mime",
+        "@raze__percent_encoding__2_1_0//:percent_encoding",
         "@raze__pin_project_lite__0_2_9//:pin_project_lite",
+        "@raze__serde__1_0_136//:serde",
+        "@raze__sync_wrapper__0_1_1//:sync_wrapper",
         "@raze__tokio__1_18_0//:tokio",
-        "@raze__tokio_io_timeout__1_2_0//:tokio_io_timeout",
+        "@raze__tower__0_4_12//:tower",
+        "@raze__tower_http__0_3_0//:tower_http",
+        "@raze__tower_layer__0_3_1//:tower_layer",
+        "@raze__tower_service__0_3_1//:tower_service",
     ],
 )

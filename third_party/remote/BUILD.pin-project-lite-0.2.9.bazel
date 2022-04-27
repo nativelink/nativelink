@@ -26,15 +26,13 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT OR Apache-2.0"
+    "notice",  # Apache-2.0 from expression "Apache-2.0 OR MIT"
 ])
 
 # Generated Targets
 
-# Unsupported target "client" with type "example" omitted
-
 rust_library(
-    name = "hyper_timeout",
+    name = "pin_project_lite",
     srcs = glob(["**/*.rs"]),
     crate_features = [
     ],
@@ -48,12 +46,20 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.4.1",
+    version = "0.2.9",
     # buildifier: leave-alone
     deps = [
-        "@raze__hyper__0_14_18//:hyper",
-        "@raze__pin_project_lite__0_2_9//:pin_project_lite",
-        "@raze__tokio__1_18_0//:tokio",
-        "@raze__tokio_io_timeout__1_2_0//:tokio_io_timeout",
     ],
 )
+
+# Unsupported target "compiletest" with type "test" omitted
+
+# Unsupported target "drop_order" with type "test" omitted
+
+# Unsupported target "expandtest" with type "test" omitted
+
+# Unsupported target "lint" with type "test" omitted
+
+# Unsupported target "proper_unpin" with type "test" omitted
+
+# Unsupported target "test" with type "test" omitted

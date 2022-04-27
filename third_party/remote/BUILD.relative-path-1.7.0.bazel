@@ -26,22 +26,22 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT"
+    "notice",  # MIT from expression "MIT OR Apache-2.0"
 ])
 
 # Generated Targets
 
+# Unsupported target "remove_leading" with type "example" omitted
+
 rust_library(
-    name = "axum_core",
+    name = "relative_path",
     srcs = glob(["**/*.rs"]),
     crate_features = [
+        "default",
     ],
     crate_root = "src/lib.rs",
     data = [],
     edition = "2018",
-    proc_macro_deps = [
-        "@raze__async_trait__0_1_53//:async_trait",
-    ],
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -49,13 +49,8 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.2.2",
+    version = "1.7.0",
     # buildifier: leave-alone
     deps = [
-        "@raze__bytes__1_1_0//:bytes",
-        "@raze__futures_util__0_3_21//:futures_util",
-        "@raze__http__0_2_6//:http",
-        "@raze__http_body__0_4_4//:http_body",
-        "@raze__mime__0_3_16//:mime",
     ],
 )

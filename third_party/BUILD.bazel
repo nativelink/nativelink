@@ -50,7 +50,7 @@ alias(
 
 alias(
     name = "clap",
-    actual = "@raze__clap__3_1_10//:clap",
+    actual = "@raze__clap__3_1_12//:clap",
     tags = [
         "cargo-raze",
         "manual",
@@ -221,7 +221,7 @@ alias(
 
 alias(
     name = "pin_project_lite",
-    actual = "@raze__pin_project_lite__0_2_8//:pin_project_lite",
+    actual = "@raze__pin_project_lite__0_2_9//:pin_project_lite",
     tags = [
         "cargo-raze",
         "manual",
@@ -267,6 +267,15 @@ alias(
 alias(
     name = "rand",
     actual = "@raze__rand__0_8_5//:rand",
+    tags = [
+        "cargo-raze",
+        "manual",
+    ],
+)
+
+alias(
+    name = "relative_path",
+    actual = "@raze__relative_path__1_7_0//:relative_path",
     tags = [
         "cargo-raze",
         "manual",
@@ -365,7 +374,7 @@ alias(
 
 alias(
     name = "tokio",
-    actual = "@raze__tokio__1_17_0//:tokio",
+    actual = "@raze__tokio__1_18_0//:tokio",
     tags = [
         "cargo-raze",
         "manual",

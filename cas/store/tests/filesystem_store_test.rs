@@ -6,13 +6,12 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 use buf_channel::{make_buf_channel_pair, DropCloserReadHalf};
-use common::DigestInfo;
+use common::{fs, DigestInfo};
 use config;
 use error::{Error, ResultExt};
 use filesystem_store::FilesystemStore;
 use filetime::{set_file_atime, FileTime};
 use rand::{thread_rng, Rng};
-use tokio::fs;
 use tokio::io::AsyncReadExt;
 use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 use traits::StoreTrait;
@@ -29,7 +28,7 @@ fn make_temp_path(data: &str) -> String {
 }
 
 async fn read_file_contents(file_name: &str) -> Result<Vec<u8>, Error> {
-    let mut file = fs::File::open(&file_name)
+    let mut file = fs::open_file(&file_name)
         .await
         .err_tip(|| format!("Failed to open file: {}", file_name))?;
     let mut data = vec![];
@@ -131,9 +130,10 @@ mod filesystem_store_tests {
             assert_eq!(&data[..], VALUE2.as_bytes(), "Expected file content to match");
         }
 
-        let temp_dir_handle = fs::read_dir(temp_path.clone())
+        let (_permit, temp_dir_handle) = fs::read_dir(temp_path.clone())
             .await
-            .err_tip(|| "Failed opening temp directory")?;
+            .err_tip(|| "Failed opening temp directory")?
+            .into_inner();
         let mut read_dir_stream = ReadDirStream::new(temp_dir_handle);
 
         // Ensure we let any background tasks finish.
@@ -200,9 +200,10 @@ mod filesystem_store_tests {
 
         {
             // Now ensure we only have 1 file in our temp path.
-            let temp_dir_handle = fs::read_dir(temp_path.clone())
+            let (_permit, temp_dir_handle) = fs::read_dir(temp_path.clone())
                 .await
-                .err_tip(|| "Failed opening temp directory")?;
+                .err_tip(|| "Failed opening temp directory")?
+                .into_inner();
             let mut read_dir_stream = ReadDirStream::new(temp_dir_handle);
             let mut num_files = 0;
             while let Some(temp_dir_entry) = read_dir_stream.next().await {
@@ -229,9 +230,10 @@ mod filesystem_store_tests {
 
         {
             // Now ensure our temp file was cleaned up.
-            let temp_dir_handle = fs::read_dir(temp_path.clone())
+            let (_permit, temp_dir_handle) = fs::read_dir(temp_path.clone())
                 .await
-                .err_tip(|| "Failed opening temp directory")?;
+                .err_tip(|| "Failed opening temp directory")?
+                .into_inner();
             let mut read_dir_stream = ReadDirStream::new(temp_dir_handle);
             while let Some(temp_dir_entry) = read_dir_stream.next().await {
                 let path = temp_dir_entry?.path();
@@ -293,9 +295,10 @@ mod filesystem_store_tests {
 
         {
             // Now ensure we only have 1 file in our temp path.
-            let temp_dir_handle = fs::read_dir(temp_path.clone())
+            let (_permit, temp_dir_handle) = fs::read_dir(temp_path.clone())
                 .await
-                .err_tip(|| "Failed opening temp directory")?;
+                .err_tip(|| "Failed opening temp directory")?
+                .into_inner();
             let mut read_dir_stream = ReadDirStream::new(temp_dir_handle);
             let mut num_files = 0;
             while let Some(temp_dir_entry) = read_dir_stream.next().await {
@@ -318,9 +321,10 @@ mod filesystem_store_tests {
 
         {
             // Now ensure our temp file was cleaned up.
-            let temp_dir_handle = fs::read_dir(temp_path.clone())
+            let (_permit, temp_dir_handle) = fs::read_dir(temp_path.clone())
                 .await
-                .err_tip(|| "Failed opening temp directory")?;
+                .err_tip(|| "Failed opening temp directory")?
+                .into_inner();
             let mut read_dir_stream = ReadDirStream::new(temp_dir_handle);
             while let Some(temp_dir_entry) = read_dir_stream.next().await {
                 let path = temp_dir_entry?.path();

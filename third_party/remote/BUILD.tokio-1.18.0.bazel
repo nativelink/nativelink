@@ -49,6 +49,7 @@ rust_library(
         "net",
         "num_cpus",
         "once_cell",
+        "parking_lot",
         "process",
         "rt",
         "rt-multi-thread",
@@ -72,7 +73,7 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "1.17.0",
+    version = "1.18.0",
     # buildifier: leave-alone
     deps = [
         "@raze__bytes__1_1_0//:bytes",
@@ -80,7 +81,8 @@ rust_library(
         "@raze__mio__0_8_2//:mio",
         "@raze__num_cpus__1_13_1//:num_cpus",
         "@raze__once_cell__1_10_0//:once_cell",
-        "@raze__pin_project_lite__0_2_8//:pin_project_lite",
+        "@raze__parking_lot__0_12_0//:parking_lot",
+        "@raze__pin_project_lite__0_2_9//:pin_project_lite",
         "@raze__socket2__0_4_4//:socket2",
     ] + selects.with_or({
         # cfg(unix)
@@ -171,6 +173,8 @@ rust_library(
 # Unsupported target "macros_join" with type "test" omitted
 
 # Unsupported target "macros_pin" with type "test" omitted
+
+# Unsupported target "macros_rename_test" with type "test" omitted
 
 # Unsupported target "macros_select" with type "test" omitted
 

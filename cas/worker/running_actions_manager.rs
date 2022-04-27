@@ -10,13 +10,12 @@ use fast_async_mutex::mutex::Mutex;
 use filetime::{set_file_mtime, FileTime};
 use futures::future::{BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{FuturesUnordered, TryStreamExt};
-use tokio::fs;
 use tokio::task::spawn_blocking;
 
 use ac_utils::get_and_decode_digest;
 use action_messages::ActionInfo;
 use async_trait::async_trait;
-use common::DigestInfo;
+use common::{fs, DigestInfo};
 use error::{make_err, Code, Error, ResultExt};
 use fast_slow_store::FastSlowStore;
 use filesystem_store::FilesystemStore;

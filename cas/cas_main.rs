@@ -13,7 +13,8 @@ use ac_server::AcServer;
 use bytestream_server::ByteStreamServer;
 use capabilities_server::CapabilitiesServer;
 use cas_server::CasServer;
-use config::cas_server::{CasConfig, WorkerConfig};
+use common::fs::set_open_file_limit;
+use config::cas_server::{CasConfig, GlobalConfig, WorkerConfig};
 use default_store_factory::store_factory;
 use error::{make_err, Code, Error, ResultExt};
 use execution_server::ExecutionServer;
@@ -58,6 +59,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let json_contents = String::from_utf8(tokio::fs::read(config_file).await?)?;
     let cfg: CasConfig = json5::from_str(&json_contents)?;
+
+    // Note: If the default changes make sure you update the documentation in
+    // `config/cas_server.rs`.
+    const DEFAULT_MAX_OPEN_FILES: usize = 512;
+    let global_cfg = if let Some(mut global_cfg) = cfg.global {
+        if global_cfg.max_open_files == 0 {
+            global_cfg.max_open_files = DEFAULT_MAX_OPEN_FILES;
+        }
+        global_cfg
+    } else {
+        GlobalConfig {
+            max_open_files: DEFAULT_MAX_OPEN_FILES,
+        }
+    };
+    set_open_file_limit(global_cfg.max_open_files);
 
     let store_manager = Arc::new(StoreManager::new());
     for (name, store_cfg) in cfg.stores {

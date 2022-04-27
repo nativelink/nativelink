@@ -29,8 +29,20 @@ rust_library(
         "//third_party:serde",
         "//third_party:tokio",
         ":error",
+        ":fs",
     ],
     visibility = ["//visibility:public"],
+)
+
+# This crate should be accessed through `common::fs`.
+rust_library(
+    name = "fs",
+    srcs = ["fs.rs"],
+    deps = [
+        "//third_party:log",
+        "//third_party:tokio",
+        ":error",
+    ],
 )
 
 rust_library(
@@ -117,6 +129,7 @@ rust_test(
         "//third_party:sha2",
         "//third_party:tokio",
         "//third_party:tokio_util",
+        "//util:common",
         ":fastcdc",
     ],
 )
