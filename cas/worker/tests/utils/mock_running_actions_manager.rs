@@ -6,13 +6,14 @@ use async_trait::async_trait;
 use fast_async_mutex::mutex::Mutex;
 use tokio::sync::mpsc;
 
+use action_messages::ActionResult;
 use error::{make_input_err, Error};
-use proto::com::github::allada::turbo_cache::remote_execution::{ExecuteFinishedResult, StartExecute};
-use running_actions_manager::{RunningAction, RunningActionsManager};
+use proto::com::github::allada::turbo_cache::remote_execution::StartExecute;
+use running_actions_manager::{ActionId, RunningAction, RunningActionsManager};
 
 #[derive(Debug)]
 enum RunningActionManagerCalls {
-    CreateAndAddAction(StartExecute),
+    CreateAndAddAction((String, StartExecute)),
 }
 
 enum RunningActionManagerReturns {
@@ -41,7 +42,10 @@ impl MockRunningActionsManager {
 }
 
 impl MockRunningActionsManager {
-    pub async fn expect_create_and_add_action(&self, result: Result<Arc<MockRunningAction>, Error>) -> StartExecute {
+    pub async fn expect_create_and_add_action(
+        &self,
+        result: Result<Arc<MockRunningAction>, Error>,
+    ) -> (String, StartExecute) {
         let mut rx_call_lock = self.rx_call.lock().await;
         let req = match rx_call_lock.recv().await.expect("Could not receive msg in mpsc") {
             RunningActionManagerCalls::CreateAndAddAction(req) => req,
@@ -60,15 +64,23 @@ impl RunningActionsManager for MockRunningActionsManager {
 
     async fn create_and_add_action(
         self: Arc<Self>,
+        worker_id: String,
         start_execute: StartExecute,
     ) -> Result<Arc<Self::RunningAction>, Error> {
         self.tx_call
-            .send(RunningActionManagerCalls::CreateAndAddAction(start_execute))
+            .send(RunningActionManagerCalls::CreateAndAddAction((
+                worker_id,
+                start_execute,
+            )))
             .expect("Could not send request to mpsc");
         let mut rx_resp_lock = self.rx_resp.lock().await;
         match rx_resp_lock.recv().await.expect("Could not receive msg in mpsc") {
             RunningActionManagerReturns::CreateAndAddAction(result) => result,
         }
+    }
+
+    async fn get_action(&self, _action_id: &ActionId) -> Result<Arc<Self::RunningAction>, Error> {
+        unimplemented!("get_action not implemented");
     }
 }
 
@@ -87,7 +99,7 @@ enum RunningActionReturns {
     Execute(Result<Arc<MockRunningAction>, Error>),
     UploadResults(Result<Arc<MockRunningAction>, Error>),
     Cleanup(Result<Arc<MockRunningAction>, Error>),
-    GetFinishedResult(Result<ExecuteFinishedResult, Error>),
+    GetFinishedResult(Result<ActionResult, Error>),
 }
 
 #[derive(Debug)]
@@ -113,13 +125,14 @@ impl MockRunningAction {
 
     pub async fn simple_expect_get_finished_result(
         self: &Arc<Self>,
-        result: Result<ExecuteFinishedResult, Error>,
+        result: Result<ActionResult, Error>,
     ) -> Result<(), Error> {
         self.expect_prepare_action(Ok(())).await?;
         self.expect_execute(Ok(())).await?;
         self.upload_results(Ok(())).await?;
+        let result = self.get_finished_result(result).await;
         self.cleanup(Ok(())).await?;
-        self.get_finished_result(result).await
+        result
     }
 
     pub async fn expect_prepare_action(self: &Arc<Self>, result: Result<(), Error>) -> Result<(), Error> {
@@ -186,10 +199,7 @@ impl MockRunningAction {
         Ok(req)
     }
 
-    pub async fn get_finished_result(
-        self: &Arc<Self>,
-        result: Result<ExecuteFinishedResult, Error>,
-    ) -> Result<(), Error> {
+    pub async fn get_finished_result(self: &Arc<Self>, result: Result<ActionResult, Error>) -> Result<(), Error> {
         let mut rx_call_lock = self.rx_call.lock().await;
         let req = match rx_call_lock.recv().await.expect("Could not receive msg in mpsc") {
             RunningActionCalls::GetFinishedResult => (),
@@ -254,7 +264,7 @@ impl RunningAction for MockRunningAction {
         }
     }
 
-    async fn get_finished_result(self: Arc<Self>) -> Result<ExecuteFinishedResult, Error> {
+    async fn get_finished_result(self: Arc<Self>) -> Result<ActionResult, Error> {
         self.tx_call
             .send(RunningActionCalls::GetFinishedResult)
             .expect("Could not send request to mpsc");

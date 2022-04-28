@@ -1,26 +1,50 @@
 // Copyright 2022 Nathan (Blaise) Bruer.  All rights reserved.
 
+use std::collections::vec_deque::VecDeque;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::fs::Permissions;
-use std::os::unix::fs::PermissionsExt;
+use std::io::Cursor;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::path::Path;
 use std::pin::Pin;
-use std::sync::{Arc, Weak};
+use std::process::Stdio;
+use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc, Weak};
+use std::time::SystemTime;
 
+use bytes::{BufMut, Bytes, BytesMut};
 use fast_async_mutex::mutex::Mutex;
 use filetime::{set_file_mtime, FileTime};
-use futures::future::{BoxFuture, FutureExt, TryFutureExt};
-use futures::stream::{FuturesUnordered, TryStreamExt};
+use futures::future::{try_join, try_join3, try_join_all, BoxFuture, FutureExt, TryFutureExt};
+use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use hex;
+use relative_path::RelativePath;
+use tokio::io::AsyncSeekExt;
+use tokio::process;
+use tokio::sync::oneshot;
 use tokio::task::spawn_blocking;
+use tokio_stream::wrappers::ReadDirStream;
+use tokio_util::io::ReaderStream;
 
-use ac_utils::get_and_decode_digest;
-use action_messages::ActionInfo;
+use ac_utils::{compute_digest, get_and_decode_digest, serialize_and_upload_message, upload_to_store};
+use action_messages::{ActionInfo, ActionResult, DirectoryInfo, ExecutionMetadata, FileInfo, NameOrPath, SymlinkInfo};
 use async_trait::async_trait;
-use common::{fs, DigestInfo};
-use error::{make_err, Code, Error, ResultExt};
+use common::{fs, log, DigestInfo, JoinHandleDropGuard};
+use error::{make_err, make_input_err, Code, Error, ResultExt};
 use fast_slow_store::FastSlowStore;
 use filesystem_store::FilesystemStore;
-use proto::build::bazel::remote::execution::v2::{Action, Directory as ProtoDirectory};
-use proto::com::github::allada::turbo_cache::remote_execution::{ExecuteFinishedResult, StartExecute};
+use proto::build::bazel::remote::execution::v2::{
+    Action, Command as ProtoCommand, Directory as ProtoDirectory, Directory, DirectoryNode, FileNode, SymlinkNode,
+    Tree as ProtoTree,
+};
+use proto::com::github::allada::turbo_cache::remote_execution::StartExecute;
+use store::Store;
+
+pub type ActionId = [u8; 32];
+
+/// For simplicity we use a fixed exit code for cases when our program is terminated
+/// due to a signal.
+const EXIT_CODE_FOR_SIGNAL: i32 = 9;
 
 /// Aggressively download the digests of files and make a local folder from it. This function
 /// will spawn unbounded number of futures to try and get these downloaded. The store itself
@@ -106,13 +130,13 @@ pub fn download_to_directory<'a>(
             );
         }
 
-        for symlink in directory.symlinks {
-            let dest = format!("{}/{}", current_directory, symlink.name);
+        for symlink_node in directory.symlinks {
+            let dest = format!("{}/{}", current_directory, symlink_node.name);
             futures.push(
                 async move {
-                    fs::symlink(&symlink.target, &dest)
+                    fs::symlink(&symlink_node.target, &dest)
                         .await
-                        .err_tip(|| format!("Could not create symlink {} -> {}", symlink.target, dest))?;
+                        .err_tip(|| format!("Could not create symlink {} -> {}", symlink_node.target, dest))?;
                     Ok(())
                 }
                 .boxed(),
@@ -123,6 +147,169 @@ pub fn download_to_directory<'a>(
         Ok(())
     }
     .boxed()
+}
+
+async fn upload_file<'a>(
+    file_handle: fs::FileSlot<'static>,
+    cas_store: Pin<&'a dyn Store>,
+    full_path: impl AsRef<Path> + Debug,
+) -> Result<FileInfo, Error> {
+    let (digest, mut file_handle) = compute_digest(file_handle)
+        .await
+        .err_tip(|| format!("for {:?}", full_path))?;
+    file_handle.rewind().await.err_tip(|| "Could not rewind file")?;
+    upload_to_store(cas_store, digest.clone(), &mut file_handle)
+        .await
+        .err_tip(|| format!("for {:?}", full_path))?;
+
+    let name = full_path
+        .as_ref()
+        .file_name()
+        .err_tip(|| format!("Expected file_name to exist on {:?}", full_path))?
+        .to_str()
+        .err_tip(|| make_err!(Code::Internal, "Could not convert {:?} to string", full_path))?
+        .to_string();
+    let metadata = file_handle
+        .as_ref()
+        .metadata()
+        .await
+        .err_tip(|| format!("While reading metadata for {:?}", full_path))?;
+    let is_executable = (metadata.mode() & 0o001) != 0;
+    Ok(FileInfo {
+        name_or_path: NameOrPath::Name(name),
+        digest,
+        is_executable,
+    })
+}
+
+async fn upload_symlink(
+    full_path: impl AsRef<Path> + Debug,
+    full_work_directory_path: impl AsRef<Path>,
+) -> Result<SymlinkInfo, Error> {
+    let full_target_path = fs::read_link(full_path.as_ref())
+        .await
+        .err_tip(|| format!("Could not get read_link path of {:?}", full_path))?;
+
+    // Detect if our symlink is inside our work directory, if it is find the
+    // relative path otherwise use the absolute path.
+    let target = if full_target_path.starts_with(full_work_directory_path.as_ref()) {
+        let full_target_path = RelativePath::from_path(&full_target_path)
+            .map_err(|v| make_err!(Code::Internal, "Could not convert {} to RelativePath", v))?;
+        RelativePath::from_path(full_work_directory_path.as_ref())
+            .map_err(|v| make_err!(Code::Internal, "Could not convert {} to RelativePath", v))?
+            .relative(full_target_path)
+            .normalize()
+            .into_string()
+    } else {
+        full_target_path
+            .to_str()
+            .err_tip(|| make_err!(Code::Internal, "Could not convert '{:?}' to string", full_target_path))?
+            .to_string()
+    };
+
+    let name = full_path
+        .as_ref()
+        .file_name()
+        .err_tip(|| format!("Expected file_name to exist on {:?}", full_path))?
+        .to_str()
+        .err_tip(|| make_err!(Code::Internal, "Could not convert {:?} to string", full_path))?
+        .to_string();
+
+    Ok(SymlinkInfo {
+        name_or_path: NameOrPath::Name(name),
+        target,
+    })
+}
+
+fn upload_directory<'a, P: AsRef<Path> + Debug + Send + Sync + Clone + 'a>(
+    cas_store: Pin<&'a dyn Store>,
+    full_dir_path: P,
+    full_work_directory: &'a str,
+) -> BoxFuture<'a, Result<(Directory, VecDeque<ProtoDirectory>), Error>> {
+    Box::pin(async move {
+        let file_futures = FuturesUnordered::new();
+        let dir_futures = FuturesUnordered::new();
+        let symlink_futures = FuturesUnordered::new();
+        {
+            let (_permit, dir_handle) = fs::read_dir(&full_dir_path)
+                .await
+                .err_tip(|| format!("Error reading dir for reading {:?}", full_dir_path))?
+                .into_inner();
+            let mut dir_stream = ReadDirStream::new(dir_handle);
+            while let Some(entry) = dir_stream.next().await {
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(e) => return Err(e).err_tip(|| "Error while iterating directory")?,
+                };
+                let file_type = entry
+                    .file_type()
+                    .await
+                    .err_tip(|| format!("Error running file_type() on {:?}", entry))?;
+                let full_path = full_dir_path.as_ref().join(entry.path());
+                if file_type.is_dir() {
+                    let full_dir_path = full_dir_path.clone();
+                    dir_futures.push(
+                        upload_directory(cas_store, full_path.clone(), &full_work_directory)
+                            .and_then(|(dir, all_dirs)| async move {
+                                let directory_name = full_path
+                                    // .as_ref()
+                                    .file_name()
+                                    .err_tip(|| format!("Expected file_name to exist on {:?}", full_dir_path))?
+                                    .to_str()
+                                    .err_tip(|| {
+                                        make_err!(Code::Internal, "Could not convert {:?} to string", full_dir_path)
+                                    })?
+                                    .to_string();
+
+                                let digest = serialize_and_upload_message(&dir, cas_store)
+                                    .await
+                                    .err_tip(|| format!("for {:?}", full_path))?;
+
+                                Result::<(DirectoryNode, VecDeque<Directory>), Error>::Ok((
+                                    DirectoryNode {
+                                        name: directory_name,
+                                        digest: Some(digest.into()),
+                                    },
+                                    all_dirs,
+                                ))
+                            })
+                            .boxed(),
+                    );
+                } else if file_type.is_file() {
+                    let file_handle = fs::open_file(&full_path)
+                        .await
+                        .err_tip(|| format!("Could not open file {:?}", full_path))?;
+                    file_futures.push(upload_file(file_handle, cas_store, full_path).map_ok(|v| v.into()));
+                } else if file_type.is_symlink() {
+                    symlink_futures.push(upload_symlink(full_path, &full_work_directory).map_ok(|v| v.into()));
+                }
+            }
+        }
+
+        let (file_nodes, dir_entries, symlinks) = try_join3(
+            file_futures.try_collect::<Vec<FileNode>>(),
+            dir_futures.try_collect::<Vec<(DirectoryNode, VecDeque<Directory>)>>(),
+            symlink_futures.try_collect::<Vec<SymlinkNode>>(),
+        )
+        .await?;
+
+        let mut directory_nodes = Vec::with_capacity(dir_entries.len());
+        let mut all_child_directories = VecDeque::with_capacity(dir_entries.len());
+        for (directory_node, mut recursive_child_directories) in dir_entries {
+            directory_nodes.push(directory_node);
+            all_child_directories.append(&mut recursive_child_directories);
+        }
+
+        let directory = Directory {
+            files: file_nodes,
+            directories: directory_nodes,
+            symlinks,
+            node_properties: None, // We don't support file properties.
+        };
+        all_child_directories.push_back(directory.clone());
+
+        Ok((directory, all_child_directories))
+    })
 }
 
 #[async_trait]
@@ -142,45 +329,390 @@ pub trait RunningAction: Sync + Send + Sized + Unpin + 'static {
     /// Returns the final result. As a general rule this action should be thought of as
     /// a consumption of `self`, meaning once a return happens here the lifetime of `Self`
     /// is over and any action performed on it after this call is undefined behavior.
-    async fn get_finished_result(self: Arc<Self>) -> Result<ExecuteFinishedResult, Error>;
+    async fn get_finished_result(self: Arc<Self>) -> Result<ActionResult, Error>;
+}
+
+struct RunningActionImplExecutionResult {
+    stdout: Bytes,
+    stderr: Bytes,
+    exit_code: i32,
+}
+
+struct RunningActionImplState {
+    command_proto: Option<ProtoCommand>,
+    _kill_channel_tx: Option<oneshot::Sender<()>>,
+    kill_channel_rx: Option<oneshot::Receiver<()>>,
+    execution_result: Option<RunningActionImplExecutionResult>,
+    action_result: Option<ActionResult>,
 }
 
 pub struct RunningActionImpl {
-    _action_info: ActionInfo,
-    _cas_store: Pin<Arc<FastSlowStore>>,
-    _filesystem_store: Pin<Arc<FilesystemStore>>,
+    worker_id: String,
+    action_id: ActionId,
+    work_directory: String,
+    action_info: ActionInfo,
+    running_actions_manager: Arc<RunningActionsManagerImpl>,
+    state: Mutex<RunningActionImplState>,
+    did_cleanup: AtomicBool,
 }
 
 impl RunningActionImpl {
-    fn new(action_info: ActionInfo, cas_store: Arc<FastSlowStore>, filesystem_store: Arc<FilesystemStore>) -> Self {
+    fn new(
+        worker_id: String,
+        action_id: ActionId,
+        work_directory: String,
+        action_info: ActionInfo,
+        running_actions_manager: Arc<RunningActionsManagerImpl>,
+    ) -> Self {
+        let (kill_channel_tx, kill_channel_rx) = oneshot::channel();
         Self {
-            _action_info: action_info,
-            _cas_store: Pin::new(cas_store),
-            _filesystem_store: Pin::new(filesystem_store),
+            worker_id,
+            action_id,
+            work_directory,
+            action_info,
+            running_actions_manager,
+            state: Mutex::new(RunningActionImplState {
+                command_proto: None,
+                kill_channel_rx: Some(kill_channel_rx),
+                _kill_channel_tx: Some(kill_channel_tx),
+                execution_result: None,
+                action_result: None,
+            }),
+            did_cleanup: AtomicBool::new(false),
         }
+    }
+
+    fn cas_store_pin(&self) -> Pin<&FastSlowStore> {
+        Pin::new(self.running_actions_manager.cas_store.as_ref())
+    }
+
+    fn filesystem_store_pin(&self) -> Pin<&FilesystemStore> {
+        Pin::new(self.running_actions_manager.filesystem_store.as_ref())
+    }
+}
+
+impl Drop for RunningActionImpl {
+    fn drop(&mut self) {
+        assert!(
+            self.did_cleanup.load(Ordering::Relaxed),
+            "RunningActionImpl did not cleanup. This is a violation of how RunningActionImpl's requirements"
+        );
     }
 }
 
 #[async_trait]
 impl RunningAction for RunningActionImpl {
+    /// Prepares any actions needed to execution this action. This action will do the following:
+    /// * Download any files needed to execute the action
+    /// * Build a folder with all files needed to execute the action.
+    /// This function will aggressively download and spawn potentially thousands of futures. It is
+    /// up to the stores to rate limit if needed.
     async fn prepare_action(self: Arc<Self>) -> Result<Arc<Self>, Error> {
-        unimplemented!();
+        let command = {
+            // Download and build out our input files/folders. Also fetch and decode our Command.
+            let command_fut = async {
+                Ok(
+                    get_and_decode_digest::<ProtoCommand>(self.cas_store_pin(), &self.action_info.command_digest)
+                        .await
+                        .err_tip(|| "Converting command_digest to Command")?,
+                )
+            };
+            // Download the input files/folder and place them into the temp directory.
+            let download_to_directory_fut = download_to_directory(
+                self.cas_store_pin(),
+                self.filesystem_store_pin(),
+                &self.action_info.input_root_digest,
+                &self.work_directory,
+            );
+            let (command, _) = try_join(command_fut, download_to_directory_fut).await?;
+            command
+        };
+        {
+            // Create all directories needed for our output paths. This is required by the bazel spec.
+            let full_work_directory = format!("{}/{}", self.work_directory, command.working_directory);
+            let prepare_output_directories = move |output_file| {
+                let full_output_path = format!("{}/{}", full_work_directory, output_file);
+                async move {
+                    let full_parent_path = Path::new(&full_output_path)
+                        .parent()
+                        .err_tip(|| format!("Parent path for {} has no parent", full_output_path))?;
+                    fs::create_dir_all(full_parent_path)
+                        .await
+                        .err_tip(|| format!("Error creating output directory {} (file)", full_parent_path.display()))?;
+                    Result::<(), Error>::Ok(())
+                }
+            };
+            try_join_all(command.output_paths.iter().map(prepare_output_directories)).await?;
+        }
+        {
+            let mut state = self.state.lock().await;
+            state.command_proto = Some(command);
+        }
+        Ok(self)
     }
 
     async fn execute(self: Arc<Self>) -> Result<Arc<Self>, Error> {
-        unimplemented!();
+        let (command_proto, mut kill_channel_rx) = {
+            let mut state = self.state.lock().await;
+            (
+                state
+                    .command_proto
+                    .take()
+                    .err_tip(|| "Expected state to have command_proto in execute()")?,
+                state
+                    .kill_channel_rx
+                    .take()
+                    .err_tip(|| "Expected state to have kill_channel_rx in execute()")?,
+            )
+        };
+        let args = &command_proto.arguments[..];
+        if args.len() < 1 {
+            return Err(make_input_err!("No arguments provided in Command proto"));
+        }
+        let mut command_builder = process::Command::new(args[0].clone());
+        command_builder
+            .args(&args[1..])
+            .kill_on_drop(true)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .current_dir(format!("{}/{}", self.work_directory, command_proto.working_directory))
+            .env_clear();
+        for environment_variable in &command_proto.environment_variables {
+            command_builder.env(&environment_variable.name, &environment_variable.value);
+        }
+
+        let mut child_process = command_builder
+            .spawn()
+            .err_tip(|| format!("Could not execute command {:?}", command_proto.arguments))?;
+        let mut stdout_stream = ReaderStream::new(
+            child_process
+                .stdout
+                .take()
+                .err_tip(|| "Expected stdout to exist on command this should never happen")?,
+        );
+        let mut stderr_stream = ReaderStream::new(
+            child_process
+                .stderr
+                .take()
+                .err_tip(|| "Expected stderr to exist on command this should never happen")?,
+        );
+
+        let all_stdout_fut = JoinHandleDropGuard::new(tokio::spawn(async move {
+            let mut all_stdout = BytesMut::new();
+            while let Some(chunk) = stdout_stream.next().await {
+                all_stdout.put(chunk.err_tip(|| "Error reading stdout stream")?);
+            }
+            Result::<Bytes, Error>::Ok(all_stdout.freeze())
+        }));
+        let all_stderr_fut = JoinHandleDropGuard::new(tokio::spawn(async move {
+            let mut all_stderr = BytesMut::new();
+            while let Some(chunk) = stderr_stream.next().await {
+                all_stderr.put(chunk.err_tip(|| "Error reading stderr stream")?);
+            }
+            Result::<Bytes, Error>::Ok(all_stderr.freeze())
+        }));
+        loop {
+            tokio::select! {
+                maybe_exit_status = child_process.wait() => {
+                    let exit_status = maybe_exit_status.err_tip(|| "Failed to collect exit code of process")?;
+                    // TODO(allada) We should implement stderr/stdout streaming to client here.
+                    let stdout = all_stdout_fut.await.err_tip(|| "Internal error reading from stdout of worker task")??;
+                    let stderr = all_stderr_fut.await.err_tip(|| "Internal error reading from stderr of worker task")??;
+                    {
+                        let mut state = self.state.lock().await;
+                        state.command_proto = Some(command_proto);
+                        state.execution_result = Some(RunningActionImplExecutionResult{
+                            stdout,
+                            stderr,
+                            exit_code: exit_status.code().unwrap_or(EXIT_CODE_FOR_SIGNAL),
+                        });
+                    }
+                    return Ok(self);
+                },
+                _ = &mut kill_channel_rx => {
+                    if let Err(e) = child_process.start_kill() {
+                        log::error!("Could kill process in RunningActionsManager : {:?}", e);
+                    }
+                },
+            }
+        }
+        // Unreachable.
     }
 
     async fn upload_results(self: Arc<Self>) -> Result<Arc<Self>, Error> {
-        unimplemented!();
+        let (command_proto, execution_result) = {
+            let mut state = self.state.lock().await;
+            (
+                state
+                    .command_proto
+                    .take()
+                    .err_tip(|| "Expected state to have command_proto in execute()")?,
+                state
+                    .execution_result
+                    .take()
+                    .err_tip(|| "Execution result does not exist at upload_results stage")?,
+            )
+        };
+        let cas_store = Pin::new(self.running_actions_manager.cas_store.as_ref());
+        let (stdout_digest, stderr_digest) = {
+            // Upload our stdout/stderr to our CAS store.
+            let stdout_digest_fut = async {
+                let cursor = Cursor::new(execution_result.stdout);
+                let (digest, mut cursor) = compute_digest(cursor).await?;
+                cursor.rewind().await.err_tip(|| "Could not rewind cursor")?;
+                upload_to_store(cas_store, digest.clone(), &mut cursor).await?;
+                Result::<DigestInfo, Error>::Ok(digest)
+            };
+
+            let stderr_digest_fut = async {
+                let cursor = Cursor::new(execution_result.stderr);
+                let (digest, mut cursor) = compute_digest(cursor).await?;
+                cursor.rewind().await.err_tip(|| "Could not rewind cursor")?;
+                upload_to_store(cas_store, digest.clone(), &mut cursor).await?;
+                Result::<DigestInfo, Error>::Ok(digest)
+            };
+
+            let (stdout_digest, stderr_digest) = try_join(stdout_digest_fut, stderr_digest_fut).await?;
+            (stdout_digest, stderr_digest)
+        };
+
+        enum OutputType {
+            None,
+            File(FileInfo),
+            Directory(DirectoryInfo),
+            Symlink(SymlinkInfo),
+        }
+        let full_work_directory = format!("{}/{}", self.work_directory, command_proto.working_directory);
+
+        let mut futures = FuturesUnordered::new();
+        for entry in command_proto.output_paths.into_iter() {
+            let full_work_directory = &full_work_directory; // This ensures we don't move the value.
+            let full_path = format!("{}/{}", full_work_directory, entry);
+            futures.push(async move {
+                let metadata = {
+                    let file_handle = match fs::open_file(&full_path).await {
+                        Ok(handle) => handle,
+                        Err(e) => {
+                            if e.code == Code::NotFound {
+                                // In the event our output does not exist, according to the bazel remote
+                                // execution spec, we simply ignore it continue.
+                                return Result::<OutputType, Error>::Ok(OutputType::None);
+                            }
+                            return Err(e).err_tip(|| format!("Could not open file {}", full_path));
+                        }
+                    };
+                    // We cannot rely on the file_handle's metadata, because it follows symlinks, so
+                    // we need to instead use `symlink_metadata`.
+                    let metadata = fs::symlink_metadata(&full_path)
+                        .await
+                        .err_tip(|| format!("While querying symlink metadata for {}", entry))?;
+                    if metadata.is_file() {
+                        return Ok(OutputType::File(
+                            upload_file(file_handle, cas_store, full_path)
+                                .await
+                                .map(|mut file_info| {
+                                    file_info.name_or_path = NameOrPath::Path(entry);
+                                    file_info
+                                })?,
+                        ));
+                    }
+                    metadata
+                };
+                if metadata.is_dir() {
+                    Ok(OutputType::Directory(
+                        upload_directory(cas_store, full_path, full_work_directory)
+                            .and_then(|(root_dir, children)| async move {
+                                let tree = ProtoTree {
+                                    root: Some(root_dir),
+                                    children: children.into(),
+                                };
+                                let tree_digest = serialize_and_upload_message(&tree, cas_store)
+                                    .await
+                                    .err_tip(|| format!("While processing {}", entry))?;
+                                Ok(DirectoryInfo {
+                                    path: entry,
+                                    tree_digest,
+                                })
+                            })
+                            .await?,
+                    ))
+                } else if metadata.is_symlink() {
+                    Ok(OutputType::Symlink(
+                        upload_symlink(full_path, full_work_directory)
+                            .await
+                            .map(|mut symlink_info| {
+                                symlink_info.name_or_path = NameOrPath::Path(entry);
+                                symlink_info
+                            })?,
+                    ))
+                } else {
+                    Err(make_err!(
+                        Code::Internal,
+                        "{} was not a file, folder or symlink. Must be one.",
+                        full_path
+                    ))
+                }
+            });
+        }
+        let mut output_files = vec![];
+        let mut output_folders = vec![];
+        let mut output_symlinks = vec![];
+        while let Some(output_type) = futures.try_next().await? {
+            match output_type {
+                OutputType::File(output_file) => output_files.push(output_file),
+                OutputType::Directory(output_folder) => output_folders.push(output_folder),
+                OutputType::Symlink(output_symlink) => output_symlinks.push(output_symlink),
+                OutputType::None => { /* Safe to ignore */ }
+            }
+        }
+        drop(futures);
+        {
+            let mut state = self.state.lock().await;
+            state.action_result = Some(ActionResult {
+                output_files,
+                output_folders,
+                output_symlinks,
+                exit_code: execution_result.exit_code,
+                stdout_digest: stdout_digest.into(),
+                stderr_digest: stderr_digest.into(),
+                // TODO(allada) We should implement the timing info here.
+                execution_metadata: ExecutionMetadata {
+                    worker: self.worker_id.to_string(),
+                    queued_timestamp: SystemTime::UNIX_EPOCH,
+                    worker_start_timestamp: SystemTime::UNIX_EPOCH,
+                    worker_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    input_fetch_start_timestamp: SystemTime::UNIX_EPOCH,
+                    input_fetch_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    execution_start_timestamp: SystemTime::UNIX_EPOCH,
+                    execution_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    output_upload_start_timestamp: SystemTime::UNIX_EPOCH,
+                    output_upload_completed_timestamp: SystemTime::UNIX_EPOCH,
+                },
+                server_logs: Default::default(), // TODO(allada) Not implemented.
+            });
+        }
+        Ok(self)
     }
 
     async fn cleanup(self: Arc<Self>) -> Result<Arc<Self>, Error> {
-        unimplemented!();
+        // Note: We need to be careful to keep trying to cleanup even if one of the steps fails.
+        let remove_dir_result = fs::remove_dir_all(&self.work_directory)
+            .await
+            .err_tip(|| format!("Could not remove working directory {}", self.work_directory));
+        self.did_cleanup.store(true, Ordering::Relaxed);
+        if let Err(e) = self.running_actions_manager.cleanup_action(&self.action_id).await {
+            return Result::<Arc<Self>, Error>::Err(e).merge(remove_dir_result.map(|_| self));
+        }
+        remove_dir_result.map(|_| self)
     }
 
-    async fn get_finished_result(self: Arc<Self>) -> Result<ExecuteFinishedResult, Error> {
-        unimplemented!();
+    async fn get_finished_result(self: Arc<Self>) -> Result<ActionResult, Error> {
+        let mut state = self.state.lock().await;
+        state
+            .action_result
+            .take()
+            .err_tip(|| "Expected action_result to exist in get_finished_result")
     }
 }
 
@@ -190,35 +722,46 @@ pub trait RunningActionsManager: Sync + Send + Sized + Unpin + 'static {
 
     async fn create_and_add_action(
         self: Arc<Self>,
+        worker_id: String,
         start_execute: StartExecute,
     ) -> Result<Arc<Self::RunningAction>, Error>;
-}
 
-type ActionId = [u8; 32];
+    async fn get_action(&self, action_id: &ActionId) -> Result<Arc<Self::RunningAction>, Error>;
+}
 
 /// Holds state info about what is being executed and the interface for interacting
 /// with actions while they are running.
 pub struct RunningActionsManagerImpl {
+    root_work_directory: String,
     cas_store: Arc<FastSlowStore>,
     filesystem_store: Arc<FilesystemStore>,
     running_actions: Mutex<HashMap<ActionId, Weak<RunningActionImpl>>>,
 }
 
 impl RunningActionsManagerImpl {
-    pub fn new(cas_store: Arc<FastSlowStore>) -> Result<Self, Error> {
+    pub fn new(root_work_directory: String, cas_store: Arc<FastSlowStore>) -> Result<Self, Error> {
         // Sadly because of some limitations of how Any works we need to clone more times than optimal.
         let filesystem_store = cas_store
-            .fast_slow()
+            .fast_store()
             .clone()
             .as_any()
             .downcast_ref::<Arc<FilesystemStore>>()
             .err_tip(|| "Expected fast slow store for cas_store in RunningActionsManagerImpl")?
             .clone();
         Ok(Self {
+            root_work_directory,
             cas_store,
             filesystem_store,
             running_actions: Mutex::new(HashMap::new()),
         })
+    }
+
+    async fn make_work_directory(&self, action_id: &ActionId) -> Result<String, Error> {
+        let work_directory = format!("{}/{}", self.root_work_directory, hex::encode(action_id));
+        fs::create_dir(&work_directory)
+            .await
+            .err_tip(|| format!("Error creating work directory {}", work_directory))?;
+        Ok(work_directory)
     }
 
     async fn create_action_info(&self, start_execute: StartExecute) -> Result<ActionInfo, Error> {
@@ -238,6 +781,17 @@ impl RunningActionsManagerImpl {
                 .err_tip(|| "Could not create ActionInfo in create_and_add_action()")?,
         )
     }
+
+    async fn cleanup_action(&self, action_id: &ActionId) -> Result<(), Error> {
+        let mut running_actions = self.running_actions.lock().await;
+        running_actions.remove(action_id).err_tip(|| {
+            format!(
+                "Expected action id '{:?}' to exist in RunningActionsManagerImpl",
+                action_id
+            )
+        })?;
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -246,19 +800,32 @@ impl RunningActionsManager for RunningActionsManagerImpl {
 
     async fn create_and_add_action(
         self: Arc<Self>,
+        worker_id: String,
         start_execute: StartExecute,
     ) -> Result<Arc<RunningActionImpl>, Error> {
         let action_info = self.create_action_info(start_execute).await?;
         let action_id = action_info.unique_qualifier.get_hash();
+        let work_directory = self.make_work_directory(&action_id).await?;
         let running_action = Arc::new(RunningActionImpl::new(
+            worker_id,
+            action_id,
+            work_directory,
             action_info,
-            self.cas_store.clone(),
-            self.filesystem_store.clone(),
+            self.clone(),
         ));
         {
             let mut running_actions = self.running_actions.lock().await;
             running_actions.insert(action_id, Arc::downgrade(&running_action));
         }
         Ok(running_action)
+    }
+
+    async fn get_action(&self, action_id: &ActionId) -> Result<Arc<Self::RunningAction>, Error> {
+        let running_actions = self.running_actions.lock().await;
+        Ok(running_actions
+            .get(action_id)
+            .err_tip(|| format!("Action '{:?}' not found", action_id))?
+            .upgrade()
+            .err_tip(|| "Could not upgrade RunningAction Arc")?)
     }
 }

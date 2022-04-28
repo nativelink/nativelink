@@ -54,7 +54,12 @@ rust_library(
     name = "ac_utils",
     srcs = ["ac_utils.rs"],
     deps = [
+        "//third_party:bytes",
+        "//third_party:futures",
         "//third_party:prost",
+        "//third_party:sha2",
+        "//third_party:tokio",
+        "//util:buf_channel",
         "//util:common",
         "//util:error",
         ":store",

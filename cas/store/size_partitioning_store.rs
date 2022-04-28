@@ -73,7 +73,7 @@ impl StoreTrait for SizePartitioningStore {
             .await
     }
 
-    fn as_any(self: Arc<Self>) -> Arc<dyn std::any::Any> {
-        self
+    fn as_any(self: Arc<Self>) -> Box<dyn std::any::Any> {
+        Box::new(self)
     }
 }

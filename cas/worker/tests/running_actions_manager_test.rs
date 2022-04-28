@@ -1,22 +1,30 @@
 // Copyright 2022 Nathan (Blaise) Bruer.  All rights reserved.
 
+use std::collections::HashMap;
 use std::env;
 use std::os::unix::fs::MetadataExt;
 use std::pin::Pin;
+use std::str::from_utf8;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use prost::Message;
 use rand::{thread_rng, Rng};
 
+use ac_utils::{get_and_decode_digest, serialize_and_upload_message};
+use action_messages::{ActionResult, DirectoryInfo, ExecutionMetadata, FileInfo, NameOrPath, SymlinkInfo};
 use common::{fs, DigestInfo};
 use config;
 use error::{Error, ResultExt};
 use fast_slow_store::FastSlowStore;
 use filesystem_store::FilesystemStore;
+use futures::{FutureExt, TryFutureExt};
 use memory_store::MemoryStore;
-use prost::Message;
-use proto::build::bazel::remote::execution::v2::{Directory, DirectoryNode, FileNode, NodeProperties, SymlinkNode};
-use running_actions_manager::download_to_directory;
+use proto::build::bazel::remote::execution::v2::{
+    Action, Command, Directory, DirectoryNode, ExecuteRequest, FileNode, NodeProperties, SymlinkNode, Tree,
+};
+use proto::com::github::allada::turbo_cache::remote_execution::StartExecute;
+use running_actions_manager::{download_to_directory, RunningAction, RunningActionsManager, RunningActionsManagerImpl};
 use store::Store;
 
 /// Get temporary path from either `TEST_TMPDIR` or best effort temp directory if
@@ -313,6 +321,357 @@ mod running_actions_manager_tests {
                 .err_tip(|| "On symlink symlink_metadata")?;
             assert_eq!(symlink_metadata.is_symlink(), true);
         }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn upload_files_test() -> Result<(), Box<dyn std::error::Error>> {
+        let (_, slow_store, cas_store) = setup_stores().await?;
+        let root_work_directory = make_temp_path("root_work_directory");
+        fs::create_dir_all(&root_work_directory).await?;
+        let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(
+            root_work_directory,
+            Pin::into_inner(cas_store.clone()),
+        )?);
+        const WORKER_ID: &str = "foo_worker_id";
+        let action_result = {
+            const SALT: u64 = 55;
+            let command = Command {
+                arguments: vec![
+                    "sh".to_string(),
+                    "-c".to_string(),
+                    "echo -n 123 > test.txt; echo -n foo-stdout; >&2 echo -n bar-stderr".to_string(),
+                ],
+                output_paths: vec!["test.txt".to_string()],
+                working_directory: ".".to_string(),
+                ..Default::default()
+            };
+            let command_digest = serialize_and_upload_message(&command, cas_store.as_ref()).await?;
+            let input_root_digest = serialize_and_upload_message(&Directory::default(), cas_store.as_ref()).await?;
+            let action = Action {
+                command_digest: Some(command_digest.into()),
+                input_root_digest: Some(input_root_digest.into()),
+                ..Default::default()
+            };
+            let action_digest = serialize_and_upload_message(&action, cas_store.as_ref()).await?;
+
+            let running_action_impl = running_actions_manager
+                .create_and_add_action(
+                    WORKER_ID.to_string(),
+                    StartExecute {
+                        execute_request: Some(ExecuteRequest {
+                            action_digest: Some(action_digest.into()),
+                            ..Default::default()
+                        }),
+                        salt: SALT,
+                    },
+                )
+                .await?;
+
+            running_action_impl
+                .clone()
+                .prepare_action()
+                .and_then(|action| action.execute())
+                .and_then(|action| action.upload_results())
+                .and_then(|action| action.get_finished_result())
+                .then(|result| async move {
+                    running_action_impl.cleanup().await?;
+                    result
+                })
+                .await?
+        };
+        assert_eq!(
+            action_result,
+            ActionResult {
+                output_files: vec![FileInfo {
+                    name_or_path: NameOrPath::Path("test.txt".to_string()),
+                    digest: DigestInfo::try_new("a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3", 3)?,
+                    is_executable: false,
+                }],
+                stdout_digest: DigestInfo::try_new(
+                    "426afaf613d8cfdd9fa8addcc030ae6c95a7950ae0301164af1d5851012081d5",
+                    10
+                )?,
+                stderr_digest: DigestInfo::try_new(
+                    "7b2e400d08b8e334e3172d105be308b506c6036c62a9bde5c509d7808b28b213",
+                    10
+                )?,
+                exit_code: 0,
+                output_folders: vec![],
+                output_symlinks: vec![],
+                server_logs: HashMap::new(),
+                execution_metadata: ExecutionMetadata {
+                    worker: WORKER_ID.to_string(),
+                    queued_timestamp: SystemTime::UNIX_EPOCH,
+                    worker_start_timestamp: SystemTime::UNIX_EPOCH,
+                    worker_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    input_fetch_start_timestamp: SystemTime::UNIX_EPOCH,
+                    input_fetch_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    execution_start_timestamp: SystemTime::UNIX_EPOCH,
+                    execution_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    output_upload_start_timestamp: SystemTime::UNIX_EPOCH,
+                    output_upload_completed_timestamp: SystemTime::UNIX_EPOCH,
+                }
+            }
+        );
+        let file_content = slow_store
+            .as_ref()
+            .get_part_unchunked(action_result.output_files[0].digest.clone(), 0, None, None)
+            .await?;
+        assert_eq!(from_utf8(&file_content)?, "123");
+        let stdout_content = slow_store
+            .as_ref()
+            .get_part_unchunked(action_result.stdout_digest.clone(), 0, None, None)
+            .await?;
+        assert_eq!(from_utf8(&stdout_content)?, "foo-stdout");
+        let stderr_content = slow_store
+            .as_ref()
+            .get_part_unchunked(action_result.stderr_digest.clone(), 0, None, None)
+            .await?;
+        assert_eq!(from_utf8(&stderr_content)?, "bar-stderr");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn upload_dir_and_symlink_test() -> Result<(), Box<dyn std::error::Error>> {
+        let (_, slow_store, cas_store) = setup_stores().await?;
+        let root_work_directory = make_temp_path("root_work_directory");
+        fs::create_dir_all(&root_work_directory).await?;
+        let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(
+            root_work_directory,
+            Pin::into_inner(cas_store.clone()),
+        )?);
+        const WORKER_ID: &str = "foo_worker_id";
+        let action_result = {
+            const SALT: u64 = 55;
+            let command = Command {
+                arguments: vec![
+                    "sh".to_string(),
+                    "-c".to_string(),
+                    concat!(
+                        "mkdir -p dir1/dir2 && ",
+                        "echo foo > dir1/file && ",
+                        "touch dir1/file2 && ",
+                        "ln -s ../file dir1/dir2/sym &&",
+                        "ln -s /dev/null empty_sym",
+                    )
+                    .to_string(),
+                ],
+                output_paths: vec!["dir1".to_string(), "empty_sym".to_string()],
+                working_directory: ".".to_string(),
+                ..Default::default()
+            };
+            let command_digest = serialize_and_upload_message(&command, cas_store.as_ref()).await?;
+            let input_root_digest = serialize_and_upload_message(&Directory::default(), cas_store.as_ref()).await?;
+            let action = Action {
+                command_digest: Some(command_digest.into()),
+                input_root_digest: Some(input_root_digest.into()),
+                ..Default::default()
+            };
+            let action_digest = serialize_and_upload_message(&action, cas_store.as_ref()).await?;
+
+            let running_action_impl = running_actions_manager
+                .create_and_add_action(
+                    WORKER_ID.to_string(),
+                    StartExecute {
+                        execute_request: Some(ExecuteRequest {
+                            action_digest: Some(action_digest.into()),
+                            ..Default::default()
+                        }),
+                        salt: SALT,
+                    },
+                )
+                .await?;
+
+            running_action_impl
+                .clone()
+                .prepare_action()
+                .and_then(|action| action.execute())
+                .and_then(|action| action.upload_results())
+                .and_then(|action| action.get_finished_result())
+                .then(|result| async move {
+                    running_action_impl.cleanup().await?;
+                    result
+                })
+                .await?
+        };
+        assert_eq!(
+            action_result,
+            ActionResult {
+                output_files: vec![],
+                stdout_digest: DigestInfo::try_new(
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    0
+                )?,
+                stderr_digest: DigestInfo::try_new(
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    0
+                )?,
+                exit_code: 0,
+                output_folders: vec![DirectoryInfo {
+                    path: "dir1".to_string(),
+                    tree_digest: DigestInfo::try_new(
+                        "64a6fe8e50ccb5ba731986c2239b6c979e3d445b593d35b0acbe0b58f40322aa",
+                        490
+                    )?,
+                }],
+                output_symlinks: vec![SymlinkInfo {
+                    name_or_path: NameOrPath::Path("empty_sym".to_string()),
+                    target: "/dev/null".to_string(),
+                }],
+                server_logs: HashMap::new(),
+                execution_metadata: ExecutionMetadata {
+                    worker: WORKER_ID.to_string(),
+                    queued_timestamp: SystemTime::UNIX_EPOCH,
+                    worker_start_timestamp: SystemTime::UNIX_EPOCH,
+                    worker_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    input_fetch_start_timestamp: SystemTime::UNIX_EPOCH,
+                    input_fetch_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    execution_start_timestamp: SystemTime::UNIX_EPOCH,
+                    execution_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    output_upload_start_timestamp: SystemTime::UNIX_EPOCH,
+                    output_upload_completed_timestamp: SystemTime::UNIX_EPOCH,
+                }
+            }
+        );
+        let tree =
+            get_and_decode_digest::<Tree>(slow_store.as_ref(), &action_result.output_folders[0].tree_digest).await?;
+        let root_directory = Directory {
+            files: vec![
+                FileNode {
+                    name: "file2".to_string(),
+                    digest: Some(
+                        DigestInfo::try_new("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 0)?
+                            .into(),
+                    ),
+                    ..Default::default()
+                },
+                FileNode {
+                    name: "file".to_string(),
+                    digest: Some(
+                        DigestInfo::try_new("b5bb9d8014a0f9b1d61e21e796d78dccdf1352f23cd32812f4850b878ae4944c", 4)?
+                            .into(),
+                    ),
+                    ..Default::default()
+                },
+            ],
+            directories: vec![DirectoryNode {
+                name: "dir2".to_string(),
+                digest: Some(
+                    DigestInfo::try_new("cce0098e0b0f1d785edb0da50beedb13e27dcd459b091b2f8f82543cb7cd0527", 16)?.into(),
+                ),
+            }],
+            ..Default::default()
+        };
+        assert_eq!(
+            tree,
+            Tree {
+                root: Some(root_directory.clone()),
+                children: vec![
+                    Directory {
+                        symlinks: vec![SymlinkNode {
+                            name: "sym".to_string(),
+                            target: "../file".to_string(),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    },
+                    root_directory
+                ],
+                ..Default::default()
+            }
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn cleanup_happens_on_job_failure() -> Result<(), Box<dyn std::error::Error>> {
+        let (_, _, cas_store) = setup_stores().await?;
+        let root_work_directory = make_temp_path("root_work_directory");
+        fs::create_dir_all(&root_work_directory).await?;
+        let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(
+            root_work_directory.clone(),
+            Pin::into_inner(cas_store.clone()),
+        )?);
+        const WORKER_ID: &str = "foo_worker_id";
+        let action_result = {
+            const SALT: u64 = 55;
+            let command = Command {
+                arguments: vec!["sh".to_string(), "-c".to_string(), "exit 33".to_string()],
+                output_paths: vec![],
+                working_directory: ".".to_string(),
+                ..Default::default()
+            };
+            let command_digest = serialize_and_upload_message(&command, cas_store.as_ref()).await?;
+            let input_root_digest = serialize_and_upload_message(&Directory::default(), cas_store.as_ref()).await?;
+            let action = Action {
+                command_digest: Some(command_digest.into()),
+                input_root_digest: Some(input_root_digest.into()),
+                ..Default::default()
+            };
+            let action_digest = serialize_and_upload_message(&action, cas_store.as_ref()).await?;
+
+            let running_action_impl = running_actions_manager
+                .create_and_add_action(
+                    WORKER_ID.to_string(),
+                    StartExecute {
+                        execute_request: Some(ExecuteRequest {
+                            action_digest: Some(action_digest.into()),
+                            ..Default::default()
+                        }),
+                        salt: SALT,
+                    },
+                )
+                .await?;
+
+            running_action_impl
+                .clone()
+                .prepare_action()
+                .and_then(|action| action.execute())
+                .and_then(|action| action.upload_results())
+                .and_then(|action| action.get_finished_result())
+                .then(|result| async move {
+                    running_action_impl.cleanup().await?;
+                    result
+                })
+                .await?
+        };
+        assert_eq!(
+            action_result,
+            ActionResult {
+                output_files: vec![],
+                stdout_digest: DigestInfo::try_new(
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    0
+                )?,
+                stderr_digest: DigestInfo::try_new(
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    0
+                )?,
+                exit_code: 33,
+                output_folders: vec![],
+                output_symlinks: vec![],
+                server_logs: HashMap::new(),
+                execution_metadata: ExecutionMetadata {
+                    worker: WORKER_ID.to_string(),
+                    queued_timestamp: SystemTime::UNIX_EPOCH,
+                    worker_start_timestamp: SystemTime::UNIX_EPOCH,
+                    worker_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    input_fetch_start_timestamp: SystemTime::UNIX_EPOCH,
+                    input_fetch_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    execution_start_timestamp: SystemTime::UNIX_EPOCH,
+                    execution_completed_timestamp: SystemTime::UNIX_EPOCH,
+                    output_upload_start_timestamp: SystemTime::UNIX_EPOCH,
+                    output_upload_completed_timestamp: SystemTime::UNIX_EPOCH,
+                }
+            }
+        );
+        let mut dir_stream = fs::read_dir(&root_work_directory).await?;
+        assert!(
+            dir_stream.as_mut().next_entry().await?.is_none(),
+            "Expected empty directory at {}",
+            root_work_directory
+        );
         Ok(())
     }
 }

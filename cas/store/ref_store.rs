@@ -105,7 +105,7 @@ impl StoreTrait for RefStore {
         Pin::new(store.as_ref()).get_part(digest, writer, offset, length).await
     }
 
-    fn as_any(self: Arc<Self>) -> Arc<dyn std::any::Any> {
-        self
+    fn as_any(self: Arc<Self>) -> Box<dyn std::any::Any> {
+        Box::new(self)
     }
 }

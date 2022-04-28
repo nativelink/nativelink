@@ -16,8 +16,8 @@ use prost::Message;
 use prost_types::Any;
 use proto::build::bazel::remote::execution::v2::{
     execution_stage, Action, ActionResult as ProtoActionResult, ExecuteOperationMetadata, ExecuteRequest,
-    ExecuteResponse, ExecutedActionMetadata, FileNode, LogFile, OutputDirectory, OutputFile, OutputSymlink,
-    SymlinkNode,
+    ExecuteResponse, ExecutedActionMetadata, ExecutionPolicy, FileNode, LogFile, OutputDirectory, OutputFile,
+    OutputSymlink, Platform, SymlinkNode,
 };
 use proto::google::longrunning::{operation::Result as LongRunningResult, Operation};
 
@@ -112,16 +112,13 @@ impl ActionInfo {
                 .try_into()?,
             timeout: action
                 .timeout
-                .err_tip(|| "Expected timeout to exist on Action")?
+                .unwrap_or(prost_types::Duration::default())
                 .try_into()
                 .map_err(|_| make_input_err!("Failed convert proto duration to system duration"))?,
-            platform_properties: action
-                .platform
-                .err_tip(|| "Expected platform to exist on Action")?
-                .try_into()?,
+            platform_properties: action.platform.unwrap_or(Platform::default()).try_into()?,
             priority: execute_request
                 .execution_policy
-                .err_tip(|| "Expected execution_policy to exist on ExecuteRequest")?
+                .unwrap_or(ExecutionPolicy::default())
                 .priority,
             insert_timestamp: SystemTime::UNIX_EPOCH, // We can't know it at this point.
             unique_qualifier: ActionInfoHashKey {
