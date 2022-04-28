@@ -1,5 +1,6 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
+use std::fmt::{Debug, Formatter};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -26,7 +27,6 @@ use traits::{StoreTrait, UploadSizeInfo};
 // Default size to allocate memory of the buffer when reading files.
 const DEFAULT_BUFF_SIZE: usize = 32 * 1024;
 
-#[derive(Debug)]
 struct FileEntry {
     digest: DigestInfo,
     file_size: u64,
@@ -34,6 +34,7 @@ struct FileEntry {
     content_path: Arc<String>,
     // Will be the name of the file in the temp_path if it is flagged for deletion.
     pending_delete_file_name: AtomicU64,
+    file_evicted_callback: Option<&'static (dyn Fn() + Sync)>,
 }
 
 impl FileEntry {
@@ -52,6 +53,18 @@ impl FileEntry {
     #[inline]
     fn flag_moved_to_temp_file(&self, rand_file_name: u64) {
         self.pending_delete_file_name.store(rand_file_name, Ordering::Relaxed);
+    }
+}
+
+impl Debug for FileEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("FileEntry")
+            .field("digest", &self.digest)
+            .field("file_size", &self.file_size)
+            .field("temp_path", &self.temp_path)
+            .field("content_path", &self.content_path)
+            .field("pending_delete_file_name", &self.pending_delete_file_name)
+            .finish()
     }
 }
 
@@ -109,6 +122,7 @@ impl Drop for FileEntry {
         if pending_delete_file_name == 0 {
             return;
         }
+        let file_evicted_callback = self.file_evicted_callback.take();
         let full_temp_path = to_full_path(&self.temp_path, &pending_delete_file_name.to_string());
         tokio::spawn(async move {
             log::info!("\x1b[0;31mFilesystem Store\x1b[0m: Store deleting: {}", &full_temp_path);
@@ -118,6 +132,9 @@ impl Drop for FileEntry {
                     full_temp_path,
                     err
                 );
+            }
+            if let Some(callback) = file_evicted_callback {
+                (callback)();
             }
         });
     }
@@ -162,6 +179,7 @@ async fn add_files_to_cache(
             temp_path: temp_path.clone(),
             content_path: content_path.clone(),
             pending_delete_file_name: AtomicU64::new(0),
+            file_evicted_callback: None,
         };
         let time_since_anchor = anchor_time
             .duration_since(atime)
@@ -252,9 +270,19 @@ pub struct FilesystemStore {
     content_path: Arc<String>,
     evicting_map: EvictingMap<Arc<FileEntry>, SystemTime>,
     read_buffer_size: usize,
+    file_evicted_callback: Option<&'static (dyn Fn() + Sync)>,
 }
 
 impl FilesystemStore {
+    pub async fn new_with_callback(
+        config: &config::backends::FilesystemStore,
+        file_evicted_callback: &'static (dyn Fn() + Sync),
+    ) -> Result<Self, Error> {
+        let mut me = Self::new(config).await?;
+        me.file_evicted_callback = Some(file_evicted_callback);
+        Ok(me)
+    }
+
     pub async fn new(config: &config::backends::FilesystemStore) -> Result<Self, Error> {
         let now = SystemTime::now();
 
@@ -284,6 +312,7 @@ impl FilesystemStore {
             content_path: Arc::new(config.content_path.clone()),
             evicting_map,
             read_buffer_size,
+            file_evicted_callback: None,
         };
         Ok(store)
     }
@@ -295,7 +324,7 @@ impl FilesystemStore {
     async fn update_file<'a>(
         self: Pin<&Self>,
         temp_loc: &str,
-        temp_file: &mut fs::FileSlot<'a>,
+        mut temp_file: fs::FileSlot<'a>,
         temp_name_num: u64,
         digest: DigestInfo,
         mut reader: DropCloserReadHalf,
@@ -323,12 +352,15 @@ impl FilesystemStore {
             .await
             .err_tip(|| format!("Failed to sync_data in filesystem store {}", temp_loc))?;
 
+        drop(temp_file);
+
         let entry = Arc::new(FileEntry {
             digest: digest.clone(),
             file_size,
             temp_path: self.temp_path.clone(),
             content_path: self.content_path.clone(),
             pending_delete_file_name: AtomicU64::new(0),
+            file_evicted_callback: self.file_evicted_callback,
         });
 
         let final_loc = to_full_path_from_digest(&self.content_path, &digest);
@@ -386,12 +418,12 @@ impl StoreTrait for FilesystemStore {
         let temp_name_num = thread_rng().gen::<u64>();
         let temp_full_path = to_full_path(&self.temp_path, &temp_name_num.to_string());
 
-        let mut temp_file = fs::create_file(&temp_full_path)
+        let temp_file = fs::create_file(&temp_full_path)
             .await
             .err_tip(|| "Failed to create temp file in filesystem store")?;
 
         if let Err(err) = self
-            .update_file(&temp_full_path, &mut temp_file, temp_name_num, digest, reader)
+            .update_file(&temp_full_path, temp_file, temp_name_num, digest, reader)
             .await
         {
             let result = fs::remove_file(temp_full_path)
