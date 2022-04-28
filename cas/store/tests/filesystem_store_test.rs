@@ -2,18 +2,20 @@
 
 use std::env;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
+
+use filetime::{set_file_atime, FileTime};
+use rand::{thread_rng, Rng};
+use tokio::io::AsyncReadExt;
+use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 
 use buf_channel::{make_buf_channel_pair, DropCloserReadHalf};
 use common::{fs, DigestInfo};
 use config;
 use error::{Error, ResultExt};
 use filesystem_store::FilesystemStore;
-use filetime::{set_file_atime, FileTime};
-use rand::{thread_rng, Rng};
-use tokio::io::AsyncReadExt;
-use tokio_stream::{wrappers::ReadDirStream, StreamExt};
 use traits::StoreTrait;
 
 /// Get temporary path from either `TEST_TMPDIR` or best effort temp directory if
@@ -98,16 +100,24 @@ mod filesystem_store_tests {
         let content_path = make_temp_path("content_path");
         let temp_path = make_temp_path("temp_path");
 
+        static DELETES_FINISHED: AtomicU32 = AtomicU32::new(0);
+        fn on_file_delete() {
+            DELETES_FINISHED.fetch_add(1, Ordering::Relaxed);
+        }
+
         let store = Box::pin(
-            FilesystemStore::new(&config::backends::FilesystemStore {
-                content_path: content_path.clone(),
-                temp_path: temp_path.clone(),
-                eviction_policy: Some(config::backends::EvictionPolicy {
-                    max_count: 3,
+            FilesystemStore::new_with_callback(
+                &config::backends::FilesystemStore {
+                    content_path: content_path.clone(),
+                    temp_path: temp_path.clone(),
+                    eviction_policy: Some(config::backends::EvictionPolicy {
+                        max_count: 3,
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            })
+                },
+                &on_file_delete,
+            )
             .await?,
         );
 
@@ -130,14 +140,18 @@ mod filesystem_store_tests {
             assert_eq!(&data[..], VALUE2.as_bytes(), "Expected file content to match");
         }
 
+        loop {
+            if DELETES_FINISHED.load(Ordering::Relaxed) == 1 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+
         let (_permit, temp_dir_handle) = fs::read_dir(temp_path.clone())
             .await
             .err_tip(|| "Failed opening temp directory")?
             .into_inner();
         let mut read_dir_stream = ReadDirStream::new(temp_dir_handle);
-
-        // Ensure we let any background tasks finish.
-        tokio::task::yield_now().await;
 
         while let Some(temp_dir_entry) = read_dir_stream.next().await {
             let path = temp_dir_entry?.path();
@@ -156,16 +170,24 @@ mod filesystem_store_tests {
         let content_path = make_temp_path("content_path");
         let temp_path = make_temp_path("temp_path");
 
+        static DELETES_FINISHED: AtomicU32 = AtomicU32::new(0);
+        fn on_file_delete() {
+            DELETES_FINISHED.fetch_add(1, Ordering::Relaxed);
+        }
+
         let store = Arc::new(
-            FilesystemStore::new(&config::backends::FilesystemStore {
-                content_path: content_path.clone(),
-                temp_path: temp_path.clone(),
-                eviction_policy: Some(config::backends::EvictionPolicy {
-                    max_count: 3,
-                    ..Default::default()
-                }),
-                read_buffer_size: 1,
-            })
+            FilesystemStore::new_with_callback(
+                &config::backends::FilesystemStore {
+                    content_path: content_path.clone(),
+                    temp_path: temp_path.clone(),
+                    eviction_policy: Some(config::backends::EvictionPolicy {
+                        max_count: 3,
+                        ..Default::default()
+                    }),
+                    read_buffer_size: 1,
+                },
+                &on_file_delete,
+            )
             .await?,
         );
 
@@ -225,8 +247,12 @@ mod filesystem_store_tests {
             "Expected file content to match"
         );
 
-        // Ensure we let any background tasks finish.
-        tokio::task::yield_now().await;
+        loop {
+            if DELETES_FINISHED.load(Ordering::Relaxed) == 1 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
 
         {
             // Now ensure our temp file was cleaned up.
