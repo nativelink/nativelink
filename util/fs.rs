@@ -244,3 +244,11 @@ pub async fn symlink_metadata(path: impl AsRef<Path>) -> Result<Metadata, Error>
         .map_err(|e| make_err!(Code::Internal, "Open file semaphore closed {:?}", e))?;
     tokio::fs::symlink_metadata(path).await.map_err(|e| e.into())
 }
+
+pub async fn remove_dir_all(path: impl AsRef<Path>) -> Result<(), Error> {
+    let _permit = OPEN_FILE_SEMAPHORE
+        .acquire()
+        .await
+        .map_err(|e| make_err!(Code::Internal, "Open file semaphore closed {:?}", e))?;
+    tokio::fs::remove_dir_all(path).await.map_err(|e| e.into())
+}

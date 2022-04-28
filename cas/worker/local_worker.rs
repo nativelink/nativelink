@@ -10,6 +10,7 @@ use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tonic::{transport::Channel as TonicChannel, Streaming};
 
+use action_messages::{ActionResult, ActionStage};
 use common::log;
 use config::cas_server::LocalWorkerConfig;
 use error::{make_err, make_input_err, Code, Error, ResultExt};
@@ -119,22 +120,44 @@ impl<'a, T: WorkerApiClientTrait, U: RunningActionsManager> LocalWorkerImpl<'a, 
                         Update::StartAction(start_execute) => {
                             let add_future_channel = add_future_channel.clone();
                             let mut grpc_client = self.grpc_client.clone();
+                            let salt = start_execute.salt.clone();
+                            let worker_id = self.worker_id.clone();
+                            let action_digest = start_execute.execute_request.as_ref().map_or(None, |v| v.action_digest.clone());
                             let start_action_fut = self
                                 .running_actions_manager
                                 .clone()
-                                .create_and_add_action(start_execute)
-                                .and_then(|action| action.prepare_action())
-                                .and_then(|action| action.execute())
-                                .and_then(|action| action.upload_results())
-                                .and_then(|action| action.cleanup())
-                                .and_then(|action| action.get_finished_result());
+                                .create_and_add_action(worker_id.clone(), start_execute)
+                                .and_then(|action|
+                                    action
+                                        .clone()
+                                        .prepare_action()
+                                        .and_then(|action| action.execute())
+                                        .and_then(|action| action.upload_results())
+                                        .and_then(|action| action.get_finished_result())
+                                        // Note: We need ensure we run cleanup even if one of the other steps fail.
+                                        .then(|result| async move {
+                                            if let Err(e) = action.cleanup().await {
+                                                return Result::<ActionResult, Error>::Err(e).merge(result);
+                                            }
+                                            result
+                                        })
+                                );
 
-                            let make_publish_future = move |res: Result<ExecuteFinishedResult, Error>| async move {
+                            let make_publish_future = move |res: Result<ActionResult, Error>| async move {
                                 match res {
-                                    Ok(finished_result) => {
-                                        grpc_client.execution_response(ExecuteResult{
-                                            response: Some(execute_result::Response::Result(finished_result)),
-                                        }).await.err_tip(|| "Error while calling execution_response")?;
+                                    Ok(action_result) => {
+                                        grpc_client.execution_response(
+                                            ExecuteResult{
+                                                response: Some(execute_result::Response::Result(ExecuteFinishedResult{
+                                                    worker_id,
+                                                    action_digest,
+                                                    salt,
+                                                    execute_response: Some(ActionStage::Completed(action_result).into()),
+                                                })),
+                                            }
+                                        )
+                                        .await
+                                        .err_tip(|| "Error while calling execution_response")?;
                                     },
                                     Err(e) => {
                                         grpc_client.execution_response(ExecuteResult{
@@ -189,7 +212,11 @@ pub fn new_local_worker(
         .downcast_ref::<Arc<FastSlowStore>>()
         .err_tip(|| "Expected store for LocalWorker's store to be a FastSlowStore")?
         .clone();
-    let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(fast_slow_store)?).clone();
+    let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(
+        config.work_directory.clone(),
+        fast_slow_store,
+    )?)
+    .clone();
     Ok(LocalWorker::new_with_connection_factory_and_actions_manager(
         config.clone(),
         running_actions_manager,

@@ -33,7 +33,7 @@ impl FastSlowStore {
         Self { fast_store, slow_store }
     }
 
-    pub fn fast_slow<'a>(&'a self) -> &'a Arc<dyn StoreTrait> {
+    pub fn fast_store<'a>(&'a self) -> &'a Arc<dyn StoreTrait> {
         &self.fast_store
     }
 
@@ -211,7 +211,7 @@ impl StoreTrait for FastSlowStore {
         Ok(())
     }
 
-    fn as_any(self: Arc<Self>) -> Arc<dyn std::any::Any> {
-        self
+    fn as_any(self: Arc<Self>) -> Box<dyn std::any::Any> {
+        Box::new(self)
     }
 }

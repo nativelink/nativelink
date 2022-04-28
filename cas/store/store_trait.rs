@@ -95,5 +95,6 @@ pub trait StoreTrait: Sync + Send + Unpin {
             .merge(data_res.err_tip(|| "Failed to read stream to completion in get_part_unchunked"))
     }
 
-    fn as_any(self: Arc<Self>) -> Arc<dyn std::any::Any>;
+    /// Expect the returned Any to be `Arc<Self>`.
+    fn as_any(self: Arc<Self>) -> Box<dyn std::any::Any>;
 }

@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime};
 use prost::Message;
 use tonic::Response;
 
-use action_messages::{ActionInfo, ActionInfoHashKey};
+use action_messages::{ActionInfo, ActionInfoHashKey, ActionResult, ActionStage, ExecutionMetadata};
 use common::{encode_stream_proto, DigestInfo};
 use config::cas_server::WrokerProperty;
 use error::{make_input_err, Error};
@@ -131,6 +131,7 @@ mod local_worker_tests {
         }
 
         const SALT: u64 = 1000;
+        let action_digest = DigestInfo::new([03u8; 32], 10);
         let action_info = ActionInfo {
             instance_name: "foo".to_string(),
             command_digest: DigestInfo::new([01u8; 32], 10),
@@ -140,7 +141,7 @@ mod local_worker_tests {
             priority: 0,
             insert_timestamp: SystemTime::UNIX_EPOCH,
             unique_qualifier: ActionInfoHashKey {
-                digest: DigestInfo::new([03u8; 32], 10),
+                digest: action_digest.clone(),
                 salt: SALT,
             },
         };
@@ -157,11 +158,26 @@ mod local_worker_tests {
                 .await
                 .map_err(|e| make_input_err!("Could not send : {:?}", e))?;
         }
-        let execute_finished_result = ExecuteFinishedResult {
-            worker_id: "1234".to_string(),
-            action_digest: Some(DigestInfo::new([11u8; 32], 10).into()),
-            salt: 123,
-            execute_response: None,
+        let action_result = ActionResult {
+            output_files: vec![],
+            output_folders: vec![],
+            output_symlinks: vec![],
+            exit_code: 5,
+            stdout_digest: DigestInfo::new([21u8; 32], 10),
+            stderr_digest: DigestInfo::new([22u8; 32], 10),
+            execution_metadata: ExecutionMetadata {
+                worker: expected_worker_id.clone(),
+                queued_timestamp: SystemTime::UNIX_EPOCH,
+                worker_start_timestamp: SystemTime::UNIX_EPOCH,
+                worker_completed_timestamp: SystemTime::UNIX_EPOCH,
+                input_fetch_start_timestamp: SystemTime::UNIX_EPOCH,
+                input_fetch_completed_timestamp: SystemTime::UNIX_EPOCH,
+                execution_start_timestamp: SystemTime::UNIX_EPOCH,
+                execution_completed_timestamp: SystemTime::UNIX_EPOCH,
+                output_upload_start_timestamp: SystemTime::UNIX_EPOCH,
+                output_upload_completed_timestamp: SystemTime::UNIX_EPOCH,
+            },
+            server_logs: HashMap::new(),
         };
         let running_action = Arc::new(MockRunningAction::new());
 
@@ -174,7 +190,7 @@ mod local_worker_tests {
         // Now the RunningAction needs to send a series of state updates. This shortcuts them
         // into a single call (shortcut for prepare, execute, upload, collect_results, cleanup).
         running_action
-            .simple_expect_get_finished_result(Ok(execute_finished_result.clone()))
+            .simple_expect_get_finished_result(Ok(action_result.clone()))
             .await?;
 
         // Now our client should be notified that our runner finished.
@@ -187,7 +203,12 @@ mod local_worker_tests {
         assert_eq!(
             execution_response,
             ExecuteResult {
-                response: Some(execute_result::Response::Result(execute_finished_result))
+                response: Some(execute_result::Response::Result(ExecuteFinishedResult {
+                    worker_id: expected_worker_id,
+                    action_digest: Some(action_digest.into()),
+                    salt: SALT,
+                    execute_response: Some(ActionStage::Completed(action_result).into()),
+                }))
             }
         );
 
