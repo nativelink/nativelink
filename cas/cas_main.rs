@@ -96,13 +96,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for worker_cfg in cfg.workers.unwrap_or(vec![]) {
         let spawn_fut = match worker_cfg {
             WorkerConfig::local(local_worker_cfg) => {
-                let cas_store = store_manager.get_store(&local_worker_cfg.cas_store).err_tip(|| {
+                let fast_slow_store = store_manager.get_store(&local_worker_cfg.cas_fast_slow_store).err_tip(|| {
                     format!(
                         "Failed to find store for cas_store_ref in worker config : {}",
-                        local_worker_cfg.cas_store
+                        local_worker_cfg.cas_fast_slow_store
                     )
                 })?;
-                let local_worker = new_local_worker(Arc::new(local_worker_cfg), cas_store.clone())
+                let local_worker = new_local_worker(Arc::new(local_worker_cfg), fast_slow_store.clone())
                     .err_tip(|| "Could not make LocalWorker")?;
                 tokio::spawn(local_worker.run())
             }

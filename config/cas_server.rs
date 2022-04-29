@@ -213,23 +213,12 @@ pub struct LocalWorkerConfig {
     /// command like: "run.sh sleep 5".
     pub entrypoint_cmd: String,
 
-    /// Reference to a filesystem store (runtime enforced). This store will be used
-    /// to store a local cache of files for optimization purposes.
-    /// Must be a reference to a store implementing backends::FilesystemStore.
-    /// Note: Internally we will combine `cas_store` and this store into a
-    /// FastSlowStore. This has two effects, there will be non-file objects (like
-    /// execution proto results) and filesystem will be the `fast` store. This
-    /// means you likely don't need a layer of caching for `cas_store`.
-    pub local_filesystem_store_ref: StoreRefName,
-
     /// Underlying CAS store that the worker will use to download CAS artifacts.
-    /// This store must have the same objects that the scheduler/client-cas uses.
-    /// The scheduler will send job requests that will reference objects stored
-    /// in this store. If the objects referenced in the job request don't exist
-    /// in this store an error may be returned.
-    /// Note: We may combine this store with `local_filesystem_store_ref`.
-    /// See comment above for more info.
-    pub cas_store: StoreRefName,
+    /// This store must be a `FastSlowStore`. The `fast` store must be a
+    /// `FileSystemStore` because it will use hardlinks when building out the files
+    /// instead of copying the files. The slow store must eventually resolve to the
+    /// same store the scheduler/client uses to send job requests.
+    pub cas_fast_slow_store: StoreRefName,
 
     /// Underlying AC store that the worker will use to publish execution results
     /// into. Objects placed in this store should be reachable from the

@@ -3,26 +3,35 @@
     "CAS_MAIN_STORE": {
       "memory": {
         "eviction_policy": {
-          // 100mb.
-          "max_bytes": 100000000,
+          // 1gb.
+          "max_bytes": 1000000000,
         }
       }
     },
     "AC_MAIN_STORE": {
       "memory": {
         "eviction_policy": {
-          // 10mb.
-          "max_bytes": 10000000,
+          // 100mb.
+          "max_bytes": 100000000,
         }
       }
     },
-    "WORKER_FILESYSTEM_STORE": {
-      "filesystem": {
-        "content_path": "/tmp/turbo_cache/data/content_path-cas",
-        "temp_path": "/tmp/turbo_cache/data/tmp_path-cas",
-        "eviction_policy": {
-          // 2gb.
-          "max_bytes": 2000000000,
+    "WORKER_FAST_SLOW_STORE": {
+      "fast_slow": {
+        "fast": {
+          "filesystem": {
+            "content_path": "/tmp/turbo_cache/data-worker-test/content_path-cas",
+            "temp_path": "/tmp/turbo_cache/data-worker-test/tmp_path-cas",
+            "eviction_policy": {
+              // 2gb.
+              "max_bytes": 2000000000,
+            }
+          }
+        },
+        "slow": {
+          "ref_store": {
+            "name": "CAS_MAIN_STORE",
+          }
         }
       }
     }
@@ -51,11 +60,10 @@
   "workers": [{
     "local": {
       "worker_api_endpoint": {
-        "uri": "127.0.0.1:50061",
+        "uri": "grpc://127.0.0.1:50061",
       },
       "entrypoint_cmd": "./examples/worker/local_entrypoint.sh $@",
-      "local_filesystem_store_ref": "WORKER_FILESYSTEM_STORE",
-      "cas_store": "CAS_MAIN_STORE",
+      "cas_fast_slow_store": "WORKER_FAST_SLOW_STORE",
       "ac_store": "AC_MAIN_STORE",
       "work_directory": "/tmp/turbo_cache/work",
       "platform_properties": {
