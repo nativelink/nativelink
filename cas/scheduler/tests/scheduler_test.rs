@@ -477,9 +477,13 @@ mod scheduler_tests {
                 path: "123".to_string(),
                 tree_digest: DigestInfo::new([9u8; 32], 100),
             }],
-            output_symlinks: vec![SymlinkInfo {
+            output_file_symlinks: vec![SymlinkInfo {
                 name_or_path: NameOrPath::Name("foo".to_string()),
                 target: "bar".to_string(),
+            }],
+            output_directory_symlinks: vec![SymlinkInfo {
+                name_or_path: NameOrPath::Name("foo2".to_string()),
+                target: "bar2".to_string(),
             }],
             exit_code: 0,
             stdout_digest: DigestInfo::new([6u8; 32], 19),
@@ -554,7 +558,8 @@ mod scheduler_tests {
         let action_result = ActionResult {
             output_files: Default::default(),
             output_folders: Default::default(),
-            output_symlinks: Default::default(),
+            output_file_symlinks: Default::default(),
+            output_directory_symlinks: Default::default(),
             exit_code: 0,
             stdout_digest: DigestInfo::new([6u8; 32], 19),
             stderr_digest: DigestInfo::new([7u8; 32], 20),

@@ -300,7 +300,11 @@ pub mod execution_response_tests {
                             contents: Default::default(), // We don't implement this.
                             node_properties: None,
                         }],
-                        output_file_symlinks: Default::default(), // Bazel deprecated this.
+                        output_file_symlinks: vec![OutputSymlink {
+                            path: "some path3".to_string(),
+                            target: "some target3".to_string(),
+                            node_properties: None,
+                        }],
                         output_symlinks: vec![OutputSymlink {
                             path: "some path3".to_string(),
                             target: "some target3".to_string(),

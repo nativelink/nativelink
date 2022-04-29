@@ -39,7 +39,8 @@ mod action_messages_tests {
         let execute_response: ExecuteResponse = ActionStage::Completed(ActionResult {
             output_files: vec![],
             output_folders: vec![],
-            output_symlinks: vec![],
+            output_file_symlinks: vec![],
+            output_directory_symlinks: vec![],
             exit_code: 0,
             stdout_digest: DigestInfo::new([2u8; 32], 5),
             stderr_digest: DigestInfo::new([3u8; 32], 5),

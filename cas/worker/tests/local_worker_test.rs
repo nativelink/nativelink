@@ -161,7 +161,8 @@ mod local_worker_tests {
         let action_result = ActionResult {
             output_files: vec![],
             output_folders: vec![],
-            output_symlinks: vec![],
+            output_file_symlinks: vec![],
+            output_directory_symlinks: vec![],
             exit_code: 5,
             stdout_digest: DigestInfo::new([21u8; 32], 10),
             stderr_digest: DigestInfo::new([22u8; 32], 10),

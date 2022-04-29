@@ -476,7 +476,8 @@ impl TryFrom<ExecutedActionMetadata> for ExecutionMetadata {
 pub struct ActionResult {
     pub output_files: Vec<FileInfo>,
     pub output_folders: Vec<DirectoryInfo>,
-    pub output_symlinks: Vec<SymlinkInfo>,
+    pub output_directory_symlinks: Vec<SymlinkInfo>,
+    pub output_file_symlinks: Vec<SymlinkInfo>,
     pub exit_code: i32,
     pub stdout_digest: DigestInfo,
     pub stderr_digest: DigestInfo,
@@ -561,19 +562,33 @@ impl Into<ExecuteResponse> for ActionStage {
             );
         }
 
+        let mut output_symlinks = Vec::with_capacity(
+            action_result.output_file_symlinks.len() + action_result.output_directory_symlinks.len(),
+        );
+        output_symlinks.extend_from_slice(action_result.output_file_symlinks.as_slice());
+        output_symlinks.extend_from_slice(action_result.output_directory_symlinks.as_slice());
+
         ExecuteResponse {
             result: Some(ProtoActionResult {
                 output_files: action_result.output_files.into_iter().map(|v| v.into()).collect(),
-                output_symlinks: action_result.output_symlinks.into_iter().map(|v| v.into()).collect(),
+                output_file_symlinks: action_result
+                    .output_file_symlinks
+                    .into_iter()
+                    .map(|v| v.into())
+                    .collect(),
+                output_symlinks: output_symlinks.into_iter().map(|v| v.into()).collect(),
                 output_directories: action_result.output_folders.into_iter().map(|v| v.into()).collect(),
+                output_directory_symlinks: action_result
+                    .output_directory_symlinks
+                    .into_iter()
+                    .map(|v| v.into())
+                    .collect(),
                 exit_code: action_result.exit_code,
+                stdout_raw: Default::default(),
                 stdout_digest: Some(action_result.stdout_digest.into()),
+                stderr_raw: Default::default(),
                 stderr_digest: Some(action_result.stderr_digest.into()),
                 execution_metadata: Some(action_result.execution_metadata.into()),
-                output_directory_symlinks: Default::default(),
-                output_file_symlinks: Default::default(),
-                stdout_raw: Default::default(),
-                stderr_raw: Default::default(),
             }),
             cached_result: was_from_cache,
             status: Some(error.map_or(Status::default(), |v| v.into())),
@@ -592,7 +607,10 @@ impl TryFrom<ExecuteResponse> for ActionStage {
             .err_tip(|| "Expected result to be set on ExecuteResponse msg")?;
         let action_result = ActionResult {
             output_files: proto_action_result.output_files.try_map(|v| v.try_into())?,
-            output_symlinks: proto_action_result.output_symlinks.try_map(|v| v.try_into())?,
+            output_directory_symlinks: proto_action_result
+                .output_directory_symlinks
+                .try_map(|v| v.try_into())?,
+            output_file_symlinks: proto_action_result.output_file_symlinks.try_map(|v| v.try_into())?,
             output_folders: proto_action_result.output_directories.try_map(|v| v.try_into())?,
             exit_code: proto_action_result.exit_code,
 

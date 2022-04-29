@@ -441,11 +441,11 @@ impl RunningAction for RunningActionImpl {
             let (command, _) = try_join(command_fut, download_to_directory_fut).await?;
             command
         };
+        log::info!("\x1b[0;31mWorker Received Command\x1b[0m: {:?}", command);
         {
             // Create all directories needed for our output paths. This is required by the bazel spec.
-            let full_work_directory = format!("{}/{}", self.work_directory, command.working_directory);
-            let prepare_output_directories = move |output_file| {
-                let full_output_path = format!("{}/{}", full_work_directory, output_file);
+            let prepare_output_directories = |output_file| {
+                let full_output_path = format!("{}/{}", self.work_directory, output_file);
                 async move {
                     let full_parent_path = Path::new(&full_output_path)
                         .parent()
@@ -555,7 +555,7 @@ impl RunningAction for RunningActionImpl {
     }
 
     async fn upload_results(self: Arc<Self>) -> Result<Arc<Self>, Error> {
-        let (command_proto, execution_result) = {
+        let (mut command_proto, execution_result) = {
             let mut state = self.state.lock().await;
             (
                 state
@@ -594,14 +594,20 @@ impl RunningAction for RunningActionImpl {
             None,
             File(FileInfo),
             Directory(DirectoryInfo),
-            Symlink(SymlinkInfo),
+            FileSymlink(SymlinkInfo),
+            DirectorySymlink(SymlinkInfo),
         }
-        let full_work_directory = format!("{}/{}", self.work_directory, command_proto.working_directory);
 
         let mut output_path_futures = FuturesUnordered::new();
-        for entry in command_proto.output_paths.into_iter() {
-            let full_work_directory = &full_work_directory; // This ensures we don't move the value.
-            let full_path = format!("{}/{}", full_work_directory, entry);
+        let mut output_paths = command_proto.output_paths;
+        if output_paths.is_empty() {
+            output_paths.reserve(command_proto.output_files.len() + command_proto.output_directories.len());
+            output_paths.append(&mut command_proto.output_files);
+            output_paths.append(&mut command_proto.output_directories);
+        }
+        for entry in output_paths.into_iter() {
+            let full_path = format!("{}/{}", self.work_directory, entry);
+            let work_directory = &self.work_directory;
             output_path_futures.push(async move {
                 let metadata = {
                     let file_handle = match fs::open_file(&full_path).await {
@@ -634,7 +640,7 @@ impl RunningAction for RunningActionImpl {
                 };
                 if metadata.is_dir() {
                     Ok(OutputType::Directory(
-                        upload_directory(cas_store, full_path, full_work_directory)
+                        upload_directory(cas_store, full_path, work_directory)
                             .and_then(|(root_dir, children)| async move {
                                 let tree = ProtoTree {
                                     root: Some(root_dir),
@@ -651,14 +657,31 @@ impl RunningAction for RunningActionImpl {
                             .await?,
                     ))
                 } else if metadata.is_symlink() {
-                    Ok(OutputType::Symlink(
-                        upload_symlink(full_path, full_work_directory)
-                            .await
-                            .map(|mut symlink_info| {
-                                symlink_info.name_or_path = NameOrPath::Path(entry);
-                                symlink_info
-                            })?,
-                    ))
+                    let output_symlink = upload_symlink(&full_path, work_directory)
+                        .await
+                        .map(|mut symlink_info| {
+                            symlink_info.name_or_path = NameOrPath::Path(entry);
+                            symlink_info
+                        })?;
+                    match fs::metadata(&full_path).await {
+                        Ok(metadata) => {
+                            if metadata.is_dir() {
+                                return Ok(OutputType::DirectorySymlink(output_symlink));
+                            } else {
+                                // Note: If it's anything but directory we put it as a file symlink.
+                                return Ok(OutputType::FileSymlink(output_symlink));
+                            }
+                        }
+                        Err(e) => {
+                            if e.code != Code::NotFound {
+                                return Err(e)
+                                    .err_tip(|| format!("While querying target symlink metadata for {}", full_path));
+                            }
+                            // If the file doesn't exist, we consider it a file. Even though the
+                            // file doesn't exist we still need to populate an entry.
+                            return Ok(OutputType::FileSymlink(output_symlink));
+                        }
+                    }
                 } else {
                     Err(make_err!(
                         Code::Internal,
@@ -670,25 +693,29 @@ impl RunningAction for RunningActionImpl {
         }
         let mut output_files = vec![];
         let mut output_folders = vec![];
-        let mut output_symlinks = vec![];
+        let mut output_directory_symlinks = vec![];
+        let mut output_file_symlinks = vec![];
         while let Some(output_type) = output_path_futures.try_next().await? {
             match output_type {
                 OutputType::File(output_file) => output_files.push(output_file),
                 OutputType::Directory(output_folder) => output_folders.push(output_folder),
-                OutputType::Symlink(output_symlink) => output_symlinks.push(output_symlink),
+                OutputType::FileSymlink(output_symlink) => output_file_symlinks.push(output_symlink),
+                OutputType::DirectorySymlink(output_symlink) => output_directory_symlinks.push(output_symlink),
                 OutputType::None => { /* Safe to ignore */ }
             }
         }
         drop(output_path_futures);
         output_files.sort_unstable_by(|a, b| a.name_or_path.cmp(&b.name_or_path));
         output_folders.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-        output_symlinks.sort_unstable_by(|a, b| a.name_or_path.cmp(&b.name_or_path));
+        output_file_symlinks.sort_unstable_by(|a, b| a.name_or_path.cmp(&b.name_or_path));
+        output_directory_symlinks.sort_unstable_by(|a, b| a.name_or_path.cmp(&b.name_or_path));
         {
             let mut state = self.state.lock().await;
             state.action_result = Some(ActionResult {
                 output_files,
                 output_folders,
-                output_symlinks,
+                output_directory_symlinks,
+                output_file_symlinks,
                 exit_code: execution_result.exit_code,
                 stdout_digest: stdout_digest.into(),
                 stderr_digest: stderr_digest.into(),
@@ -820,6 +847,7 @@ impl RunningActionsManager for RunningActionsManagerImpl {
         start_execute: StartExecute,
     ) -> Result<Arc<RunningActionImpl>, Error> {
         let action_info = self.create_action_info(start_execute).await?;
+        log::info!("\x1b[0;31mWorker Received Action\x1b[0m: {:?}", action_info);
         let action_id = action_info.unique_qualifier.get_hash();
         let work_directory = self.make_work_directory(&action_id).await?;
         let running_action = Arc::new(RunningActionImpl::new(
