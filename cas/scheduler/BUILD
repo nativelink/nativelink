@@ -62,6 +62,19 @@ rust_library(
 )
 
 rust_test(
+    name = "action_messages_test",
+    srcs = ["tests/action_messages_test.rs"],
+    deps = [
+        "//proto",
+        "//third_party:pretty_assertions",
+        "//third_party:tokio",
+        "//util:common",
+        "//util:error",
+        ":action_messages",
+    ],
+)
+
+rust_test(
     name = "scheduler_test",
     srcs = ["tests/scheduler_test.rs"],
     deps = [

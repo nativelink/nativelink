@@ -7,19 +7,20 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
+use prost::Message;
+use prost_types::Any;
 use sha2::{Digest as _, Sha256};
 
 use common::{DigestInfo, HashMapExt, VecExt};
 use error::{make_input_err, Error, ResultExt};
 use platform_property_manager::PlatformProperties;
-use prost::Message;
-use prost_types::Any;
 use proto::build::bazel::remote::execution::v2::{
     execution_stage, Action, ActionResult as ProtoActionResult, ExecuteOperationMetadata, ExecuteRequest,
     ExecuteResponse, ExecutedActionMetadata, ExecutionPolicy, FileNode, LogFile, OutputDirectory, OutputFile,
     OutputSymlink, Platform, SymlinkNode,
 };
 use proto::google::longrunning::{operation::Result as LongRunningResult, Operation};
+use proto::google::rpc::Status;
 
 /// This is a utility struct used to make it easier to match ActionInfos in a
 /// HashMap without needing to construct an entire ActionInfo.
@@ -575,7 +576,7 @@ impl Into<ExecuteResponse> for ActionStage {
                 stderr_raw: Default::default(),
             }),
             cached_result: was_from_cache,
-            status: error.and_then(|v| Some(v.into())),
+            status: Some(error.map_or(Status::default(), |v| v.into())),
             server_logs,
             message: "TODO(blaise.bruer) We should put a reference something like bb_browser".to_string(),
         }
@@ -660,12 +661,12 @@ impl Into<Operation> for ActionState {
         Operation {
             name: self.name,
             metadata: Some(Any {
-                type_url: "build.bazel.remote.execution.v2.ExecuteOperationMetadata".to_string(),
+                type_url: "type.googleapis.com/build.bazel.remote.execution.v2.ExecuteOperationMetadata".to_string(),
                 value: metadata.encode_to_vec(),
             }),
             done: has_action_result,
             result: Some(LongRunningResult::Response(Any {
-                type_url: "build.bazel.remote.execution.v2.ExecuteResponse".to_string(),
+                type_url: "type.googleapis.com/build.bazel.remote.execution.v2.ExecuteResponse".to_string(),
                 value: serialized_response,
             })),
         }
