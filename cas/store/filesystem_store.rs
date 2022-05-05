@@ -5,7 +5,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use async_trait::async_trait;
 use bytes::BytesMut;
@@ -15,6 +15,7 @@ use nix::fcntl::{renameat2, RenameFlags};
 use rand::{thread_rng, Rng};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom, Take};
 use tokio::task::spawn_blocking;
+use tokio::time::sleep;
 use tokio_stream::wrappers::ReadDirStream;
 
 use buf_channel::{DropCloserReadHalf, DropCloserWriteHalf};
@@ -348,7 +349,7 @@ impl FilesystemStore {
 
         temp_file
             .as_ref()
-            .sync_data()
+            .sync_all()
             .await
             .err_tip(|| format!("Failed to sync_data in filesystem store {}", temp_loc))?;
 
@@ -366,6 +367,7 @@ impl FilesystemStore {
         let final_loc = to_full_path_from_digest(&self.content_path, &digest);
 
         let final_path = Path::new(&final_loc);
+        // println!("making: {:?}", final_path);
         let current_path = Path::new(&temp_loc);
         let rename_flags = if final_path.exists() {
             RenameFlags::RENAME_EXCHANGE
@@ -395,9 +397,19 @@ impl FilesystemStore {
             .err_tip(|| "This could be due to the filesystem not supporting RENAME_EXCHANGE")?;
 
         if let Some(old_item) = self.evicting_map.insert(digest, entry).await {
-            // At this point `temp_name_num` will be the file containing the old content we
-            // are going to delete.
-            old_item.flag_moved_to_temp_file(temp_name_num);
+            // Even though the move is atomic above, it is possible that during a hardlink operation
+            // the action will find the inode (which could be either the new or old file at this
+            // point), then create the hardlink with the queried inode. But if the file gets deleted
+            // after it grabs the inode but before the hardlink it could result in a NotFound error.
+            // By putting a delay before deleting the temp files we give some leeway so this error
+            // will be extremely rare.
+            tokio::spawn(async move {
+                const DELAY_TO_DELETE_TEMP_FILES: u64 = 100;
+                sleep(Duration::from_millis(DELAY_TO_DELETE_TEMP_FILES)).await;
+                // At this point `temp_name_num` will be the file containing the old content we
+                // are going to delete.
+                old_item.flag_moved_to_temp_file(temp_name_num);
+            });
         }
         Ok(())
     }
