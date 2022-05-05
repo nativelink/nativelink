@@ -10,7 +10,7 @@ use fast_async_mutex::mutex::Mutex;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 
-use common::{DigestInfo, SerializableDigestInfo};
+use common::{log, DigestInfo, SerializableDigestInfo};
 use config::backends::EvictionPolicy;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -178,9 +178,10 @@ where
             return;
         };
         while self.should_evict(state.lru.len(), peek_entry, state.sum_store_size) {
-            let (_, eviction_item) = state.lru.pop_lru().expect("Tried to peek() then pop() but failed");
+            let (key, eviction_item) = state.lru.pop_lru().expect("Tried to peek() then pop() but failed");
             state.sum_store_size -= eviction_item.data.len() as u64;
             eviction_item.data.unref().await;
+            log::info!("\x1b[0;31mevicting map\x1b[0m: Evicting {:?}", key);
 
             peek_entry = if let Some((_, entry)) = state.lru.peek_lru() {
                 entry

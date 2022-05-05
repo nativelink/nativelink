@@ -70,8 +70,6 @@ impl AcServer {
     ) -> Result<Response<ActionResult>, Error> {
         let update_action_request = grpc_request.into_inner();
 
-        // TODO(blaise.bruer) This needs to be fixed. It is using wrong macro.
-        // We also should write a test for these errors.
         let digest: DigestInfo = update_action_request
             .action_digest
             .err_tip(|| "Action digest was not set in message")?

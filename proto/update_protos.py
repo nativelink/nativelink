@@ -22,7 +22,7 @@ import shutil
 # whence we can read data dependencies, and (b) the Git repository,
 # whither we can write output files.
 _BAZEL_DIR = os.path.join("proto")
-_REPO_DIR = os.path.join(os.path.dirname(os.readlink(__file__)), "genproto")
+_REPO_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "genproto")
 
 _RUST_LICENSE = """\
 // Copyright 2020 Nathan (Blaise) Bruer.  All rights reserved.

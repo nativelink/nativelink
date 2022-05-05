@@ -9,6 +9,8 @@ build:self_test --remote_cache=grpc://127.0.0.1:50051
 
 build:self_execute --remote_executor=grpc://127.0.0.1:50051
 build:self_execute --remote_instance_name=main
+build:self_execute --remote_default_exec_properties=cpu_count=1
+build:self_execute --platform_suffix=self-execute
 
 build --aspects=@rules_rust//rust:defs.bzl%rustfmt_aspect
 test --@rules_rust//:rustfmt.toml=//:.rustfmt.toml
