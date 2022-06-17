@@ -147,6 +147,18 @@ impl Worker {
             }
         }
     }
+
+    pub fn restore_platform_properties(&mut self, props: &PlatformProperties) {
+        for (property, prop_value) in &props.properties {
+            if let PlatformPropertyValue::Minimum(value) = prop_value {
+                let worker_props = &mut self.platform_properties.properties;
+                if let &mut PlatformPropertyValue::Minimum(worker_value) = &mut worker_props.get_mut(property).unwrap()
+                {
+                    *worker_value += value;
+                }
+            }
+        }
+    }
 }
 
 impl PartialEq for Worker {
