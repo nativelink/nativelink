@@ -101,6 +101,17 @@ pub enum StoreConfig {
     /// safely use VerifyStore.verify_size = true, this store should be safe
     /// to use (ie: CAS stores).
     size_partitioning(Box<SizePartitioningStore>),
+
+    /// This store will pass-through calls to another GRPC store. This store
+    /// is not designed to be used as a sub-store of another store, but it
+    /// does satisfy the interface and will likely work.
+    ///
+    /// One major GOTCHA is that some stores use a special function on this
+    /// store to get the size of the underlying object, which is only reliable
+    /// when this store is serving the a CAS store, not an AC store. If using
+    /// this store directly without being a child of any store there are no
+    /// side effects and is the most efficient way to use it.
+    grpc(GrpcStore),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -346,6 +357,17 @@ pub struct S3Store {
     /// Default: 20.
     #[serde(default)]
     pub additional_max_concurrent_requests: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct GrpcStore {
+    /// Instance name for GRPC calls. Proxy calls will have the instance_name changed to this.
+    #[serde(default)]
+    pub instance_name: String,
+
+    /// The endpoint of the grpc connection.
+    #[serde(default)]
+    pub endpoints: Vec<String>,
 }
 
 /// Retry configuration. This configuration is exponential and each iteration

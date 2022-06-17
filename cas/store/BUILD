@@ -24,6 +24,7 @@ rust_library(
         ":dedup_store",
         ":fast_slow_store",
         ":filesystem_store",
+        ":grpc_store",
         ":memory_store",
         ":ref_store",
         ":s3_store",
@@ -228,6 +229,27 @@ rust_library(
         "//util:common",
         "//util:error",
         "//util:evicting_map",
+        ":traits",
+    ],
+    proc_macro_deps = ["//third_party:async_trait"],
+    visibility = ["//cas:__pkg__", "//cas:__subpackages__"]
+)
+
+rust_library(
+    name = "grpc_store",
+    srcs = ["grpc_store.rs"],
+    deps = [
+        "//config",
+        "//proto",
+        "//third_party:fast_async_mutex",
+        "//third_party:futures",
+        "//third_party:tokio",
+        "//third_party:tonic",
+        "//third_party:uuid",
+        "//util:buf_channel",
+        "//util:common",
+        "//util:error",
+        "//util:write_request_stream_wrapper",
         ":traits",
     ],
     proc_macro_deps = ["//third_party:async_trait"],

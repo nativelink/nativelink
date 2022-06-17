@@ -1,14 +1,20 @@
 // Copyright 2020-2021 Nathan (Blaise) Bruer.  All rights reserved.
 
 use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 
 use bytes::Bytes;
 use futures::{stream::Stream, FutureExt, StreamExt};
+use proto::google::rpc::Status as GrpcStatus;
+use tonic::{Request, Response, Status};
+
+use common::{log, DigestInfo};
+use config::cas_server::{CasStoreConfig, InstanceName};
+use error::{error_if, make_err, make_input_err, Code, Error, ResultExt};
+use grpc_store::GrpcStore;
 use proto::build::bazel::remote::execution::v2::{
     batch_read_blobs_response, batch_update_blobs_response,
     content_addressable_storage_server::ContentAddressableStorage,
@@ -16,17 +22,13 @@ use proto::build::bazel::remote::execution::v2::{
     BatchReadBlobsResponse, BatchUpdateBlobsRequest, BatchUpdateBlobsResponse, FindMissingBlobsRequest,
     FindMissingBlobsResponse, GetTreeRequest, GetTreeResponse,
 };
-use proto::google::rpc::Status as GrpcStatus;
-use tonic::{Request, Response, Status};
-
-use common::{log, DigestInfo};
-use config::cas_server::{CasStoreConfig, InstanceName};
-use error::{error_if, make_input_err, Code, Error, ResultExt};
 use store::{Store, StoreManager};
 
 pub struct CasServer {
     stores: HashMap<String, Arc<dyn Store>>,
 }
+
+type GetTreeStream = Pin<Box<dyn Stream<Item = Result<GetTreeResponse, Status>> + Send + 'static>>;
 
 impl CasServer {
     pub fn new(config: &HashMap<InstanceName, CasStoreConfig>, store_manager: &StoreManager) -> Result<Self, Error> {
@@ -48,18 +50,28 @@ impl CasServer {
         &self,
         grpc_request: Request<FindMissingBlobsRequest>,
     ) -> Result<Response<FindMissingBlobsResponse>, Error> {
-        let mut futures = futures::stream::FuturesOrdered::new();
         let inner_request = grpc_request.into_inner();
-        let instance_name = inner_request.instance_name;
+
+        let instance_name = &inner_request.instance_name;
+        let store = self
+            .stores
+            .get(instance_name)
+            .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?
+            .clone();
+
+        // If we are a GrpcStore we shortcut here, as this is a special store.
+        let any_store = store.clone().as_any();
+        let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+        if let Some(grpc_store) = maybe_grpc_store {
+            return grpc_store.find_missing_blobs(Request::new(inner_request)).await;
+        }
+
+        let mut futures = futures::stream::FuturesOrdered::new();
         for digest in inner_request.blob_digests.into_iter() {
             let digest: DigestInfo = digest.try_into()?;
-            let store_owned = self
-                .stores
-                .get(&instance_name)
-                .err_tip(|| format!("'instance_name' not configured for '{}'", &instance_name))?
-                .clone();
+            let store_clone = store.clone();
             futures.push(tokio::spawn(async move {
-                let store = Pin::new(store_owned.as_ref());
+                let store = Pin::new(store_clone.as_ref());
                 store.has(digest.clone()).await.map_or_else(
                     |e| {
                         log::error!(
@@ -89,17 +101,27 @@ impl CasServer {
         &self,
         grpc_request: Request<BatchUpdateBlobsRequest>,
     ) -> Result<Response<BatchUpdateBlobsResponse>, Error> {
-        let mut futures = futures::stream::FuturesOrdered::new();
         let inner_request = grpc_request.into_inner();
-        let instance_name = inner_request.instance_name;
+        let instance_name = &inner_request.instance_name;
+
+        let store = self
+            .stores
+            .get(instance_name)
+            .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?
+            .clone();
+
+        // If we are a GrpcStore we shortcut here, as this is a special store.
+        let any_store = store.clone().as_any();
+        let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+        if let Some(grpc_store) = maybe_grpc_store {
+            return grpc_store.batch_update_blobs(Request::new(inner_request)).await;
+        }
+
+        let mut futures = futures::stream::FuturesOrdered::new();
         for request in inner_request.requests {
+            let store_clone = store.clone();
             let digest: DigestInfo = request.digest.err_tip(|| "Digest not found in request")?.try_into()?;
             let digest_copy = digest.clone();
-            let store_owned = self
-                .stores
-                .get(&instance_name)
-                .err_tip(|| format!("'instance_name' not configured for '{}'", &instance_name))?
-                .clone();
             let request_data = request.data;
             futures.push(tokio::spawn(
                 async move {
@@ -111,7 +133,7 @@ impl CasServer {
                         size_bytes,
                         request_data.len()
                     );
-                    Pin::new(store_owned.as_ref())
+                    Pin::new(store_clone.as_ref())
                         .update_oneshot(digest_copy, request_data)
                         .await
                         .err_tip(|| "Error writing to store")
@@ -133,24 +155,34 @@ impl CasServer {
         &self,
         grpc_request: Request<BatchReadBlobsRequest>,
     ) -> Result<Response<BatchReadBlobsResponse>, Error> {
-        let mut futures = futures::stream::FuturesOrdered::new();
         let inner_request = grpc_request.into_inner();
-        let instance_name = inner_request.instance_name;
+        let instance_name = &inner_request.instance_name;
+
+        let store = self
+            .stores
+            .get(instance_name)
+            .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?
+            .clone();
+
+        // If we are a GrpcStore we shortcut here, as this is a special store.
+        let any_store = store.clone().as_any();
+        let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+        if let Some(grpc_store) = maybe_grpc_store {
+            return grpc_store.batch_read_blobs(Request::new(inner_request)).await;
+        }
+
+        let mut futures = futures::stream::FuturesOrdered::new();
         for digest in inner_request.digests {
             let digest: DigestInfo = digest.try_into()?;
             let digest_copy = digest.clone();
-            let store_owned = self
-                .stores
-                .get(&instance_name)
-                .err_tip(|| format!("'instance_name' not configured for '{}'", &instance_name))?
-                .clone();
+            let store_clone = store.clone();
 
             futures.push(tokio::spawn(
                 async move {
                     let size_bytes = usize::try_from(digest_copy.size_bytes)
                         .err_tip(|| "Digest size_bytes was not convertible to usize")?;
                     // TODO(allada) There is a security risk here of someone taking all the memory on the instance.
-                    let store_data = Pin::new(store_owned.as_ref())
+                    let store_data = Pin::new(store_clone.as_ref())
                         .get_part_unchunked(digest_copy, 0, None, Some(size_bytes))
                         .await
                         .err_tip(|| "Error reading from store")?;
@@ -183,6 +215,28 @@ impl CasServer {
             responses.push(result.err_tip(|| "Internal error joining future")?);
         }
         Ok(Response::new(BatchReadBlobsResponse { responses: responses }))
+    }
+
+    async fn inner_get_tree(&self, grpc_request: Request<GetTreeRequest>) -> Result<Response<GetTreeStream>, Error> {
+        let inner_request = grpc_request.into_inner();
+        let instance_name = &inner_request.instance_name;
+
+        let store = self
+            .stores
+            .get(instance_name)
+            .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?
+            .clone();
+
+        // If we are a GrpcStore we shortcut here, as this is a special store.
+        let any_store = store.clone().as_any();
+        let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+
+        if let Some(grpc_store) = maybe_grpc_store {
+            let stream = grpc_store.get_tree(Request::new(inner_request)).await?.into_inner();
+            // let stream = grpc_store.read(Request::new(read_request)).await?.into_inner();
+            return Ok(Response::new(Box::pin(stream)));
+        }
+        return Err(make_err!(Code::Unimplemented, "get_tree is not implemented"));
     }
 }
 
@@ -248,11 +302,20 @@ impl ContentAddressableStorage for CasServer {
         resp
     }
 
-    type GetTreeStream = Pin<Box<dyn Stream<Item = Result<GetTreeResponse, Status>> + Send + Sync + 'static>>;
-    async fn get_tree(&self, _request: Request<GetTreeRequest>) -> Result<Response<Self::GetTreeStream>, Status> {
-        use stdext::function_name;
-        let output = format!("{} not yet implemented", function_name!());
-        log::error!("\x1b[0;31mget_tree\x1b[0m: {:?}", output);
-        Err(Status::unimplemented(output))
+    type GetTreeStream = GetTreeStream;
+    async fn get_tree(&self, grpc_request: Request<GetTreeRequest>) -> Result<Response<Self::GetTreeStream>, Status> {
+        log::info!("\x1b[0;31mget_tree Req\x1b[0m: {:?}", grpc_request.get_ref());
+        let now = Instant::now();
+        let resp: Result<Response<Self::GetTreeStream>, Status> = self
+            .inner_get_tree(grpc_request)
+            .await
+            .err_tip(|| format!("Failed on get_tree() command"))
+            .map_err(|e| e.into());
+        let d = now.elapsed().as_secs_f32();
+        match &resp {
+            Err(err) => log::error!("\x1b[0;31mget_tree Resp\x1b[0m: {} : {:?}", d, err),
+            Ok(_) => log::info!("\x1b[0;31mget_tree Resp\x1b[0m: {}", d),
+        }
+        resp
     }
 }

@@ -7,7 +7,7 @@ build:debug -c dbg
 build:self_test --remote_instance_name=main
 build:self_test --remote_cache=grpc://127.0.0.1:50051
 
-build:self_execute --remote_executor=grpc://127.0.0.1:50051
+build:self_execute --remote_executor=grpc://127.0.0.1:50052
 build:self_execute --remote_instance_name=main
 build:self_execute --remote_default_exec_properties=cpu_count=1
 build:self_execute --platform_suffix=self-execute

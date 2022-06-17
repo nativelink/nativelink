@@ -186,8 +186,10 @@ impl ExecutionServer {
             .await
             .err_tip(|| "Failed to schedule task")?;
 
-        let receiver_stream =
-            Box::pin(WatchStream::new(rx).map(|action_update| Ok(action_update.as_ref().clone().into())));
+        let receiver_stream = Box::pin(WatchStream::new(rx).map(|action_update| {
+            log::info!("\x1b[0;31mexecute Resp Stream\x1b[0m: {:?}", action_update);
+            Ok(action_update.as_ref().clone().into())
+        }));
         Ok(tonic::Response::new(receiver_stream))
     }
 }

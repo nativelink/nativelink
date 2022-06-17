@@ -8,7 +8,7 @@ on:
     branches: [ master ]
 
 jobs:
-  test:
+  unit-test:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     steps:
@@ -26,3 +26,19 @@ jobs:
 
     - name: Bazel test
       run: bazel test //...
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3.0.1
+      with:
+        fetch-depth: 0
+
+    - uses: satackey/action-docker-layer-caching@v0.0.11
+      continue-on-error: true
+      with:
+        key: ${{ runner.os }}-{hash}-v1
+        restore-keys: |
+          docker-compose-cache-
+
+    - name: Run tests
+      run: sudo ./run_integration_tests.sh

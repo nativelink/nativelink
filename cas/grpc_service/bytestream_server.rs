@@ -17,8 +17,11 @@ use tonic::{Request, Response, Status, Streaming};
 use buf_channel::{make_buf_channel_pair, DropCloserReadHalf};
 use common::{log, DigestInfo};
 use config::cas_server::ByteStreamConfig;
-use error::{error_if, make_err, make_input_err, Code, Error, ResultExt};
+use error::{make_err, make_input_err, Code, Error, ResultExt};
+use grpc_store::GrpcStore;
+use resource_info::ResourceInfo;
 use store::{Store, StoreManager, UploadSizeInfo};
+use write_request_stream_wrapper::WriteRequestStreamWrapper;
 
 struct ReaderState {
     max_bytes_per_stream: usize,
@@ -26,7 +29,7 @@ struct ReaderState {
     reading_future: tokio::task::JoinHandle<Result<(), Error>>,
 }
 
-type ReadStream = Pin<Box<dyn Stream<Item = Result<ReadResponse, Status>> + Send + Sync + 'static>>;
+type ReadStream = Pin<Box<dyn Stream<Item = Result<ReadResponse, Status>> + Send + 'static>>;
 
 pub struct ByteStreamServer {
     stores: HashMap<String, Arc<dyn Store>>,
@@ -61,16 +64,24 @@ impl ByteStreamServer {
         let read_limit =
             usize::try_from(read_request.read_limit).err_tip(|| "read_limit has is not convertible to usize")?;
         let resource_info = ResourceInfo::new(&read_request.resource_name)?;
-        let digest = DigestInfo::try_new(&resource_info.hash, resource_info.expected_size)?;
-
-        let (tx, rx) = buf_channel::make_buf_channel_pair();
-
         let instance_name = resource_info.instance_name;
         let store_clone = self
             .stores
             .get(instance_name)
             .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?
             .clone();
+
+        // If we are a GrpcStore we shortcut here, as this is a special store.
+        let any_store = store_clone.clone().as_any();
+        let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+        if let Some(grpc_store) = maybe_grpc_store {
+            let stream = grpc_store.read(Request::new(read_request)).await?.into_inner();
+            return Ok(Response::new(Box::pin(stream)));
+        }
+
+        let digest = DigestInfo::try_new(&resource_info.hash, resource_info.expected_size)?;
+
+        let (tx, rx) = buf_channel::make_buf_channel_pair();
 
         let reading_future = tokio::spawn(async move {
             let read_limit = if read_limit != 0 { Some(read_limit) } else { None };
@@ -134,7 +145,10 @@ impl ByteStreamServer {
         }))))
     }
 
-    async fn inner_write(&self, mut stream: WriteRequestStreamWrapper) -> Result<Response<WriteResponse>, Error> {
+    async fn inner_write(
+        &self,
+        mut stream: WriteRequestStreamWrapper<Streaming<WriteRequest>, Status>,
+    ) -> Result<Response<WriteResponse>, Error> {
         let (mut tx, rx) = make_buf_channel_pair();
 
         let join_handle = {
@@ -144,6 +158,14 @@ impl ByteStreamServer {
                 .get(instance_name)
                 .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?
                 .clone();
+
+            // If we are a GrpcStore we shortcut here, as this is a special store.
+            let any_store = store_clone.clone().as_any();
+            let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+            if let Some(grpc_store) = maybe_grpc_store {
+                return grpc_store.write(stream).await;
+            }
+
             let hash = stream.hash.clone();
             let expected_size = stream.expected_size;
             tokio::spawn(async move {
@@ -183,6 +205,24 @@ impl ByteStreamServer {
     ) -> Result<Response<QueryWriteStatusResponse>, Error> {
         let mut resource_info = ResourceInfo::new(&query_request.resource_name)?;
 
+        let store_clone = self
+            .stores
+            .get(resource_info.instance_name)
+            .err_tip(|| {
+                format!(
+                    "'instance_name' not configured for '{}'",
+                    (&resource_info).instance_name
+                )
+            })?
+            .clone();
+
+        // If we are a GrpcStore we shortcut here, as this is a special store.
+        let any_store = store_clone.clone().as_any();
+        let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+        if let Some(grpc_store) = maybe_grpc_store {
+            return grpc_store.query_write_status(Request::new(query_request.clone())).await;
+        }
+
         let uuid = resource_info
             .uuid
             .take()
@@ -200,16 +240,6 @@ impl ByteStreamServer {
             }
         }
 
-        let store_clone = self
-            .stores
-            .get(resource_info.instance_name)
-            .err_tip(|| {
-                format!(
-                    "'instance_name' not configured for '{}'",
-                    (&resource_info).instance_name
-                )
-            })?
-            .clone();
         let digest = DigestInfo::try_new(resource_info.hash, resource_info.expected_size)?;
         let result = tokio::spawn(async move { Pin::new(store_clone.as_ref()).has(digest).await })
             .await
@@ -222,124 +252,6 @@ impl ByteStreamServer {
             committed_size: 0,
             complete: true,
         }))
-    }
-}
-
-struct ResourceInfo<'a> {
-    instance_name: &'a str,
-    uuid: Option<&'a str>,
-    hash: &'a str,
-    expected_size: usize,
-}
-
-impl<'a> ResourceInfo<'a> {
-    fn new(resource_name: &'a str) -> Result<ResourceInfo<'a>, Error> {
-        let mut parts = resource_name.splitn(6, '/');
-        const ERROR_MSG: &str = concat!(
-            "Expected resource_name to be of pattern ",
-            "'{instance_name}/uploads/{uuid}/blobs/{hash}/{size}' or ",
-            "'{instance_name}/blobs/{hash}/{size}'",
-        );
-        let instance_name = &parts.next().err_tip(|| ERROR_MSG)?;
-        let mut blobs_or_uploads: &str = parts.next().err_tip(|| ERROR_MSG)?;
-        let mut uuid = None;
-        if &blobs_or_uploads == &"uploads" {
-            uuid = Some(parts.next().err_tip(|| ERROR_MSG)?);
-            blobs_or_uploads = parts.next().err_tip(|| ERROR_MSG)?;
-        }
-
-        error_if!(
-            &blobs_or_uploads != &"blobs",
-            "Element 2 or 4 of resource_name should have been 'blobs'. Got: {}",
-            blobs_or_uploads
-        );
-        let hash = &parts.next().err_tip(|| ERROR_MSG)?;
-        let raw_digest_size = parts.next().err_tip(|| ERROR_MSG)?;
-        let expected_size = raw_digest_size.parse::<usize>().err_tip(|| {
-            format!(
-                "Digest size_bytes was not convertible to usize. Got: {}",
-                raw_digest_size
-            )
-        })?;
-        Ok(ResourceInfo {
-            instance_name: instance_name,
-            uuid,
-            hash,
-            expected_size,
-        })
-    }
-}
-
-#[derive(Debug)]
-struct WriteRequestStreamWrapper {
-    stream: Streaming<WriteRequest>,
-    first_msg: Option<WriteRequest>,
-    uuid: Option<String>,
-    hash: String,
-    instance_name: String,
-    expected_size: usize,
-    write_finished: bool,
-    bytes_received: usize,
-}
-
-impl WriteRequestStreamWrapper {
-    async fn from(mut stream: Streaming<WriteRequest>) -> Result<WriteRequestStreamWrapper, Error> {
-        let first_msg = stream
-            .message()
-            .await
-            .err_tip(|| "Error receiving first message in stream")?
-            .err_tip(|| "Expected WriteRequest struct in stream")?;
-
-        let resource_info = ResourceInfo::new(&first_msg.resource_name)
-            .err_tip(|| "Could not extract resource info from first message of stream")?;
-        let instance_name = resource_info.instance_name.to_string();
-        let hash = resource_info.hash.to_string();
-        let expected_size = resource_info.expected_size;
-        let uuid = resource_info.uuid.map(|v| v.to_string());
-        let write_finished = first_msg.finish_write;
-
-        Ok(WriteRequestStreamWrapper {
-            stream,
-            first_msg: Some(first_msg),
-            uuid,
-            hash,
-            instance_name,
-            expected_size,
-            write_finished,
-            bytes_received: 0,
-        })
-    }
-
-    async fn next(&mut self) -> Result<Option<WriteRequest>, Error> {
-        if let Some(first_msg) = self.first_msg.take() {
-            self.bytes_received += first_msg.data.len();
-            return Ok(Some(first_msg));
-        }
-        if self.write_finished {
-            error_if!(
-                self.bytes_received != self.expected_size,
-                "Did not send enough data. Expected {}, but so far received {}",
-                self.expected_size,
-                self.bytes_received
-            );
-            return Ok(None); // Previous message said it was the last msg.
-        }
-        error_if!(
-            self.bytes_received > self.expected_size,
-            "Sent too much data. Expected {}, but so far received {}",
-            self.expected_size,
-            self.bytes_received
-        );
-        let next_msg = self
-            .stream
-            .message()
-            .await
-            .err_tip(|| format!("Stream error at byte {}", self.bytes_received))?
-            .err_tip(|| "Expected WriteRequest struct in stream")?;
-        self.write_finished = next_msg.finish_write;
-        self.bytes_received += next_msg.data.len();
-
-        Ok(Some(next_msg))
     }
 }
 

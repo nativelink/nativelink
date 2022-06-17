@@ -1,0 +1,65 @@
+// This configuration will place objects in various folders in
+// `/root/.cache/turbo-cache`. It will store all data on disk and
+// allows for restarts of the underlying service. It is optimized
+// so objects are compressed, deduplicated and uses some in-memory
+// optimizations for certain hot paths.
+{
+  "stores": {
+    "CAS_MAIN_STORE": {
+      "verify": {
+        "backend": {
+          "compression": {
+            "compression_algorithm": {
+              "LZ4": {}
+            },
+            "backend": {
+              "filesystem": {
+                "content_path": "/root/.cache/turbo-cache/content_path-cas",
+                "temp_path": "/root/.cache/turbo-cache/tmp_path-cas",
+                "eviction_policy": {
+                  // 10gb.
+                  "max_bytes": 10000000000,
+                }
+              }
+            }
+          }
+        },
+        "verify_size": true,
+        "verify_hash": true
+      }
+    },
+    "AC_MAIN_STORE": {
+      "filesystem": {
+        "content_path": "/root/.cache/turbo-cache/content_path-ac",
+        "temp_path": "/root/.cache/turbo-cache/tmp_path-ac",
+        "eviction_policy": {
+          // 500mb.
+          "max_bytes": 500000000,
+        }
+      }
+    }
+  },
+  "servers": [{
+    "listen_address": "0.0.0.0:50051",
+    "services": {
+      "cas": {
+        "main": {
+          "cas_store": "CAS_MAIN_STORE"
+        }
+      },
+      "ac": {
+        "main": {
+          "ac_store": "AC_MAIN_STORE"
+        }
+      },
+      "capabilities": {},
+      "bytestream": {
+        "cas_stores": {
+          "main": "CAS_MAIN_STORE",
+        },
+        // According to https://github.com/grpc/grpc.github.io/issues/371 16KiB - 64KiB is optimal.
+        "max_bytes_per_stream": 64000, // 64kb.
+      }
+    }
+  }]
+}

@@ -57,6 +57,25 @@ rust_library(
 )
 
 rust_library(
+    name = "resource_info",
+    srcs = ["resource_info.rs"],
+    deps = [":error"],
+    visibility = ["//visibility:public"],
+)
+
+rust_library(
+    name = "write_request_stream_wrapper",
+    srcs = ["write_request_stream_wrapper.rs"],
+    deps = [
+        "//proto",
+        "//third_party:futures",
+        ":error",
+        ":resource_info",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+rust_library(
     name = "evicting_map",
     srcs = ["evicting_map.rs"],
     deps = [

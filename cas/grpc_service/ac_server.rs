@@ -14,6 +14,7 @@ use ac_utils::{get_and_decode_digest, ESTIMATED_DIGEST_SIZE};
 use common::{log, DigestInfo};
 use config::cas_server::{AcStoreConfig, InstanceName};
 use error::{make_input_err, Error, ResultExt};
+use grpc_store::GrpcStore;
 use proto::build::bazel::remote::execution::v2::{
     action_cache_server::ActionCache, action_cache_server::ActionCacheServer as Server, ActionResult,
     GetActionResultRequest, UpdateActionResultRequest,
@@ -46,21 +47,27 @@ impl AcServer {
     ) -> Result<Response<ActionResult>, Error> {
         let get_action_request = grpc_request.into_inner();
 
+        let instance_name = &get_action_request.instance_name;
+        let store = self
+            .stores
+            .get(instance_name)
+            .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?;
+
+        // If we are a GrpcStore we shortcut here, as this is a special store.
+        let any_store = store.clone().as_any();
+        let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+        if let Some(grpc_store) = maybe_grpc_store {
+            return grpc_store.get_action_result(Request::new(get_action_request)).await;
+        }
+
         // TODO(blaise.bruer) We should write a test for these errors.
         let digest: DigestInfo = get_action_request
             .action_digest
             .err_tip(|| "Action digest was not set in message")?
             .try_into()?;
 
-        let instance_name = get_action_request.instance_name;
-        let store = Pin::new(
-            self.stores
-                .get(&instance_name)
-                .err_tip(|| format!("'instance_name' not configured for '{}'", &instance_name))?
-                .as_ref(),
-        );
         Ok(Response::new(
-            get_and_decode_digest::<ActionResult>(store, &digest).await?,
+            get_and_decode_digest::<ActionResult>(Pin::new(store.as_ref()), &digest).await?,
         ))
     }
 
@@ -69,6 +76,21 @@ impl AcServer {
         grpc_request: Request<UpdateActionResultRequest>,
     ) -> Result<Response<ActionResult>, Error> {
         let update_action_request = grpc_request.into_inner();
+
+        let instance_name = &update_action_request.instance_name;
+        let store = self
+            .stores
+            .get(instance_name)
+            .err_tip(|| format!("'instance_name' not configured for '{}'", instance_name))?;
+
+        // If we are a GrpcStore we shortcut here, as this is a special store.
+        let any_store = store.clone().as_any();
+        let maybe_grpc_store = any_store.downcast_ref::<Arc<GrpcStore>>();
+        if let Some(grpc_store) = maybe_grpc_store {
+            return grpc_store
+                .update_action_result(Request::new(update_action_request))
+                .await;
+        }
 
         let digest: DigestInfo = update_action_request
             .action_digest
@@ -84,14 +106,7 @@ impl AcServer {
             .encode(&mut store_data)
             .err_tip(|| "Provided ActionResult could not be serialized")?;
 
-        let instance_name = update_action_request.instance_name;
-        let store = Pin::new(
-            self.stores
-                .get(&instance_name)
-                .err_tip(|| format!("'instance_name' not configured for '{}'", &instance_name))?
-                .as_ref(),
-        );
-        store
+        Pin::new(store.as_ref())
             .update_oneshot(digest, store_data.freeze())
             .await
             .err_tip(|| "Failed to update in action cache")?;

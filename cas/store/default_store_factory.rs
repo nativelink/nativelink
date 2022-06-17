@@ -10,6 +10,7 @@ use error::Error;
 use fast_slow_store::FastSlowStore;
 use filesystem_store::FilesystemStore;
 use futures::Future;
+use grpc_store::GrpcStore;
 use memory_store::MemoryStore;
 use ref_store::RefStore;
 use s3_store::S3Store;
@@ -50,6 +51,7 @@ pub fn store_factory<'a>(
                 store_factory(&config.lower_store, store_manager).await?,
                 store_factory(&config.upper_store, store_manager).await?,
             )),
+            StoreConfig::grpc(config) => Arc::new(GrpcStore::new(&config).await?),
         };
         Ok(store)
     })

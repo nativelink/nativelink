@@ -1,0 +1,44 @@
+# Copyright 2022 Nathan (Blaise) Bruer.  All rights reserved.
+
+version: '2.2'
+
+services:
+  turbo_cache_local_cas:
+    image: allada/turbo-cache:latest
+    build:
+      context: ../..
+      dockerfile: ./deployment-examples/docker-compose/Dockerfile
+    volumes:
+      - ${TURBO_CACHE_DIR:-~/.cache/turbo-cache}:/root/.cache/turbo-cache
+      - type: bind
+        source: .
+        target: /root
+    environment:
+      RUST_LOG: ${RUST_LOG:-}
+    ports: [ "50051:50051/tcp" ]
+    command: |
+      cas /root/local-storage-cas.json
+
+  turbo_cache_scheduler:
+    image: allada/turbo-cache:latest
+    volumes:
+      - type: bind
+        source: .
+        target: /root
+    environment:
+      RUST_LOG: ${RUST_LOG:-}
+    ports: [ "50052:50052/tcp" ]
+    command: |
+      cas /root/scheduler.json
+
+  turbo_cache_executor:
+    image: allada/turbo-cache:latest
+    volumes:
+      - ${TURBO_CACHE_DIR:-~/.cache/turbo-cache}:/root/.cache/turbo-cache
+      - type: bind
+        source: .
+        target: /root
+    environment:
+      RUST_LOG: ${RUST_LOG:-}
+    command: |
+      cas /root/worker.json

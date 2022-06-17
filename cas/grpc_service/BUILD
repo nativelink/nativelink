@@ -7,6 +7,7 @@ rust_library(
     srcs = ["cas_server.rs"],
     deps = [
         "//cas/store",
+        "//cas/store:grpc_store",
         "//config",
         "//proto",
         "//third_party:bytes",
@@ -26,6 +27,7 @@ rust_library(
     deps = [
         "//cas/store",
         "//cas/store:ac_utils",
+        "//cas/store:grpc_store",
         "//config",
         "//proto",
         "//third_party:bytes",
@@ -56,6 +58,7 @@ rust_library(
     srcs = ["bytestream_server.rs"],
     deps = [
         "//cas/store",
+        "//cas/store:grpc_store",
         "//config",
         "//proto",
         "//third_party:fast_async_mutex",
@@ -65,6 +68,8 @@ rust_library(
         "//util:buf_channel",
         "//util:common",
         "//util:error",
+        "//util:resource_info",
+        "//util:write_request_stream_wrapper",
     ],
     visibility = ["//cas:__pkg__"]
 )

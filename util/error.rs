@@ -174,6 +174,12 @@ impl From<Code> for Error {
     }
 }
 
+impl From<tonic::transport::Error> for Error {
+    fn from(error: tonic::transport::Error) -> Self {
+        make_err!(Code::Internal, "{}", error.to_string())
+    }
+}
+
 impl From<tonic::Status> for Error {
     fn from(status: tonic::Status) -> Self {
         make_err!(status.code().into(), "{}", status.to_string())

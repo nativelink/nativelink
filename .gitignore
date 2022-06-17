@@ -1,2 +1,3 @@
 bazel-*
 target/
+.cache

@@ -1,0 +1,52 @@
+{
+  "stores": {
+    "GRPC_LOCAL_STORE": {
+      // Note: This file is used to test GRPC store.
+      "grpc": {
+        "instance_name": "main",
+        "endpoints": ["grpc://turbo_cache_local_cas:50051"]
+      }
+    }
+  },
+  "schedulers": {
+    "MAIN_SCHEDULER": {
+      "supported_platform_properties": {
+        "cpu_count": "Minimum"
+      }
+    }
+  },
+  "servers": [{
+    "listen_address": "0.0.0.0:50052",
+    "services": {
+      "ac": {
+        "main": {
+          "ac_store": "GRPC_LOCAL_STORE"
+        }
+      },
+      "execution": {
+        "main": {
+          "cas_store": "GRPC_LOCAL_STORE",
+          "scheduler": "MAIN_SCHEDULER",
+        }
+      },
+      "capabilities": {
+        "main": {
+          "remote_execution": {
+            "scheduler": "MAIN_SCHEDULER",
+          }
+        }
+      }
+    }
+  }, {
+    "listen_address": "0.0.0.0:50061",
+    "services": {
+      // Note: This should be served on a different port, because it has
+      // a different permission set than the other services.
+      // In other words, this service is a backend api. The ones above
+      // are a frontend api.
+      "worker_api": {
+        "scheduler": "MAIN_SCHEDULER",
+      }
+    }
+  }]
+}
