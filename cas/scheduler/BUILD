@@ -82,6 +82,7 @@ rust_test(
         "//proto",
         "//third_party:pretty_assertions",
         "//third_party:tokio",
+        "//third_party:env_logger",
         "//util:common",
         "//util:error",
         ":action_messages",
