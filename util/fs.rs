@@ -2,7 +2,7 @@
 
 use std::fs::Metadata;
 use std::io::IoSlice;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
@@ -219,6 +219,14 @@ pub async fn remove_file(path: impl AsRef<Path>) -> Result<(), Error> {
         .await
         .map_err(|e| make_err!(Code::Internal, "Open file semaphore closed {:?}", e))?;
     tokio::fs::remove_file(path).await.map_err(|e| e.into())
+}
+
+pub async fn canonicalize(path: impl AsRef<Path>) -> Result<PathBuf, Error> {
+    let _permit = OPEN_FILE_SEMAPHORE
+        .acquire()
+        .await
+        .map_err(|e| make_err!(Code::Internal, "Open file semaphore closed {:?}", e))?;
+    tokio::fs::canonicalize(path).await.map_err(|e| e.into())
 }
 
 pub async fn metadata(path: impl AsRef<Path>) -> Result<Metadata, Error> {

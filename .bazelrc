@@ -20,4 +20,4 @@ test --output_groups=+rustfmt_checks
 # Simple hack to remove Bazel debug warning:
 # "indicated that a canonical reproducible form can be obtained by modifying arguments shallow_since".
 # If cargo raze ever supports something that will make this error go away we can remove this.
-build --ui_event_filters=-DEBUG
+# build --ui_event_filters=-DEBUG

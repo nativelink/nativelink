@@ -2,11 +2,13 @@
 
 use std::collections::HashMap;
 use std::env;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use prost::Message;
 use rand::{thread_rng, Rng};
+use tokio::io::AsyncWriteExt;
 use tonic::Response;
 
 use action_messages::{ActionInfo, ActionInfoHashKey, ActionResult, ActionStage, ExecutionMetadata};
@@ -264,6 +266,47 @@ mod local_worker_tests {
         assert!(
             fs::metadata(work_directory).await.is_ok(),
             "Expected work_directory to be created"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn new_local_worker_removes_work_directory_before_start_test() -> Result<(), Box<dyn std::error::Error>> {
+        let cas_store = Arc::new(FastSlowStore::new(
+            &config::backends::FastSlowStore {
+                // Note: These are not needed for this test, so we put dummy memory stores here.
+                fast: config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+                slow: config::backends::StoreConfig::memory(config::backends::MemoryStore::default()),
+            },
+            Arc::new(
+                FilesystemStore::new(&config::backends::FilesystemStore {
+                    content_path: make_temp_path("content_path"),
+                    temp_path: make_temp_path("temp_path"),
+                    ..Default::default()
+                })
+                .await?,
+            ),
+            Arc::new(MemoryStore::new(&config::backends::MemoryStore::default())),
+        ));
+        let work_directory = make_temp_path("foo");
+        fs::create_dir_all(format!("{}/{}", work_directory, "another_dir")).await?;
+        let mut file = fs::create_file(format!("{}/{}", work_directory, "foo.txt")).await?;
+        file.write_all(b"Hello, world!").await?;
+        new_local_worker(
+            Arc::new(LocalWorkerConfig {
+                work_directory: work_directory.clone(),
+                ..Default::default()
+            }),
+            cas_store,
+        )
+        .await?;
+
+        let work_directory_path_buf = PathBuf::from(work_directory);
+
+        assert!(
+            work_directory_path_buf.read_dir()?.next().is_none(),
+            "Expected work_directory to have removed all files and to be empty"
         );
 
         Ok(())

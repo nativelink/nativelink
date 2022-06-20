@@ -219,6 +219,12 @@ pub async fn new_local_worker(
         .err_tip(|| "Could expand work_directory in LocalWorker")?
         .to_string();
 
+    if let Ok(path) = fs::canonicalize(&work_directory).await {
+        fs::remove_dir_all(path)
+            .await
+            .err_tip(|| "Could not remove work_directory in LocalWorker")?;
+    }
+
     fs::create_dir_all(&work_directory)
         .await
         .err_tip(|| format!("Could not make work_directory : {}", work_directory))?;
