@@ -77,23 +77,8 @@ message SupportedProperties {
     reserved 2; // NextId.
 }
 
-
 /// The result of an ExecutionRequest.
 message ExecuteResult {
-  oneof response {
-    /// Result of an execution request if there were not detectable internal errors.
-    ExecuteFinishedResult result = 1;
-
-    /// An internal error. This is only present when an internal error happened that
-    /// was not recoverable. If the execution job failed but at no fault of the worker
-    /// it should not use this field and should send the error via ExecuteFinishedResult.
-    google.rpc.Status internal_error = 2;
-  }
-  reserved 3; // NextId.
-}
-
-/// Represents the result of an execution.
-message ExecuteFinishedResult {
     /// ID of the worker making the request.
     string worker_id = 1;
 
@@ -107,10 +92,19 @@ message ExecuteFinishedResult {
     /// are running or cached.
     uint64 salt = 3;
 
-    /// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
-    /// for details.
-    build.bazel.remote.execution.v2.ExecuteResponse execute_response = 4;
-    reserved 5; // NextId.
+    /// The actual response data.
+    oneof result {
+        /// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
+        /// for details.
+        build.bazel.remote.execution.v2.ExecuteResponse execute_response = 4;
+
+        /// An internal error. This is only present when an internal error happened that
+        /// was not recoverable. If the execution job failed but at no fault of the worker
+        /// it should not use this field and should send the error via execute_response.
+        google.rpc.Status internal_error = 5;
+    }
+
+    reserved 6; // NextId.
 }
 
 /// Result sent back from the server when a node connects.
@@ -149,7 +143,7 @@ message StartExecute {
     /// The action information used to execute job.
     build.bazel.remote.execution.v2.ExecuteRequest execute_request = 1;
 
-    /// See documentation in ExecuteFinishedResult::salt.
+    /// See documentation in ExecuteResult::salt.
     uint64 salt = 2;
     reserved 3; // NextId.
 }

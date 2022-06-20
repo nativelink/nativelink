@@ -12,13 +12,13 @@ use action_messages::{
 };
 use common::DigestInfo;
 use config::cas_server::SchedulerConfig;
-use error::{Error, ResultExt};
+use error::{make_err, Code, Error, ResultExt};
 use platform_property_manager::{PlatformProperties, PlatformPropertyValue};
 use proto::build::bazel::remote::execution::v2::ExecuteRequest;
 use proto::com::github::allada::turbo_cache::remote_execution::{
     update_for_worker, ConnectionResult, StartExecute, UpdateForWorker,
 };
-use scheduler::Scheduler;
+use scheduler::{Scheduler, INTERNAL_ERROR_EXIT_CODE};
 use worker::{Worker, WorkerId};
 
 const INSTANCE_NAME: &str = "foobar_instance_name";
@@ -829,6 +829,113 @@ mod scheduler_tests {
             };
             // We now know the name of the action so populate it.
             expected_action_state.name = action_state.name.clone();
+            assert_eq!(action_state.as_ref(), &expected_action_state);
+        }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn worker_retries_on_internal_error_and_fails_test() -> Result<(), Error> {
+        const WORKER_ID: WorkerId = WorkerId(0x123456789111);
+
+        let scheduler = Scheduler::new(&SchedulerConfig {
+            max_job_retries: 2,
+            ..Default::default()
+        });
+        let action_digest = DigestInfo::new([99u8; 32], 512);
+
+        let mut rx_from_worker = setup_new_worker(&scheduler, WORKER_ID, Default::default()).await?;
+        let mut client_rx = setup_action(&scheduler, action_digest.clone(), Default::default()).await?;
+
+        {
+            // Other tests check full data. We only care if we got StartAction.
+            match rx_from_worker.recv().await.unwrap().update {
+                Some(update_for_worker::Update::StartAction(_)) => { /* Success */ }
+                v => assert!(false, "Expected StartAction, got : {:?}", v),
+            }
+            // Other tests check full data. We only care if client thinks we are Executing.
+            assert_eq!(client_rx.borrow_and_update().stage, ActionStage::Executing);
+        }
+
+        let action_info_hash_key = ActionInfoHashKey {
+            digest: action_digest.clone(),
+            salt: 0,
+        };
+        scheduler
+            .update_worker_with_internal_error(
+                &WORKER_ID,
+                &action_info_hash_key,
+                make_err!(Code::Internal, "Some error"),
+            )
+            .await;
+
+        {
+            // Client should get notification saying it has been queued again.
+            let action_state = client_rx.borrow_and_update();
+            let expected_action_state = ActionState {
+                // Name is a random string, so we ignore it and just make it the same.
+                name: action_state.name.clone(),
+                action_digest: action_digest.clone(),
+                stage: ActionStage::Queued,
+            };
+            assert_eq!(action_state.as_ref(), &expected_action_state);
+        }
+
+        // Now connect a new worker and it should pickup the action.
+        let mut rx_from_worker = setup_new_worker(&scheduler, WORKER_ID, Default::default()).await?;
+        {
+            // Other tests check full data. We only care if we got StartAction.
+            match rx_from_worker.recv().await.unwrap().update {
+                Some(update_for_worker::Update::StartAction(_)) => { /* Success */ }
+                v => assert!(false, "Expected StartAction, got : {:?}", v),
+            }
+            // Other tests check full data. We only care if client thinks we are Executing.
+            assert_eq!(client_rx.borrow_and_update().stage, ActionStage::Executing);
+        }
+
+        // Send internal error from worker again.
+        scheduler
+            .update_worker_with_internal_error(
+                &WORKER_ID,
+                &action_info_hash_key,
+                make_err!(Code::Internal, "Some error"),
+            )
+            .await;
+
+        {
+            // Client should get notification saying it has been queued again.
+            let action_state = client_rx.borrow_and_update();
+            let expected_action_state = ActionState {
+                // Name is a random string, so we ignore it and just make it the same.
+                name: action_state.name.clone(),
+                action_digest: action_digest.clone(),
+                stage: ActionStage::Error((
+                    make_err!(Code::Internal, "Some error"),
+                    ActionResult {
+                        output_files: Default::default(),
+                        output_folders: Default::default(),
+                        output_file_symlinks: Default::default(),
+                        output_directory_symlinks: Default::default(),
+                        exit_code: INTERNAL_ERROR_EXIT_CODE,
+                        stdout_digest: DigestInfo::empty_digest(),
+                        stderr_digest: DigestInfo::empty_digest(),
+                        execution_metadata: ExecutionMetadata {
+                            worker: WORKER_ID.to_string(),
+                            queued_timestamp: SystemTime::UNIX_EPOCH,
+                            worker_start_timestamp: SystemTime::UNIX_EPOCH,
+                            worker_completed_timestamp: SystemTime::UNIX_EPOCH,
+                            input_fetch_start_timestamp: SystemTime::UNIX_EPOCH,
+                            input_fetch_completed_timestamp: SystemTime::UNIX_EPOCH,
+                            execution_start_timestamp: SystemTime::UNIX_EPOCH,
+                            execution_completed_timestamp: SystemTime::UNIX_EPOCH,
+                            output_upload_start_timestamp: SystemTime::UNIX_EPOCH,
+                            output_upload_completed_timestamp: SystemTime::UNIX_EPOCH,
+                        },
+                        server_logs: Default::default(),
+                    },
+                )),
+            };
             assert_eq!(action_state.as_ref(), &expected_action_state);
         }
 

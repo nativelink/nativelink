@@ -3,6 +3,7 @@
 use std::cmp;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use fast_async_mutex::mutex::Mutex;
 use lru::LruCache;
@@ -10,20 +11,31 @@ use rand::{thread_rng, Rng};
 use tokio::sync::watch;
 
 use action_messages::{ActionInfo, ActionInfoHashKey, ActionStage, ActionState};
-use common::log;
+use action_messages::{ActionResult, ExecutionMetadata};
+use common::{log, DigestInfo};
 use config::cas_server::SchedulerConfig;
-use error::{error_if, make_input_err, Error, ResultExt};
+use error::{error_if, make_err, make_input_err, Code, Error, ResultExt};
 use platform_property_manager::PlatformPropertyManager;
 use worker::{Worker, WorkerId, WorkerTimestamp, WorkerUpdate};
 
 /// Default timeout for workers in seconds.
+/// If this changes, remember to change the documentation in the config.
 const DEFAULT_WORKER_TIMEOUT_S: u64 = 5;
+
+/// Default times a job can retry before failing.
+/// If this changes, remember to change the documentation in the config.
+const DEFAULT_MAX_JOB_RETRIES: usize = 3;
+
+/// Exit code sent if there is an internal error.
+pub const INTERNAL_ERROR_EXIT_CODE: i32 = -178;
 
 /// An action that is being awaited on and last known state.
 struct AwaitedAction {
     action_info: Arc<ActionInfo>,
     current_state: Arc<ActionState>,
     notify_channel: watch::Sender<Arc<ActionState>>,
+    attempts: usize,
+    last_error: Option<Error>,
 }
 
 /// Holds the relationship of a worker that is executing a specific action.
@@ -125,6 +137,8 @@ struct SchedulerImpl {
     active_actions: HashMap<Arc<ActionInfo>, RunningAction>,
     /// Timeout of how long to evict workers if no response in this given amount of time in seconds.
     worker_timeout_s: u64,
+    /// Default times a job can retry before failing.
+    max_job_retries: usize,
 }
 
 impl SchedulerImpl {
@@ -195,6 +209,8 @@ impl SchedulerImpl {
                 action_info,
                 current_state,
                 notify_channel: tx,
+                attempts: 0,
+                last_error: None,
             },
         );
 
@@ -212,10 +228,48 @@ impl SchedulerImpl {
                 match self.active_actions.remove(&action_info) {
                     Some(running_action) => {
                         let mut awaited_action = running_action.action;
-                        Arc::make_mut(&mut awaited_action.current_state).stage = ActionStage::Queued;
-                        let send_result = awaited_action.notify_channel.send(awaited_action.current_state.clone());
-                        self.queued_actions_set.insert(action_info.clone());
-                        self.queued_actions.insert(action_info.clone(), awaited_action);
+                        let send_result = if awaited_action.attempts >= self.max_job_retries {
+                            Arc::make_mut(&mut awaited_action.current_state).stage = ActionStage::Error((
+                                awaited_action.last_error.unwrap_or_else(|| {
+                                    make_err!(
+                                        Code::Internal,
+                                        "Job cancelled because it attempted to execute too many times and failed"
+                                    )
+                                }),
+                                ActionResult {
+                                    output_files: Default::default(),
+                                    output_folders: Default::default(),
+                                    output_directory_symlinks: Default::default(),
+                                    output_file_symlinks: Default::default(),
+                                    exit_code: INTERNAL_ERROR_EXIT_CODE,
+                                    stdout_digest: DigestInfo::empty_digest(),
+                                    stderr_digest: DigestInfo::empty_digest(),
+                                    execution_metadata: ExecutionMetadata {
+                                        worker: format!("{}", worker_id),
+                                        queued_timestamp: SystemTime::UNIX_EPOCH,
+                                        worker_start_timestamp: SystemTime::UNIX_EPOCH,
+                                        worker_completed_timestamp: SystemTime::UNIX_EPOCH,
+                                        input_fetch_start_timestamp: SystemTime::UNIX_EPOCH,
+                                        input_fetch_completed_timestamp: SystemTime::UNIX_EPOCH,
+                                        execution_start_timestamp: SystemTime::UNIX_EPOCH,
+                                        execution_completed_timestamp: SystemTime::UNIX_EPOCH,
+                                        output_upload_start_timestamp: SystemTime::UNIX_EPOCH,
+                                        output_upload_completed_timestamp: SystemTime::UNIX_EPOCH,
+                                    },
+                                    server_logs: Default::default(),
+                                },
+                            ));
+                            awaited_action.notify_channel.send(awaited_action.current_state.clone())
+                            // Do not put the action back in the queue here, as this action attempted to run too many
+                            // times.
+                        } else {
+                            Arc::make_mut(&mut awaited_action.current_state).stage = ActionStage::Queued;
+                            let send_result = awaited_action.notify_channel.send(awaited_action.current_state.clone());
+                            self.queued_actions_set.insert(action_info.clone());
+                            self.queued_actions.insert(action_info.clone(), awaited_action);
+                            send_result
+                        };
+
                         if send_result.is_err() {
                             // Don't remove this task, instead we keep them around for a bit just in case
                             // the client disconnected and will reconnect and ask for same job to be executed
@@ -290,6 +344,7 @@ impl SchedulerImpl {
                         awaited_action.action_info.digest().str()
                     );
                 }
+                awaited_action.attempts += 1;
                 self.active_actions.insert(
                     action_info.clone(),
                     RunningAction {
@@ -301,6 +356,37 @@ impl SchedulerImpl {
             }
         }
         should_run_again
+    }
+
+    async fn update_worker_with_internal_error(
+        &mut self,
+        worker_id: &WorkerId,
+        action_info_hash_key: &ActionInfoHashKey,
+        err: Error,
+    ) {
+        let (action_info, mut running_action) = match self.active_actions.remove_entry(action_info_hash_key) {
+            Some((action_info, running_action)) => (action_info, running_action),
+            None => {
+                log::error!(
+                    "Could not find action info in active actions : {:?}",
+                    action_info_hash_key
+                );
+                return;
+            }
+        };
+
+        if running_action.worker_id != *worker_id {
+            log::error!(
+                "Got a result from a worker that should not be running the action, Removing worker. Expected worker {} got worker {}",
+                    running_action.worker_id, worker_id
+            );
+        }
+        running_action.action.last_error = Some(err);
+
+        // Now put it back. immediate_evict_worker() needs it to be there to send errors properly.
+        self.active_actions.insert(action_info, running_action);
+
+        self.immediate_evict_worker(worker_id);
     }
 
     async fn update_action(
@@ -398,6 +484,11 @@ impl Scheduler {
             worker_timeout_s = DEFAULT_WORKER_TIMEOUT_S;
         }
 
+        let mut max_job_retries = scheduler_cfg.max_job_retries;
+        if max_job_retries == 0 {
+            max_job_retries = DEFAULT_MAX_JOB_RETRIES;
+        }
+
         Self {
             inner: Mutex::new(SchedulerImpl {
                 queued_actions_set: HashSet::new(),
@@ -405,6 +496,7 @@ impl Scheduler {
                 workers: Workers::new(),
                 active_actions: HashMap::new(),
                 worker_timeout_s,
+                max_job_retries,
             }),
             platform_property_manager,
         }
@@ -434,6 +526,18 @@ impl Scheduler {
     pub async fn add_action(&self, action_info: ActionInfo) -> Result<watch::Receiver<Arc<ActionState>>, Error> {
         let mut inner = self.inner.lock().await;
         inner.add_action(action_info)
+    }
+
+    pub async fn update_worker_with_internal_error(
+        &self,
+        worker_id: &WorkerId,
+        action_info_hash_key: &ActionInfoHashKey,
+        err: Error,
+    ) {
+        let mut inner = self.inner.lock().await;
+        inner
+            .update_worker_with_internal_error(worker_id, action_info_hash_key, err)
+            .await
     }
 
     /// Adds an action to the scheduler for remote execution.

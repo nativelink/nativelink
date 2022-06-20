@@ -17,8 +17,8 @@ use config::cas_server::LocalWorkerConfig;
 use error::{make_err, make_input_err, Code, Error, ResultExt};
 use fast_slow_store::FastSlowStore;
 use proto::com::github::allada::turbo_cache::remote_execution::{
-    execute_result, update_for_worker::Update, worker_api_client::WorkerApiClient, ExecuteFinishedResult,
-    ExecuteResult, KeepAliveRequest, UpdateForWorker,
+    execute_result, update_for_worker::Update, worker_api_client::WorkerApiClient, ExecuteResult, KeepAliveRequest,
+    UpdateForWorker,
 };
 use running_actions_manager::{RunningAction, RunningActionsManager, RunningActionsManagerImpl};
 use store::Store;
@@ -149,12 +149,10 @@ impl<'a, T: WorkerApiClientTrait, U: RunningActionsManager> LocalWorkerImpl<'a, 
                                     Ok(action_result) => {
                                         grpc_client.execution_response(
                                             ExecuteResult{
-                                                response: Some(execute_result::Response::Result(ExecuteFinishedResult{
-                                                    worker_id,
-                                                    action_digest,
-                                                    salt,
-                                                    execute_response: Some(ActionStage::Completed(action_result).into()),
-                                                })),
+                                                worker_id,
+                                                action_digest,
+                                                salt,
+                                                result: Some(execute_result::Result::ExecuteResponse(ActionStage::Completed(action_result).into())),
                                             }
                                         )
                                         .await
@@ -162,7 +160,10 @@ impl<'a, T: WorkerApiClientTrait, U: RunningActionsManager> LocalWorkerImpl<'a, 
                                     },
                                     Err(e) => {
                                         grpc_client.execution_response(ExecuteResult{
-                                            response: Some(execute_result::Response::InternalError(e.into())),
+                                            worker_id,
+                                            action_digest,
+                                            salt,
+                                            result: Some(execute_result::Result::InternalError(e.into())),
                                         }).await.err_tip(|| "Error calling execution_response with error")?;
                                     },
                                 }

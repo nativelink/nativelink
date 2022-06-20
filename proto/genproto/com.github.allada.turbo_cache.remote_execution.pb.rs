@@ -33,26 +33,6 @@ pub struct SupportedProperties {
 //// The result of an ExecutionRequest.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExecuteResult {
-    #[prost(oneof="execute_result::Response", tags="1, 2")]
-    pub response: ::core::option::Option<execute_result::Response>,
-}
-/// Nested message and enum types in `ExecuteResult`.
-pub mod execute_result {
-    #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Response {
-        //// Result of an execution request if there were not detectable internal errors.
-        #[prost(message, tag="1")]
-        Result(super::ExecuteFinishedResult),
-        //// An internal error. This is only present when an internal error happened that
-        //// was not recoverable. If the execution job failed but at no fault of the worker
-        //// it should not use this field and should send the error via ExecuteFinishedResult.
-        #[prost(message, tag="2")]
-        InternalError(super::super::super::super::super::super::google::rpc::Status),
-    }
-}
-//// Represents the result of an execution.
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ExecuteFinishedResult {
     //// ID of the worker making the request.
     #[prost(string, tag="1")]
     pub worker_id: ::prost::alloc::string::String,
@@ -66,10 +46,25 @@ pub struct ExecuteFinishedResult {
     //// are running or cached.
     #[prost(uint64, tag="3")]
     pub salt: u64,
-    //// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
-    //// for details.
-    #[prost(message, optional, tag="4")]
-    pub execute_response: ::core::option::Option<super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteResponse>,
+    //// The actual response data.
+    #[prost(oneof="execute_result::Result", tags="4, 5")]
+    pub result: ::core::option::Option<execute_result::Result>,
+}
+/// Nested message and enum types in `ExecuteResult`.
+pub mod execute_result {
+    //// The actual response data.
+    #[derive(Clone, PartialEq, ::prost::Oneof)]
+    pub enum Result {
+        //// Result of the execution. See `build.bazel.remote.execution.v2.ExecuteResponse`
+        //// for details.
+        #[prost(message, tag="4")]
+        ExecuteResponse(super::super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteResponse),
+        //// An internal error. This is only present when an internal error happened that
+        //// was not recoverable. If the execution job failed but at no fault of the worker
+        //// it should not use this field and should send the error via execute_response.
+        #[prost(message, tag="5")]
+        InternalError(super::super::super::super::super::super::google::rpc::Status),
+    }
 }
 //// Result sent back from the server when a node connects.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -114,7 +109,7 @@ pub struct StartExecute {
     //// The action information used to execute job.
     #[prost(message, optional, tag="1")]
     pub execute_request: ::core::option::Option<super::super::super::super::super::build::bazel::remote::execution::v2::ExecuteRequest>,
-    //// See documentation in ExecuteFinishedResult::salt.
+    //// See documentation in ExecuteResult::salt.
     #[prost(uint64, tag="2")]
     pub salt: u64,
 }

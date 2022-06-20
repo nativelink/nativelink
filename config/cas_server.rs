@@ -64,6 +64,16 @@ pub struct SchedulerConfig {
     /// Default: 5 (seconds)
     #[serde(default)]
     pub worker_timeout_s: u64,
+
+    /// If a job returns an internal error or times out this many times when
+    /// attempting to run on a worker the scheduler will return the last error
+    /// to the client. Jobs will be retried and this configuration is to help
+    /// prevent one rogue job from infinitely retrying and taking up a lot of
+    /// resources when the task itself is the one causing the server to go
+    /// into a bad state.
+    /// Default: 3
+    #[serde(default)]
+    pub max_job_retries: usize,
 }
 
 #[derive(Deserialize, Debug, Default)]

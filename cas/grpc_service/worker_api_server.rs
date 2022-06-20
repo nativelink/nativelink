@@ -134,31 +134,35 @@ impl WorkerApiServer {
     }
 
     async fn inner_execution_response(&self, execute_result: ExecuteResult) -> Result<Response<()>, Error> {
-        let finished_result = match execute_result
-            .response
-            .err_tip(|| "Expected result to exist in ExecuteResult")?
-        {
-            execute_result::Response::Result(finished_result) => finished_result,
-            execute_result::Response::InternalError(e) => return Err(e.into()),
-        };
-        let worker_id: WorkerId = finished_result.worker_id.try_into()?;
-        let action_digest: DigestInfo = finished_result
+        let worker_id: WorkerId = execute_result.worker_id.try_into()?;
+        let action_digest: DigestInfo = execute_result
             .action_digest
             .err_tip(|| "Expected action_digest to exist")?
             .try_into()?;
         let action_info_hash_key = ActionInfoHashKey {
             digest: action_digest.clone(),
-            salt: finished_result.salt,
+            salt: execute_result.salt,
         };
-        let action_stage = finished_result
-            .execute_response
-            .err_tip(|| "Expected execute_response to exist in ExecuteResult")?
-            .try_into()
-            .err_tip(|| "Failed to convert ExecuteResponse into an ActionStage")?;
-        self.scheduler
-            .update_action(&worker_id, &action_info_hash_key, action_stage)
-            .await
-            .err_tip(|| format!("Failed to update_action {:?}", action_digest))?;
+
+        match execute_result
+            .result
+            .err_tip(|| "Expected result to exist in ExecuteResult")?
+        {
+            execute_result::Result::ExecuteResponse(finished_result) => {
+                let action_stage = finished_result
+                    .try_into()
+                    .err_tip(|| "Failed to convert ExecuteResponse into an ActionStage")?;
+                self.scheduler
+                    .update_action(&worker_id, &action_info_hash_key, action_stage)
+                    .await
+                    .err_tip(|| format!("Failed to update_action {:?}", action_digest))?;
+            }
+            execute_result::Result::InternalError(e) => {
+                self.scheduler
+                    .update_worker_with_internal_error(&worker_id, &action_info_hash_key, e.into())
+                    .await;
+            }
+        }
         Ok(Response::new(()))
     }
 }

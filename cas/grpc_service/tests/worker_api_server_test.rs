@@ -17,8 +17,8 @@ use proto::build::bazel::remote::execution::v2::{
     OutputSymlink,
 };
 use proto::com::github::allada::turbo_cache::remote_execution::{
-    execute_result, update_for_worker, worker_api_server::WorkerApi, ExecuteFinishedResult, ExecuteResult,
-    KeepAliveRequest, SupportedProperties,
+    execute_result, update_for_worker, worker_api_server::WorkerApi, ExecuteResult, KeepAliveRequest,
+    SupportedProperties,
 };
 use proto::google::rpc::Status as ProtoStatus;
 use scheduler::Scheduler;
@@ -287,62 +287,60 @@ pub mod execution_response_tests {
             },
         );
         let result = ExecuteResult {
-            response: Some(execute_result::Response::Result(ExecuteFinishedResult {
-                worker_id: test_context.worker_id.to_string(),
-                action_digest: Some(action_digest.clone().into()),
-                salt: SALT,
-                execute_response: Some(ExecuteResponse {
-                    result: Some(ProtoActionResult {
-                        output_files: vec![OutputFile {
-                            path: "some path1".to_string(),
-                            digest: Some(DigestInfo::new([8u8; 32], 124).into()),
-                            is_executable: true,
-                            contents: Default::default(), // We don't implement this.
-                            node_properties: None,
-                        }],
-                        output_file_symlinks: vec![OutputSymlink {
-                            path: "some path3".to_string(),
-                            target: "some target3".to_string(),
-                            node_properties: None,
-                        }],
-                        output_symlinks: vec![OutputSymlink {
-                            path: "some path3".to_string(),
-                            target: "some target3".to_string(),
-                            node_properties: None,
-                        }],
-                        output_directories: vec![OutputDirectory {
-                            path: "some path4".to_string(),
-                            tree_digest: Some(DigestInfo::new([12u8; 32], 124).into()),
-                        }],
-                        output_directory_symlinks: Default::default(), // Bazel deprecated this.
-                        exit_code: 5,
-                        stdout_raw: Default::default(), // We don't implement this.
-                        stdout_digest: Some(DigestInfo::new([10u8; 32], 124).into()),
-                        stderr_raw: Default::default(), // We don't implement this.
-                        stderr_digest: Some(DigestInfo::new([11u8; 32], 124).into()),
-                        execution_metadata: Some(ExecutedActionMetadata {
-                            worker: test_context.worker_id.to_string(),
-                            queued_timestamp: Some(make_system_time(1).into()),
-                            worker_start_timestamp: Some(make_system_time(2).into()),
-                            worker_completed_timestamp: Some(make_system_time(3).into()),
-                            input_fetch_start_timestamp: Some(make_system_time(4).into()),
-                            input_fetch_completed_timestamp: Some(make_system_time(5).into()),
-                            execution_start_timestamp: Some(make_system_time(6).into()),
-                            execution_completed_timestamp: Some(make_system_time(7).into()),
-                            output_upload_start_timestamp: Some(make_system_time(8).into()),
-                            output_upload_completed_timestamp: Some(make_system_time(9).into()),
-                            auxiliary_metadata: vec![],
-                        }),
+            worker_id: test_context.worker_id.to_string(),
+            action_digest: Some(action_digest.clone().into()),
+            salt: SALT,
+            result: Some(execute_result::Result::ExecuteResponse(ExecuteResponse {
+                result: Some(ProtoActionResult {
+                    output_files: vec![OutputFile {
+                        path: "some path1".to_string(),
+                        digest: Some(DigestInfo::new([8u8; 32], 124).into()),
+                        is_executable: true,
+                        contents: Default::default(), // We don't implement this.
+                        node_properties: None,
+                    }],
+                    output_file_symlinks: vec![OutputSymlink {
+                        path: "some path3".to_string(),
+                        target: "some target3".to_string(),
+                        node_properties: None,
+                    }],
+                    output_symlinks: vec![OutputSymlink {
+                        path: "some path3".to_string(),
+                        target: "some target3".to_string(),
+                        node_properties: None,
+                    }],
+                    output_directories: vec![OutputDirectory {
+                        path: "some path4".to_string(),
+                        tree_digest: Some(DigestInfo::new([12u8; 32], 124).into()),
+                    }],
+                    output_directory_symlinks: Default::default(), // Bazel deprecated this.
+                    exit_code: 5,
+                    stdout_raw: Default::default(), // We don't implement this.
+                    stdout_digest: Some(DigestInfo::new([10u8; 32], 124).into()),
+                    stderr_raw: Default::default(), // We don't implement this.
+                    stderr_digest: Some(DigestInfo::new([11u8; 32], 124).into()),
+                    execution_metadata: Some(ExecutedActionMetadata {
+                        worker: test_context.worker_id.to_string(),
+                        queued_timestamp: Some(make_system_time(1).into()),
+                        worker_start_timestamp: Some(make_system_time(2).into()),
+                        worker_completed_timestamp: Some(make_system_time(3).into()),
+                        input_fetch_start_timestamp: Some(make_system_time(4).into()),
+                        input_fetch_completed_timestamp: Some(make_system_time(5).into()),
+                        execution_start_timestamp: Some(make_system_time(6).into()),
+                        execution_completed_timestamp: Some(make_system_time(7).into()),
+                        output_upload_start_timestamp: Some(make_system_time(8).into()),
+                        output_upload_completed_timestamp: Some(make_system_time(9).into()),
+                        auxiliary_metadata: vec![],
                     }),
-                    cached_result: false,
-                    status: Some(ProtoStatus {
-                        code: 9,
-                        message: "foo".to_string(),
-                        details: Default::default(),
-                    }),
-                    server_logs: server_logs,
-                    message: "TODO(blaise.bruer) We should put a reference something like bb_browser".to_string(),
                 }),
+                cached_result: false,
+                status: Some(ProtoStatus {
+                    code: 9,
+                    message: "foo".to_string(),
+                    details: Default::default(),
+                }),
+                server_logs: server_logs,
+                message: "TODO(blaise.bruer) We should put a reference something like bb_browser".to_string(),
             })),
         };
         {
@@ -362,10 +360,10 @@ pub mod execution_response_tests {
             // Check the result that the client would have received.
             client_action_state_receiver.changed().await?;
             let client_given_state = client_action_state_receiver.borrow();
-            let execute_response = if let execute_result::Response::Result(v) = result.response.unwrap() {
-                v.execute_response.unwrap()
+            let execute_response = if let execute_result::Result::ExecuteResponse(v) = result.result.unwrap() {
+                v
             } else {
-                panic!("Expected type to be Result");
+                panic!("Expected type to be ExecuteResponse");
             };
 
             assert_eq!(client_given_state.stage, execute_response.clone().try_into()?);

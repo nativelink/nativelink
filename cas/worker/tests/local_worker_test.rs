@@ -24,8 +24,8 @@ use mock_running_actions_manager::MockRunningAction;
 use platform_property_manager::PlatformProperties;
 use proto::build::bazel::remote::execution::v2::platform::Property;
 use proto::com::github::allada::turbo_cache::remote_execution::{
-    execute_result, update_for_worker::Update, ConnectionResult, ExecuteFinishedResult, ExecuteResult, StartExecute,
-    SupportedProperties, UpdateForWorker,
+    execute_result, update_for_worker::Update, ConnectionResult, ExecuteResult, StartExecute, SupportedProperties,
+    UpdateForWorker,
 };
 
 /// Get temporary path from either `TEST_TMPDIR` or best effort temp directory if
@@ -223,12 +223,12 @@ mod local_worker_tests {
         assert_eq!(
             execution_response,
             ExecuteResult {
-                response: Some(execute_result::Response::Result(ExecuteFinishedResult {
-                    worker_id: expected_worker_id,
-                    action_digest: Some(action_digest.into()),
-                    salt: SALT,
-                    execute_response: Some(ActionStage::Completed(action_result).into()),
-                }))
+                worker_id: expected_worker_id,
+                action_digest: Some(action_digest.into()),
+                salt: SALT,
+                result: Some(execute_result::Result::ExecuteResponse(
+                    ActionStage::Completed(action_result).into()
+                )),
             }
         );
 
