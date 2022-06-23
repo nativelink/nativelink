@@ -24,6 +24,7 @@ rust_library(
     srcs = ["cas_server.rs"],
     deps = [
         "//third_party:serde",
+        "//util:serde_utils",
         ":backends",
     ],
 )
@@ -31,5 +32,8 @@ rust_library(
 rust_library(
     name = "backends",
     srcs = ["backends.rs"],
-    deps = ["//third_party:serde"],
+    deps = [
+        "//third_party:serde",
+        "//util:serde_utils",
+    ],
 )

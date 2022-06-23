@@ -13,7 +13,6 @@ use filetime::{set_file_atime, FileTime};
 use futures::stream::{StreamExt, TryStreamExt};
 use nix::fcntl::{renameat2, RenameFlags};
 use rand::{thread_rng, Rng};
-use shellexpand;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom, Take};
 use tokio::task::spawn_blocking;
 use tokio::time::sleep;
@@ -292,25 +291,15 @@ impl FilesystemStore {
         let eviction_policy = config.eviction_policy.as_ref().unwrap_or(&empty_policy);
         let evicting_map = EvictingMap::new(eviction_policy, now);
 
-        let temp_path = shellexpand::full(&config.temp_path)
-            .map_err(|e| make_input_err!("{}", e))
-            .err_tip(|| "Could expand temp_path in FilesystemStore")?
-            .to_string();
-
-        let content_path = shellexpand::full(&config.content_path)
-            .map_err(|e| make_input_err!("{}", e))
-            .err_tip(|| "Could expand content_path in FilesystemStore")?
-            .to_string();
-
-        fs::create_dir_all(&temp_path)
+        fs::create_dir_all(&config.temp_path)
             .await
-            .err_tip(|| format!("Failed to temp directory {:?}", &temp_path))?;
-        fs::create_dir_all(&content_path)
+            .err_tip(|| format!("Failed to temp directory {:?}", &config.temp_path))?;
+        fs::create_dir_all(&config.content_path)
             .await
-            .err_tip(|| format!("Failed to content directory {:?}", &content_path))?;
+            .err_tip(|| format!("Failed to content directory {:?}", &config.content_path))?;
 
-        let temp_path = Arc::new(temp_path);
-        let content_path = Arc::new(content_path);
+        let temp_path = Arc::new(config.temp_path.clone());
+        let content_path = Arc::new(config.content_path.clone());
         add_files_to_cache(&evicting_map, &now, &temp_path, &content_path).await?;
         prune_temp_path(&temp_path.as_ref()).await?;
 

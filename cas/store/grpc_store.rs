@@ -42,6 +42,8 @@ impl GrpcStore {
         error_if!(config.endpoints.len() == 0, "Expected at least 1 endpoint in GrpcStore");
         let mut endpoints = Vec::with_capacity(config.endpoints.len());
         for endpoint in &config.endpoints {
+            // TODO(allada) This should be moved to be done in utils/serde_utils.rs like the others.
+            // We currently don't have a way to handle those helpers with vectors.
             let endpoint = shellexpand::env(&endpoint)
                 .map_err(|e| make_input_err!("{}", e))
                 .err_tip(|| "Could expand endpoint in GrpcStore")?

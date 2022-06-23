@@ -5,7 +5,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::{future::BoxFuture, select, stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt};
-use shellexpand;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -215,22 +214,17 @@ pub async fn new_local_worker(
         .err_tip(|| "Expected store for LocalWorker's store to be a FastSlowStore")?
         .clone();
 
-    let work_directory = shellexpand::full(&config.work_directory)
-        .map_err(|e| make_input_err!("{}", e))
-        .err_tip(|| "Could expand work_directory in LocalWorker")?
-        .to_string();
-
-    if let Ok(path) = fs::canonicalize(&work_directory).await {
+    if let Ok(path) = fs::canonicalize(&config.work_directory).await {
         fs::remove_dir_all(path)
             .await
             .err_tip(|| "Could not remove work_directory in LocalWorker")?;
     }
 
-    fs::create_dir_all(&work_directory)
+    fs::create_dir_all(&config.work_directory)
         .await
-        .err_tip(|| format!("Could not make work_directory : {}", work_directory))?;
+        .err_tip(|| format!("Could not make work_directory : {}", config.work_directory))?;
 
-    let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(work_directory, fast_slow_store)?).clone();
+    let running_actions_manager = Arc::new(RunningActionsManagerImpl::new(config.work_directory.to_string(), fast_slow_store)?).clone();
     Ok(LocalWorker::new_with_connection_factory_and_actions_manager(
         config.clone(),
         running_actions_manager,
@@ -240,11 +234,7 @@ pub async fn new_local_worker(
                 let timeout = config.worker_api_endpoint.timeout.unwrap_or(DEFAULT_ENDPOINT_TIMEOUT_S);
                 let timeout_duration = Duration::from_secs_f32(timeout);
 
-                let uri_string = shellexpand::env(&config.worker_api_endpoint.uri)
-                    .map_err(|e| make_input_err!("{}", e))
-                    .err_tip(|| "Could expand worker_api_endpoint.uri in LocalWorker")?
-                    .to_string();
-                let uri = uri_string
+                let uri = config.worker_api_endpoint.uri
                     .clone()
                     .try_into()
                     .map_err(|e| make_input_err!("Invalid URI for worker endpoint : {:?}", e))?;
@@ -254,7 +244,7 @@ pub async fn new_local_worker(
                 let transport = endpoint
                     .connect()
                     .await
-                    .map_err(|e| make_err!(Code::Internal, "Could not connect to endpoint {}: {:?}", uri_string, e))?;
+                    .map_err(|e| make_err!(Code::Internal, "Could not connect to endpoint {}: {:?}", config.worker_api_endpoint.uri, e))?;
                 Ok(WorkerApiClient::new(transport).into())
             })
         }),

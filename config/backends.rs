@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use serde_utils::{convert_numeric_with_shellexpand, convert_string_with_shellexpand};
+
 #[allow(non_camel_case_types)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum StoreConfig {
@@ -117,6 +119,7 @@ pub enum StoreConfig {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SizePartitioningStore {
     /// Size to partition the data on.
+    #[serde(deserialize_with = "convert_numeric_with_shellexpand")]
     pub size: u64,
 
     /// Store to send data when object is < (less than) size.
@@ -129,6 +132,7 @@ pub struct SizePartitioningStore {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct RefStore {
     /// Name of the store under the root "stores" config object.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub name: String,
 }
 
@@ -139,6 +143,7 @@ pub struct FilesystemStore {
     /// On service bootup this folder will be scanned and all files will be
     /// added to the cache. In the event one of the files doesn't match the
     /// criteria, the file will be deleted.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub content_path: String,
 
     /// A temporary location of where files that are being uploaded or
@@ -146,12 +151,13 @@ pub struct FilesystemStore {
     /// accurate. This location must be on the same block device as
     /// `content_path` so atomic moves can happen (ie: move without copy).
     /// All files in this folder will be deleted on every startup.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub temp_path: String,
 
     /// Buffer size to use when reading files. Generally this should be left
     /// to the default value except for testing.
     /// Default: 32k.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub read_buffer_size: u32,
 
     /// Policy used to evict items out of the store. Failure to set this
@@ -195,7 +201,7 @@ pub struct DedupStore {
     /// deciding where to partition the data.
     ///
     /// Default: 65536 (64k)
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub min_size: u32,
 
     /// A best-effort attempt will be made to keep the average size
@@ -209,13 +215,13 @@ pub struct DedupStore {
     /// details.
     ///
     /// Default: 262144 (256k)
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub normal_size: u32,
 
     /// Maximum size a chunk is allowed to be.
     ///
     /// Default: 524288 (512k)
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_size: u32,
 
     /// Due to implementation detail, we want to prefer to download
@@ -229,7 +235,7 @@ pub struct DedupStore {
     /// request is: `max_concurrent_fetch_per_get * max_size`.
     ///
     /// Default: 10
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_concurrent_fetch_per_get: u32,
 }
 
@@ -264,7 +270,7 @@ pub struct Lz4Config {
     /// compression ratios.
     ///
     /// Default: 65536 (64k).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub block_size: u32,
 
     /// Maximum size allowed to attempt to deserialize data into.
@@ -275,7 +281,7 @@ pub struct Lz4Config {
     /// allow you to specify the maximum that we'll attempt deserialize.
     ///
     /// Default: value in `block_size`.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_decode_block_size: u32,
 }
 
@@ -312,28 +318,28 @@ pub struct CompressionStore {
 pub struct EvictionPolicy {
     /// Maximum number of bytes before eviction takes place.
     /// Default: 0. Zero means never evict based on size.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_bytes: usize,
 
     /// Maximum number of seconds for an entry to live before an eviction.
     /// Default: 0. Zero means never evict based on time.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_seconds: u32,
 
     /// Maximum size of the store before an eviction takes place.
     /// Default: 0. Zero means never evict based on count.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_count: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct S3Store {
     /// S3 region. Usually us-east-1, us-west-2, af-south-1, exc...
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_string_with_shellexpand")]
     pub region: String,
 
     /// Bucket name to use as the backend.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_string_with_shellexpand")]
     pub bucket: String,
 
     /// If you wish to prefix the location on s3. If None, no prefix will be used.
@@ -355,14 +361,14 @@ pub struct S3Store {
     /// settings we do it on the individual store level to apply globally.
     ///
     /// Default: 20.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub additional_max_concurrent_requests: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct GrpcStore {
     /// Instance name for GRPC calls. Proxy calls will have the instance_name changed to this.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_string_with_shellexpand")]
     pub instance_name: String,
 
     /// The endpoint of the grpc connection.
@@ -395,7 +401,7 @@ pub struct GrpcStore {
 pub struct Retry {
     /// Maximum number of retries until retrying stops.
     /// Setting this to zero will always attempt 1 time, but not retry.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_retries: usize,
 
     /// Delay in seconds for exponential back off.

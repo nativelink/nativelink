@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use backends;
+use serde_utils::{convert_numeric_with_shellexpand, convert_string_with_shellexpand};
 
 /// Name of the store. This type will be used when referencing a store
 /// in the `CasConfig::stores`'s map key.
@@ -21,6 +22,7 @@ pub type InstanceName = String;
 pub struct AcStoreConfig {
     /// The store name referenced in the `stores` map in the main config.
     /// This store name referenced here may be reused multiple times.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub ac_store: StoreRefName,
 }
 
@@ -28,6 +30,7 @@ pub struct AcStoreConfig {
 pub struct CasStoreConfig {
     /// The store name referenced in the `stores` map in the main config.
     /// This store name referenced here may be reused multiple times.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub cas_store: StoreRefName,
 }
 
@@ -62,7 +65,7 @@ pub struct SchedulerConfig {
     /// Remove workers from pool once the worker has not responded in this
     /// amount of time in seconds.
     /// Default: 5 (seconds)
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub worker_timeout_s: u64,
 
     /// If a job returns an internal error or times out this many times when
@@ -72,13 +75,14 @@ pub struct SchedulerConfig {
     /// resources when the task itself is the one causing the server to go
     /// into a bad state.
     /// Default: 3
-    #[serde(default)]
+    #[serde(default, deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_job_retries: usize,
 }
 
 #[derive(Deserialize, Debug, Default)]
 pub struct CapabilitiesRemoteExecutionConfig {
     /// Scheduler used to configure the capabilities of remote execution.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub scheduler: SchedulerRefName,
 }
 
@@ -118,9 +122,11 @@ pub struct ExecutionConfig {
     /// The store name referenced in the `stores` map in the main config.
     /// This store name referenced here may be reused multiple times.
     /// This value must be a CAS store reference.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub cas_store: StoreRefName,
 
     /// The scheduler name referenced in the `schedulers` map in the main config.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub scheduler: SchedulerRefName,
 }
 
@@ -130,12 +136,14 @@ pub struct ByteStreamConfig {
     pub cas_stores: HashMap<InstanceName, StoreRefName>,
 
     // Max number of bytes to send on each grpc stream chunk.
+    #[serde(deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_bytes_per_stream: usize,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct WorkerApiConfig {
     /// The scheduler name referenced in the `schedulers` map in the main config.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub scheduler: SchedulerRefName,
 }
 
@@ -180,6 +188,7 @@ pub struct ServicesConfig {
 pub struct ServerConfig {
     /// Address to listen on. Example: `127.0.0.1:8080` or `:8080` to listen
     /// to all IPs.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub listen_address: String,
 
     /// Services to attach to server.
@@ -203,6 +212,7 @@ pub enum WrokerProperty {
 #[derive(Deserialize, Debug, Default)]
 pub struct EndpointConfig {
     /// URI of the endpoint.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub uri: String,
 
     /// Timeout in seconds that a request should take.
@@ -221,6 +231,7 @@ pub struct LocalWorkerConfig {
     /// location.
     /// Example: "run.sh $@" and a job with command: "sleep 5" will result in a
     /// command like: "run.sh sleep 5".
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub entrypoint_cmd: String,
 
     /// Underlying CAS store that the worker will use to download CAS artifacts.
@@ -228,11 +239,13 @@ pub struct LocalWorkerConfig {
     /// `FileSystemStore` because it will use hardlinks when building out the files
     /// instead of copying the files. The slow store must eventually resolve to the
     /// same store the scheduler/client uses to send job requests.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub cas_fast_slow_store: StoreRefName,
 
     /// Underlying AC store that the worker will use to publish execution results
     /// into. Objects placed in this store should be reachable from the
     /// scheduler/client-cas after they have finished updating.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub ac_store: StoreRefName,
 
     /// The directory work jobs will be executed from. This directory will be fully
@@ -241,6 +254,7 @@ pub struct LocalWorkerConfig {
     /// backends::FilesystemStore::content_path must be on the same filesystem.
     /// Hardlinks will be used when placing files that are accessible to the jobs
     /// that are sourced from local_filesystem_store_ref's content_path.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
     pub work_directory: String,
 
     /// Properties of this worker. This configuration will be sent to the scheduler
@@ -268,6 +282,7 @@ pub struct GlobalConfig {
     /// Note: This value must be greater than 10.
     ///
     /// Default: 512
+    #[serde(deserialize_with = "convert_numeric_with_shellexpand")]
     pub max_open_files: usize,
 }
 

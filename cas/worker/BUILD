@@ -12,7 +12,6 @@ rust_library(
         "//config",
         "//proto",
         "//third_party:futures",
-        "//third_party:shellexpand",
         "//third_party:tokio",
         "//third_party:tokio_stream",
         "//third_party:tonic",

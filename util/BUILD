@@ -135,6 +135,16 @@ rust_library(
     visibility = ["//visibility:public"],
 )
 
+rust_library(
+    name = "serde_utils",
+    srcs = ["serde_utils.rs"],
+    deps = [
+        "//third_party:serde",
+        "//third_party:shellexpand",
+    ],
+    visibility = ["//visibility:public"],
+)
+
 rust_test(
     name = "fastcdc_test",
     srcs = ["tests/fastcdc_test.rs"],
