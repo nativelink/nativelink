@@ -35,14 +35,14 @@ rust_library(
     name = "axum",
     srcs = glob(["**/*.rs"]),
     aliases = {
-        "@raze__tower__0_4_12//:tower": "tower",
+        "@raze__tower__0_4_13//:tower": "tower",
     },
     crate_features = [
     ],
     crate_root = "src/lib.rs",
     data = [],
     compile_data = glob(['**/*.md']),
-    edition = "2018",
+    edition = "2021",
     proc_macro_deps = [
         "@raze__async_trait__0_1_56//:async_trait",
     ],
@@ -53,10 +53,10 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.5.7",
+    version = "0.5.9",
     # buildifier: leave-alone
     deps = [
-        "@raze__axum_core__0_2_5//:axum_core",
+        "@raze__axum_core__0_2_6//:axum_core",
         "@raze__bitflags__1_3_2//:bitflags",
         "@raze__bytes__1_1_0//:bytes",
         "@raze__futures_util__0_3_21//:futures_util",
@@ -72,9 +72,9 @@ rust_library(
         "@raze__serde__1_0_137//:serde",
         "@raze__sync_wrapper__0_1_1//:sync_wrapper",
         "@raze__tokio__1_19_2//:tokio",
-        "@raze__tower__0_4_12//:tower",
+        "@raze__tower__0_4_13//:tower",
         "@raze__tower_http__0_3_4//:tower_http",
         "@raze__tower_layer__0_3_1//:tower_layer",
-        "@raze__tower_service__0_3_1//:tower_service",
+        "@raze__tower_service__0_3_2//:tower_service",
     ],
 )

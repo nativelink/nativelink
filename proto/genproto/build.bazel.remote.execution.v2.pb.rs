@@ -2229,8 +2229,8 @@ pub mod execution_server {
     #[derive(Debug)]
     pub struct ExecutionServer<T: Execution> {
         inner: _Inner<T>,
-        accept_compression_encodings: (),
-        send_compression_encodings: (),
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
     impl<T: Execution> ExecutionServer<T> {
@@ -2253,6 +2253,18 @@ pub mod execution_server {
             F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with `gzip`.
+        #[must_use]
+        pub fn accept_gzip(mut self) -> Self {
+            self.accept_compression_encodings.enable_gzip();
+            self
+        }
+        /// Compress responses with `gzip`, if the client supports it.
+        #[must_use]
+        pub fn send_gzip(mut self) -> Self {
+            self.send_compression_encodings.enable_gzip();
+            self
         }
     }
     impl<T, B> tonic::codegen::Service<http::Request<B>> for ExecutionServer<T>
@@ -2458,8 +2470,8 @@ pub mod action_cache_server {
     #[derive(Debug)]
     pub struct ActionCacheServer<T: ActionCache> {
         inner: _Inner<T>,
-        accept_compression_encodings: (),
-        send_compression_encodings: (),
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
     impl<T: ActionCache> ActionCacheServer<T> {
@@ -2482,6 +2494,18 @@ pub mod action_cache_server {
             F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with `gzip`.
+        #[must_use]
+        pub fn accept_gzip(mut self) -> Self {
+            self.accept_compression_encodings.enable_gzip();
+            self
+        }
+        /// Compress responses with `gzip`, if the client supports it.
+        #[must_use]
+        pub fn send_gzip(mut self) -> Self {
+            self.send_compression_encodings.enable_gzip();
+            self
         }
     }
     impl<T, B> tonic::codegen::Service<http::Request<B>> for ActionCacheServer<T>
@@ -2802,8 +2826,8 @@ pub mod content_addressable_storage_server {
     #[derive(Debug)]
     pub struct ContentAddressableStorageServer<T: ContentAddressableStorage> {
         inner: _Inner<T>,
-        accept_compression_encodings: (),
-        send_compression_encodings: (),
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
     impl<T: ContentAddressableStorage> ContentAddressableStorageServer<T> {
@@ -2826,6 +2850,18 @@ pub mod content_addressable_storage_server {
             F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with `gzip`.
+        #[must_use]
+        pub fn accept_gzip(mut self) -> Self {
+            self.accept_compression_encodings.enable_gzip();
+            self
+        }
+        /// Compress responses with `gzip`, if the client supports it.
+        #[must_use]
+        pub fn send_gzip(mut self) -> Self {
+            self.send_compression_encodings.enable_gzip();
+            self
         }
     }
     impl<T, B> tonic::codegen::Service<http::Request<B>>
@@ -3075,8 +3111,8 @@ pub mod capabilities_server {
     #[derive(Debug)]
     pub struct CapabilitiesServer<T: Capabilities> {
         inner: _Inner<T>,
-        accept_compression_encodings: (),
-        send_compression_encodings: (),
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
     impl<T: Capabilities> CapabilitiesServer<T> {
@@ -3099,6 +3135,18 @@ pub mod capabilities_server {
             F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with `gzip`.
+        #[must_use]
+        pub fn accept_gzip(mut self) -> Self {
+            self.accept_compression_encodings.enable_gzip();
+            self
+        }
+        /// Compress responses with `gzip`, if the client supports it.
+        #[must_use]
+        pub fn send_gzip(mut self) -> Self {
+            self.send_compression_encodings.enable_gzip();
+            self
         }
     }
     impl<T, B> tonic::codegen::Service<http::Request<B>> for CapabilitiesServer<T>

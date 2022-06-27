@@ -31,13 +31,15 @@ licenses([
 
 # Generated Targets
 
-rust_library(
-    name = "clap_lex",
+rust_proc_macro(
+    name = "clap_derive",
     srcs = glob(["**/*.rs"]),
     crate_features = [
+        "default",
     ],
     crate_root = "src/lib.rs",
     data = [],
+    compile_data = ['README.md'],
     edition = "2021",
     rustc_flags = [
         "--cap-lints=allow",
@@ -46,9 +48,13 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.2.2",
+    version = "3.2.6",
     # buildifier: leave-alone
     deps = [
-        "@raze__os_str_bytes__6_1_0//:os_str_bytes",
+        "@raze__heck__0_4_0//:heck",
+        "@raze__proc_macro2__1_0_40//:proc_macro2",
+        "@raze__proc_macro_error__1_0_4//:proc_macro_error",
+        "@raze__quote__1_0_20//:quote",
+        "@raze__syn__1_0_98//:syn",
     ],
 )

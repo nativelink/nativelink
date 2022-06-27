@@ -51,6 +51,7 @@ pub mod write_tests {
 
     use tonic::{
         codec::Codec, // Needed for .decoder().
+        codec::CompressionEncoding,
         codec::ProstCodec,
         transport::Body,
         Streaming,
@@ -74,7 +75,7 @@ pub mod write_tests {
             let (tx, body) = Body::channel();
             let mut codec = ProstCodec::<WriteRequest, WriteRequest>::default();
             // Note: This is an undocumented function.
-            let stream = Streaming::new_request(codec.decoder(), body);
+            let stream = Streaming::new_request(codec.decoder(), body, Some(CompressionEncoding::Gzip));
 
             let join_handle = tokio::spawn(async move {
                 let response_future = bs_server.write(Request::new(stream));
@@ -299,7 +300,7 @@ pub mod query_tests {
         byte_stream_server::ByteStream, QueryWriteStatusRequest, QueryWriteStatusResponse, WriteRequest,
     };
 
-    use tonic::{codec::Codec, codec::ProstCodec, transport::Body, Streaming};
+    use tonic::{codec::Codec, codec::CompressionEncoding, codec::ProstCodec, transport::Body, Streaming};
 
     #[tokio::test]
     pub async fn test_query_write_status_smoke_test() -> Result<(), Box<dyn std::error::Error>> {
@@ -336,7 +337,7 @@ pub mod query_tests {
             let (tx, body) = Body::channel();
             let mut codec = ProstCodec::<WriteRequest, WriteRequest>::default();
             // Note: This is an undocumented function.
-            let stream = Streaming::new_request(codec.decoder(), body);
+            let stream = Streaming::new_request(codec.decoder(), body, Some(CompressionEncoding::Gzip));
 
             let bs_server_clone = bs_server.clone();
             let join_handle = tokio::spawn(async move {

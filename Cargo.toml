@@ -17,7 +17,7 @@ futures = "0.3.17"
 tokio = { version = "1.13.0", features = ["macros", "io-util", "fs", "rt-multi-thread", "parking_lot"] }
 tokio-stream = { version = "0.1.8", features = ["fs", "sync"] }
 tokio-util = { version = "0.6.9", features = ["io", "io-util", "codec"] }
-tonic = "0.7.1"
+tonic = { version = "0.7.1", features = ["compression"] }
 lazy-init = "0.5.0"
 log = "0.4.14"
 env_logger = "0.9.0"
@@ -48,7 +48,7 @@ relative-path = "1.7.0"
 [dev-dependencies]
 stdext = "0.2.1"
 prost-build = "0.10.1"
-tonic-build = "0.7.0"
+tonic-build = { version = "0.7.0", features = ["compression"] }
 pretty_assertions = "0.7.2"
 # Crates.io does not have `rustfmt` that is sufficient version, so load from github directly.
 rustfmt-nightly =  { git = "https://github.com/rust-lang/rustfmt", tag = "v1.4.38" }

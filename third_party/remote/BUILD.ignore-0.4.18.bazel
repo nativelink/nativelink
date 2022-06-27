@@ -51,7 +51,7 @@ rust_library(
     version = "0.4.18",
     # buildifier: leave-alone
     deps = [
-        "@raze__crossbeam_utils__0_8_9//:crossbeam_utils",
+        "@raze__crossbeam_utils__0_8_10//:crossbeam_utils",
         "@raze__globset__0_4_9//:globset",
         "@raze__lazy_static__1_4_0//:lazy_static",
         "@raze__log__0_4_17//:log",

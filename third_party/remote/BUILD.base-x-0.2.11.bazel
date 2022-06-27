@@ -31,14 +31,18 @@ licenses([
 
 # Generated Targets
 
+# Unsupported target "base" with type "bench" omitted
+
 rust_library(
-    name = "tower_service",
+    name = "base_x",
     srcs = glob(["**/*.rs"]),
     crate_features = [
+        "default",
+        "std",
     ],
     crate_root = "src/lib.rs",
     data = [],
-    edition = "2018",
+    edition = "2015",
     rustc_flags = [
         "--cap-lints=allow",
     ],
@@ -46,7 +50,7 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.3.1",
+    version = "0.2.11",
     # buildifier: leave-alone
     deps = [
     ],

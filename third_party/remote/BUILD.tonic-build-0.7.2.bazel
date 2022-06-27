@@ -35,6 +35,7 @@ rust_library(
     name = "tonic_build",
     srcs = glob(["**/*.rs"]),
     crate_features = [
+        "compression",
         "default",
         "prost",
         "prost-build",
@@ -53,10 +54,10 @@ rust_library(
     version = "0.7.2",
     # buildifier: leave-alone
     deps = [
-        "@raze__prettyplease__0_1_12//:prettyplease",
-        "@raze__proc_macro2__1_0_39//:proc_macro2",
+        "@raze__prettyplease__0_1_15//:prettyplease",
+        "@raze__proc_macro2__1_0_40//:proc_macro2",
         "@raze__prost_build__0_10_4//:prost_build",
-        "@raze__quote__1_0_18//:quote",
-        "@raze__syn__1_0_96//:syn",
+        "@raze__quote__1_0_20//:quote",
+        "@raze__syn__1_0_98//:syn",
     ],
 )

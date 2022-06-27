@@ -1,8 +1,11 @@
+.cache
+.config
 bazel-bin
 bazel-out
 bazel-remote-bin
 bazel-remote-out
 bazel-remote-testlogs
 bazel-remote-turbo-cache
+bazel-root
 bazel-testlogs
 bazel-turbo-cache

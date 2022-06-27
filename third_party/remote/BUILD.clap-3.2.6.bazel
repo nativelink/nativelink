@@ -53,7 +53,7 @@ rust_binary(
     compile_data = ['README.md'],
     edition = "2021",
     proc_macro_deps = [
-        "@raze__clap_derive__3_2_5//:clap_derive",
+        "@raze__clap_derive__3_2_6//:clap_derive",
     ],
     rustc_flags = [
         "--cap-lints=allow",
@@ -62,14 +62,14 @@ rust_binary(
         "cargo-raze",
         "manual",
     ],
-    version = "3.2.5",
+    version = "3.2.6",
     # buildifier: leave-alone
     deps = [
         ":clap",
         "@raze__atty__0_2_14//:atty",
         "@raze__bitflags__1_3_2//:bitflags",
-        "@raze__clap_lex__0_2_2//:clap_lex",
-        "@raze__indexmap__1_9_0//:indexmap",
+        "@raze__clap_lex__0_2_3//:clap_lex",
+        "@raze__indexmap__1_9_1//:indexmap",
         "@raze__once_cell__1_12_0//:once_cell",
         "@raze__strsim__0_10_0//:strsim",
         "@raze__termcolor__1_1_3//:termcolor",
@@ -199,7 +199,7 @@ rust_library(
     compile_data = ['README.md'],
     edition = "2021",
     proc_macro_deps = [
-        "@raze__clap_derive__3_2_5//:clap_derive",
+        "@raze__clap_derive__3_2_6//:clap_derive",
     ],
     rustc_flags = [
         "--cap-lints=allow",
@@ -208,13 +208,13 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "3.2.5",
+    version = "3.2.6",
     # buildifier: leave-alone
     deps = [
         "@raze__atty__0_2_14//:atty",
         "@raze__bitflags__1_3_2//:bitflags",
-        "@raze__clap_lex__0_2_2//:clap_lex",
-        "@raze__indexmap__1_9_0//:indexmap",
+        "@raze__clap_lex__0_2_3//:clap_lex",
+        "@raze__indexmap__1_9_1//:indexmap",
         "@raze__once_cell__1_12_0//:once_cell",
         "@raze__strsim__0_10_0//:strsim",
         "@raze__termcolor__1_1_3//:termcolor",

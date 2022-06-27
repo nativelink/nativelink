@@ -31,22 +31,12 @@ licenses([
 
 # Generated Targets
 
-# Unsupported target "tcp_listenfd_server" with type "example" omitted
-
-# Unsupported target "tcp_server" with type "example" omitted
-
-# Unsupported target "udp_server" with type "example" omitted
-
 rust_library(
-    name = "mio",
+    name = "tracing_core",
     srcs = glob(["**/*.rs"]),
-    aliases = {
-    },
     crate_features = [
-        "default",
-        "net",
-        "os-ext",
-        "os-poll",
+        "once_cell",
+        "std",
     ],
     crate_root = "src/lib.rs",
     data = [],
@@ -58,21 +48,15 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "0.8.3",
+    version = "0.1.28",
     # buildifier: leave-alone
     deps = [
-        "@raze__log__0_4_17//:log",
-    ] + selects.with_or({
-        # cfg(unix)
-        (
-            "@rules_rust//rust/platform:x86_64-unknown-linux-gnu",
-            "@rules_rust//rust/platform:aarch64-unknown-linux-gnu",
-            "@rules_rust//rust/platform:arm-unknown-linux-gnueabi",
-            "@rules_rust//rust/platform:powerpc-unknown-linux-gnu",
-            "@rules_rust//rust/platform:s390x-unknown-linux-gnu",
-        ): [
-            "@raze__libc__0_2_126//:libc",
-        ],
-        "//conditions:default": [],
-    }),
+        "@raze__once_cell__1_12_0//:once_cell",
+    ],
 )
+
+# Unsupported target "dispatch" with type "test" omitted
+
+# Unsupported target "global_dispatch" with type "test" omitted
+
+# Unsupported target "macros" with type "test" omitted

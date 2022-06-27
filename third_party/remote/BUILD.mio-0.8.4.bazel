@@ -26,17 +26,27 @@ package(default_visibility = [
 ])
 
 licenses([
-    "notice",  # MIT from expression "MIT OR Apache-2.0"
+    "notice",  # MIT from expression "MIT"
 ])
 
 # Generated Targets
 
-# Unsupported target "bench" with type "bench" omitted
+# Unsupported target "tcp_listenfd_server" with type "example" omitted
+
+# Unsupported target "tcp_server" with type "example" omitted
+
+# Unsupported target "udp_server" with type "example" omitted
 
 rust_library(
-    name = "smallvec",
+    name = "mio",
     srcs = glob(["**/*.rs"]),
+    aliases = {
+    },
     crate_features = [
+        "default",
+        "net",
+        "os-ext",
+        "os-poll",
     ],
     crate_root = "src/lib.rs",
     data = [],
@@ -48,10 +58,21 @@ rust_library(
         "cargo-raze",
         "manual",
     ],
-    version = "1.8.0",
+    version = "0.8.4",
     # buildifier: leave-alone
     deps = [
-    ],
+        "@raze__log__0_4_17//:log",
+    ] + selects.with_or({
+        # cfg(unix)
+        (
+            "@rules_rust//rust/platform:x86_64-unknown-linux-gnu",
+            "@rules_rust//rust/platform:aarch64-unknown-linux-gnu",
+            "@rules_rust//rust/platform:arm-unknown-linux-gnueabi",
+            "@rules_rust//rust/platform:powerpc-unknown-linux-gnu",
+            "@rules_rust//rust/platform:s390x-unknown-linux-gnu",
+        ): [
+            "@raze__libc__0_2_126//:libc",
+        ],
+        "//conditions:default": [],
+    }),
 )
-
-# Unsupported target "macro" with type "test" omitted

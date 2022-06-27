@@ -61,8 +61,8 @@ rust_library(
         "@raze__http_body__0_4_5//:http_body",
         "@raze__http_range_header__0_3_0//:http_range_header",
         "@raze__pin_project_lite__0_2_9//:pin_project_lite",
-        "@raze__tower__0_4_12//:tower",
+        "@raze__tower__0_4_13//:tower",
         "@raze__tower_layer__0_3_1//:tower_layer",
-        "@raze__tower_service__0_3_1//:tower_service",
+        "@raze__tower_service__0_3_2//:tower_service",
     ],
 )

@@ -52,12 +52,12 @@ rust_proc_macro(
     version = "0.2.9",
     # buildifier: leave-alone
     deps = [
-        "@raze__base_x__0_2_10//:base_x",
-        "@raze__proc_macro2__1_0_39//:proc_macro2",
-        "@raze__quote__1_0_18//:quote",
+        "@raze__base_x__0_2_11//:base_x",
+        "@raze__proc_macro2__1_0_40//:proc_macro2",
+        "@raze__quote__1_0_20//:quote",
         "@raze__serde__1_0_137//:serde",
         "@raze__serde_json__1_0_81//:serde_json",
         "@raze__sha1__0_6_1//:sha1",
-        "@raze__syn__1_0_96//:syn",
+        "@raze__syn__1_0_98//:syn",
     ],
 )

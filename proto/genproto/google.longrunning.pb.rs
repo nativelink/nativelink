@@ -421,8 +421,8 @@ pub mod operations_server {
     #[derive(Debug)]
     pub struct OperationsServer<T: Operations> {
         inner: _Inner<T>,
-        accept_compression_encodings: (),
-        send_compression_encodings: (),
+        accept_compression_encodings: EnabledCompressionEncodings,
+        send_compression_encodings: EnabledCompressionEncodings,
     }
     struct _Inner<T>(Arc<T>);
     impl<T: Operations> OperationsServer<T> {
@@ -445,6 +445,18 @@ pub mod operations_server {
             F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
+        }
+        /// Enable decompressing requests with `gzip`.
+        #[must_use]
+        pub fn accept_gzip(mut self) -> Self {
+            self.accept_compression_encodings.enable_gzip();
+            self
+        }
+        /// Compress responses with `gzip`, if the client supports it.
+        #[must_use]
+        pub fn send_gzip(mut self) -> Self {
+            self.send_compression_encodings.enable_gzip();
+            self
         }
     }
     impl<T, B> tonic::codegen::Service<http::Request<B>> for OperationsServer<T>

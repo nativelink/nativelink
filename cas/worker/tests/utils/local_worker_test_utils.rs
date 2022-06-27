@@ -6,6 +6,7 @@ use std::sync::Arc;
 use hyper::body::Sender as HyperSender;
 use tonic::{
     codec::Codec, // Needed for .decoder().
+    codec::CompressionEncoding,
     codec::ProstCodec,
     transport::Body,
     Response,
@@ -24,7 +25,7 @@ pub fn setup_grpc_stream() -> (HyperSender, Response<Streaming<UpdateForWorker>>
     let (tx, body) = Body::channel();
     let mut codec = ProstCodec::<UpdateForWorker, UpdateForWorker>::default();
     // Note: This is an undocumented function.
-    let stream = Streaming::new_request(codec.decoder(), body);
+    let stream = Streaming::new_request(codec.decoder(), body, Some(CompressionEncoding::Gzip));
     (tx, Response::new(stream))
 }
 
