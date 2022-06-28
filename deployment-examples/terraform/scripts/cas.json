@@ -1,0 +1,147 @@
+{
+  "stores": {
+    "AC_S3_STORE": {
+      "compression": {
+        "compression_algorithm": {
+          "LZ4": {}
+        },
+        "backend": {
+          "fast_slow": {
+            "fast": {
+              "memory": {
+                "eviction_policy": {
+                  "max_bytes": "${TURBO_CACHE_AC_CONTENT_LIMIT:-100000000}",
+                }
+              }
+            },
+            "slow": {
+              // TODO(allada) This needs to be some kind of sharding store, because s3 has
+              // a 5k requests/s per path limit. To get around this we just need to create
+              // enough shards and point them to the same bucket/path but with some key
+              // to distinguish each shard based on the key.
+              "s3_store": {
+                "region": "${TURBO_CACHE_AWS_REGION:-us-east-1}",
+                "bucket": "${TURBO_CACHE_AWS_S3_CAS_BUCKET:-not_set}",
+                "key_prefix": "ac/",
+                "retry": {
+                  "max_retries": 6,
+                  "delay": 0.3,
+                  "jitter": 0.5,
+                },
+                "additional_max_concurrent_requests": 10
+              }
+            }
+          }
+        }
+      }
+    },
+    "CAS_S3_STORE": {
+      "verify": {
+        "backend": {
+          "dedup": {
+            "index_store": {
+              "fast_slow": {
+                "fast": {
+                  "memory": {
+                    "eviction_policy": {
+                      "max_bytes": "${TURBO_CACHE_CAS_INDEX_CACHE_LIMIT:-100000000}",
+                    }
+                  }
+                },
+                "slow": {
+                  // TODO(allada) This needs to be some kind of sharding store, because s3 has
+                  // a 5k requests/s per path limit. To get around this we just need to create
+                  // enough shards and point them to the same bucket/path but with some key
+                  // to distinguish each shard based on the key.
+                  "s3_store": {
+                    "region": "${TURBO_CACHE_AWS_REGION:-us-east-1}",
+                    "bucket": "${TURBO_CACHE_AWS_S3_CAS_BUCKET:-not_set}",
+                    "key_prefix": "cas-index/",
+                    "retry": {
+                      "max_retries": 6,
+                      "delay": 0.3,
+                      "jitter": 0.5,
+                    },
+                    "additional_max_concurrent_requests": 10
+                  }
+                }
+              }
+            },
+            "content_store": {
+              "compression": {
+                "compression_algorithm": {
+                  "LZ4": {}
+                },
+                "backend": {
+                  "fast_slow": {
+                    "fast": {
+                      // The scheduler should mostly only be downloading small proto messages
+                      // that describe what is being executed. Large blobs should not be pulled
+                      // in the scheduler.
+                      "memory": {
+                        "eviction_policy": {
+                          "max_bytes": "${TURBO_CACHE_CAS_CONTENT_LIMIT:-1000000000}",
+                        }
+                      }
+                    },
+                    "slow": {
+                      // TODO(allada) This needs to be some kind of sharding store, because s3 has
+                      // a 5k requests/s per path limit. To get around this we just need to create
+                      // enough shards and point them to the same bucket/path but with some key
+                      // to distinguish each shard based on the key.
+                      "s3_store": {
+                        "region": "${TURBO_CACHE_AWS_REGION:-us-east-1}",
+                        "bucket": "${TURBO_CACHE_AWS_S3_CAS_BUCKET:-not_set}",
+                        "key_prefix": "cas/",
+                        "retry": {
+                          "max_retries": 6,
+                          "delay": 0.3,
+                          "jitter": 0.5,
+                        },
+                        "additional_max_concurrent_requests": 10
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "verify_size": true,
+        "verify_hash": true
+      }
+    },
+  },
+  "schedulers": {
+    "MAIN_SCHEDULER": {
+      "supported_platform_properties": {
+        "cpu_count": "Minimum"
+      }
+    }
+  },
+  "servers": [{
+    "listen_address": "0.0.0.0:50051",
+    "services": {
+      "cas": {
+        "main": {
+          "cas_store": "CAS_S3_STORE"
+        }
+      },
+      "ac": {
+        "main": {
+          "ac_store": "AC_S3_STORE"
+        }
+      },
+      "capabilities": {
+        "main": {}
+      },
+      "bytestream": {
+        "cas_stores": {
+          "main": "CAS_S3_STORE",
+        },
+        // According to https://github.com/grpc/grpc.github.io/issues/371 16KiB - 64KiB is optimal.
+        "max_bytes_per_stream": 64000, // 64kb.
+      }
+    }
+  }]
+}

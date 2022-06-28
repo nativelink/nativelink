@@ -118,10 +118,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     for server_cfg in cfg.servers {
-        let mut server = Server::builder();
+        let server = Server::builder();
         let services = server_cfg.services.ok_or_else(|| "'services' must be configured")?;
 
         let server = server
+            // TODO(allada) This is only used so we can get 200 status codes to know if our service
+            // is running.
+            .accept_http1(true)
             .add_optional_service(
                 services
                     .ac

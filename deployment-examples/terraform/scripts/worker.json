@@ -1,0 +1,112 @@
+{
+  "stores": {
+    "AC_S3_STORE": {
+      "compression": {
+        "compression_algorithm": {
+          "LZ4": {}
+        },
+        "backend": {
+          // TODO(allada) This needs to be some kind of sharding store, because s3 has
+          // a 5k requests/s per path limit. To get around this we just need to create
+          // enough shards and point them to the same bucket/path but with some key
+          // to distinguish each shard based on the key.
+          "s3_store": {
+            "region": "${TURBO_CACHE_AWS_REGION:-us-east-1}",
+            "bucket": "${TURBO_CACHE_AWS_S3_CAS_BUCKET:-not_set}",
+            "key_prefix": "ac/",
+            "retry": {
+              "max_retries": 6,
+              "delay": 0.3,
+              "jitter": 0.5,
+            },
+            "additional_max_concurrent_requests": 10
+          }
+        }
+      }
+    },
+    "WORKER_FAST_SLOW_STORE": {
+      "fast_slow": {
+        "fast": {
+          "filesystem": {
+            "content_path": "/worker/content_path-cas",
+            "temp_path": "/worker/tmp_path-cas",
+            "eviction_policy": {
+              "max_bytes": "${MAX_WORKER_DISK_USAGE:-not_set}",
+            }
+          }
+        },
+        "slow": {
+          "dedup": {
+            "index_store": {
+              // TODO(allada) This needs to be some kind of sharding store, because s3 has
+              // a 5k requests/s per path limit. To get around this we just need to create
+              // enough shards and point them to the same bucket/path but with some key
+              // to distinguish each shard based on the key.
+              "s3_store": {
+                "region": "${TURBO_CACHE_AWS_REGION:-us-east-1}",
+                "bucket": "${TURBO_CACHE_AWS_S3_CAS_BUCKET:-not_set}",
+                "key_prefix": "cas-index/",
+                "retry": {
+                  "max_retries": 6,
+                  "delay": 0.3,
+                  "jitter": 0.5,
+                },
+                "additional_max_concurrent_requests": 10
+              }
+            },
+            "content_store": {
+              "compression": {
+                "compression_algorithm": {
+                  "LZ4": {}
+                },
+                "backend": {
+                  // TODO(allada) This needs to be some kind of sharding store, because s3 has
+                  // a 5k requests/s per path limit. To get around this we just need to create
+                  // enough shards and point them to the same bucket/path but with some key
+                  // to distinguish each shard based on the key.
+                  "s3_store": {
+                    "region": "${TURBO_CACHE_AWS_REGION:-us-east-1}",
+                    "bucket": "${TURBO_CACHE_AWS_S3_CAS_BUCKET:-not_set}",
+                    "key_prefix": "cas/",
+                    "retry": {
+                      "max_retries": 6,
+                      "delay": 0.3,
+                      "jitter": 0.5,
+                    },
+                    "additional_max_concurrent_requests": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "workers": [{
+    "local": {
+      "worker_api_endpoint": {
+        "uri": "grpc://${SCHEDULER_ENDPOINT:-127.0.0.1}:50061",
+      },
+      "entrypoint_cmd": "$@",
+      "cas_fast_slow_store": "WORKER_FAST_SLOW_STORE",
+      "ac_store": "AC_S3_STORE",
+      "work_directory": "/worker/work",
+      "platform_properties": {
+        "cpu_count": {
+          "query_cmd": "nproc"
+        },
+        "cpu_arch": {
+          "query_cmd": "uname -p"
+        },
+        "memory_kb": {
+          "query_cmd": "awk '/MemTotal/ { printf \"%.0f\\n\", $2 * .8 }' /proc/meminfo"
+        },
+        "kernel_version": {
+          "query_cmd": "uname -r"
+        }
+      }
+    }
+  }],
+  "servers": []
+}

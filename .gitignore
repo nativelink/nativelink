@@ -4,3 +4,4 @@ target/
 .terraform*
 .config
 terraform.tfstate*
+.update_scheduler_ips.zip
