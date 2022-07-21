@@ -70,7 +70,7 @@ rust_library(
     version = "0.10.3",
     # buildifier: leave-alone
     deps = [
-        "@raze__either__1_6_1//:either",
+        "@raze__either__1_7_0//:either",
     ],
 )
 

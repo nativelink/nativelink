@@ -28,10 +28,8 @@ The terraform deployment is very easy to setup and configure, all you need is a 
 
 This project is still under active development, but has passed into the "Alpha" stage of development. All major components do work as expected and no major API changes are expected.
 
-As of November 18th, 2021 the following things are in need of fixing or should be noted by any users:
-* Uses nightly build of the Rust compiler version: `2021-11-01`. This is because this project is sufficiently tested and any bugs found in the rust compiler could be reported back to the community. As this project reaches maturity this will likely be phased out and we'll start using a stable version of the rust compiler.
-* Although all the configurations do work from unit test and local testing perspective, they have not been tested heavily in production environments yet. Please report any bugs that are discovered.
-
+As of July 21st, 2022 the following things are in need of fixing or should be noted by any users:
+* More testing is needed in a production system.
 
 ## History
 
@@ -40,6 +38,7 @@ This project was first created due to frustration with similar projects not work
 ## Build Requirements
 * Linux (most recent versions) (untested on Windows, but might work)
 * Bazel 3.0.0+
+* `libssl-dev` package installed (ie: `apt install libssl-dev` or `yum install libssl-dev`)
 
 ### Building
 ```

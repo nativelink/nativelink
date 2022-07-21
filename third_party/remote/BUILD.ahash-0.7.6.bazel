@@ -129,7 +129,7 @@ rust_library(
             "@rules_rust//rust/platform:powerpc-unknown-linux-gnu",
             "@rules_rust//rust/platform:s390x-unknown-linux-gnu",
         ): [
-            "@raze__once_cell__1_12_0//:once_cell",
+            "@raze__once_cell__1_13_0//:once_cell",
         ],
         "//conditions:default": [],
     }),

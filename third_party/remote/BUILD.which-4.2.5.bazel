@@ -49,7 +49,7 @@ rust_library(
     version = "4.2.5",
     # buildifier: leave-alone
     deps = [
-        "@raze__either__1_6_1//:either",
+        "@raze__either__1_7_0//:either",
         "@raze__libc__0_2_126//:libc",
     ],
 )

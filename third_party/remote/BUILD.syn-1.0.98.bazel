@@ -107,7 +107,7 @@ rust_library(
         ":syn_build_script",
         "@raze__proc_macro2__1_0_40//:proc_macro2",
         "@raze__quote__1_0_20//:quote",
-        "@raze__unicode_ident__1_0_1//:unicode_ident",
+        "@raze__unicode_ident__1_0_2//:unicode_ident",
     ],
 )
 

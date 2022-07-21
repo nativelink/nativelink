@@ -51,7 +51,7 @@ rust_library(
     version = "2.1.3",
     # buildifier: leave-alone
     deps = [
-        "@raze__ucd_trie__0_1_3//:ucd_trie",
+        "@raze__ucd_trie__0_1_4//:ucd_trie",
     ],
 )
 

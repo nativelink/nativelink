@@ -1,6 +1,6 @@
 // Copyright 2021 Nathan (Blaise) Bruer.  All rights reserved.
 
-#![feature(stmt_expr_attributes)]
+// #![feature(stmt_expr_attributes)]
 
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
@@ -143,7 +143,6 @@ mod fastcdc_tests {
         };
 
         let mut expected_missing_hashes = HashSet::<String>::new();
-        #[rustfmt::skip]
         {
             expected_missing_hashes.insert("076a696917163caac2725f753bd2be2e902478c59cd92eeff012851da5868800".into());
             expected_missing_hashes.insert("b60ffdcaa8f833ca6a9900814e55d5a47b3205a6ac7d21aaadc64f889b556932".into());
@@ -160,11 +159,19 @@ mod fastcdc_tests {
             }
         }
         let mut expected_new_hashes = HashMap::<String, usize>::new();
-        #[rustfmt::skip]
         {
-            expected_new_hashes.insert("867f8da2007726835f89eca1e891c292f648660d0af8cfd169262d13d650fdbd".into(), 0);
-            expected_new_hashes.insert("21930b56aa9fd7dca4160be0e4c92f04b883ffda4cdb78704f73eca8b3b98036".into(), 1832);
-            expected_new_hashes.insert("0a58dd0fbd1b4942a83d12d3f143ca26cfa2e8b606065298cf37eebde9232a83".into(), 49296);
+            expected_new_hashes.insert(
+                "867f8da2007726835f89eca1e891c292f648660d0af8cfd169262d13d650fdbd".into(),
+                0,
+            );
+            expected_new_hashes.insert(
+                "21930b56aa9fd7dca4160be0e4c92f04b883ffda4cdb78704f73eca8b3b98036".into(),
+                1832,
+            );
+            expected_new_hashes.insert(
+                "0a58dd0fbd1b4942a83d12d3f143ca26cfa2e8b606065298cf37eebde9232a83".into(),
+                49296,
+            );
 
             for (key, (_, pos)) in right_frames {
                 let expected_pos = expected_new_hashes.get(&key);

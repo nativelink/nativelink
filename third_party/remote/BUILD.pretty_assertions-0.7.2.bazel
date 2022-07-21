@@ -54,6 +54,6 @@ rust_library(
     # buildifier: leave-alone
     deps = [
         "@raze__ansi_term__0_12_1//:ansi_term",
-        "@raze__diff__0_1_12//:diff",
+        "@raze__diff__0_1_13//:diff",
     ],
 )

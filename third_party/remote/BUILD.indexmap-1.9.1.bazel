@@ -86,7 +86,7 @@ rust_library(
     # buildifier: leave-alone
     deps = [
         ":indexmap_build_script",
-        "@raze__hashbrown__0_12_1//:hashbrown",
+        "@raze__hashbrown__0_12_3//:hashbrown",
     ],
 )
 

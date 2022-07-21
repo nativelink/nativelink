@@ -50,8 +50,6 @@ stdext = "0.2.1"
 prost-build = "0.10.1"
 tonic-build = { version = "0.7.0", features = ["compression"] }
 pretty_assertions = "0.7.2"
-# Crates.io does not have `rustfmt` that is sufficient version, so load from github directly.
-rustfmt-nightly =  { git = "https://github.com/rust-lang/rustfmt", tag = "v1.4.38" }
 maplit = "1.0.2"
 mock_instant = "0.2.1"
 rusoto_mock = "=0.46.0"
@@ -69,7 +67,7 @@ data_attr = "['src/json5.pest']"
 [package.metadata.raze.crates.clap_derive.'*']
 compile_data_attr = "['README.md']"
 [package.metadata.raze.crates.clap.'*']
-compile_data_attr = "['README.md']"
+compile_data_attr = "['README.md', 'examples/demo.md']"
 
 [package.metadata.raze.crates.prost-build.'*']
 gen_buildrs = true
@@ -79,12 +77,6 @@ buildrs_additional_environment_variables = { PROTOC = "bazel-out/host/bin/extern
 
 [package.metadata.raze.crates.axum.'*']
 compile_data_attr = "glob(['**/*.md'])"
-
-[package.metadata.raze.crates.rustfmt-nightly.'*']
-gen_buildrs = true
-extra_aliased_targets = [
-    "cargo_bin_rustfmt"
-]
 
 [package.metadata.raze]
 # The path relative path to the Bazel workspace root (location of

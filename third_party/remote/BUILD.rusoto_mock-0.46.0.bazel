@@ -58,7 +58,7 @@ rust_library(
         "@raze__futures__0_3_21//:futures",
         "@raze__http__0_2_8//:http",
         "@raze__rusoto_core__0_46_0//:rusoto_core",
-        "@raze__serde__1_0_137//:serde",
-        "@raze__serde_json__1_0_81//:serde_json",
+        "@raze__serde__1_0_140//:serde",
+        "@raze__serde_json__1_0_82//:serde_json",
     ],
 )

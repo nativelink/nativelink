@@ -81,7 +81,13 @@ impl CasServer {
                         );
                         Some(digest.clone())
                     },
-                    |maybe_sz| if maybe_sz.is_some() { None } else { Some(digest.clone()) },
+                    |maybe_sz| {
+                        if maybe_sz.is_some() {
+                            None
+                        } else {
+                            Some(digest.clone())
+                        }
+                    },
                 )
             }));
         }

@@ -51,7 +51,7 @@ rust_library(
     data = [],
     edition = "2018",
     proc_macro_deps = [
-        "@raze__tracing_attributes__0_1_21//:tracing_attributes",
+        "@raze__tracing_attributes__0_1_22//:tracing_attributes",
     ],
     rustc_flags = [
         "--cap-lints=allow",

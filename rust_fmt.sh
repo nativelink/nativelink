@@ -5,9 +5,9 @@ set -eu -o pipefail
 
 cd "$(dirname $(realpath $0))"
 
-RUST_FMT="./bazel-bin/external/raze__rustfmt_nightly__1_4_38/cargo_bin_rustfmt"
+RUST_FMT="$(find ./bazel-bin/external/rules_rust/tools/rustfmt/rustfmt.runfiles -ipath */bin/rustfmt | head -n1)"
 if [ ! -e "$RUST_FMT" ] ; then
-  bazel build @raze__rustfmt_nightly__1_4_38//:cargo_bin_rustfmt
+  bazel build @rules_rust//:rustfmt
 fi
 if [ "${1:-}" != "" ]; then
   FILES="$@"
@@ -21,4 +21,5 @@ else
     ! -ipath '*/target/*' \
   2> >(grep -v 'Permission denied' >&2) || true)"
 fi
-echo "$FILES" | parallel -I% --max-args 1 $RUST_FMT --emit files --edition 2018 %
+export BUILD_WORKSPACE_DIRECTORY=$PWD
+echo "$FILES" | parallel -I% --max-args 1 $RUST_FMT --emit files --edition 2021 %

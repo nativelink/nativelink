@@ -90,7 +90,7 @@ rust_library(
     deps = [
         ":prost_build_build_script",
         "@com_google_protobuf//:protoc",
-        "@raze__bytes__1_1_0//:bytes",
+        "@raze__bytes__1_2_0//:bytes",
         "@raze__heck__0_4_0//:heck",
         "@raze__itertools__0_10_3//:itertools",
         "@raze__lazy_static__1_4_0//:lazy_static",
@@ -99,7 +99,7 @@ rust_library(
         "@raze__petgraph__0_6_2//:petgraph",
         "@raze__prost__0_10_4//:prost",
         "@raze__prost_types__0_10_1//:prost_types",
-        "@raze__regex__1_5_6//:regex",
+        "@raze__regex__1_6_0//:regex",
         "@raze__tempfile__3_3_0//:tempfile",
     ],
 )

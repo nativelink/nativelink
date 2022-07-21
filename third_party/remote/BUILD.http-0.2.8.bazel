@@ -61,7 +61,7 @@ rust_library(
     version = "0.2.8",
     # buildifier: leave-alone
     deps = [
-        "@raze__bytes__1_1_0//:bytes",
+        "@raze__bytes__1_2_0//:bytes",
         "@raze__fnv__1_0_7//:fnv",
         "@raze__itoa__1_0_2//:itoa",
     ],

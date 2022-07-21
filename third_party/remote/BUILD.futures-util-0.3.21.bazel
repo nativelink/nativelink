@@ -120,6 +120,6 @@ rust_library(
         "@raze__memchr__2_5_0//:memchr",
         "@raze__pin_project_lite__0_2_9//:pin_project_lite",
         "@raze__pin_utils__0_1_0//:pin_utils",
-        "@raze__slab__0_4_6//:slab",
+        "@raze__slab__0_4_7//:slab",
     ],
 )

@@ -41,7 +41,7 @@ alias(
 
 alias(
     name = "bytes",
-    actual = "@raze__bytes__1_1_0//:bytes",
+    actual = "@raze__bytes__1_2_0//:bytes",
     tags = [
         "cargo-raze",
         "manual",
@@ -50,7 +50,7 @@ alias(
 
 alias(
     name = "clap",
-    actual = "@raze__clap__3_2_6//:clap",
+    actual = "@raze__clap__3_2_14//:clap",
     tags = [
         "cargo-raze",
         "manual",
@@ -86,7 +86,7 @@ alias(
 
 alias(
     name = "filetime",
-    actual = "@raze__filetime__0_2_16//:filetime",
+    actual = "@raze__filetime__0_2_17//:filetime",
     tags = [
         "cargo-raze",
         "manual",
@@ -131,7 +131,7 @@ alias(
 
 alias(
     name = "hyper",
-    actual = "@raze__hyper__0_14_19//:hyper",
+    actual = "@raze__hyper__0_14_20//:hyper",
     tags = [
         "cargo-raze",
         "manual",
@@ -176,7 +176,7 @@ alias(
 
 alias(
     name = "lru",
-    actual = "@raze__lru__0_7_7//:lru",
+    actual = "@raze__lru__0_7_8//:lru",
     tags = [
         "cargo-raze",
         "manual",
@@ -275,7 +275,7 @@ alias(
 
 alias(
     name = "relative_path",
-    actual = "@raze__relative_path__1_7_0//:relative_path",
+    actual = "@raze__relative_path__1_7_2//:relative_path",
     tags = [
         "cargo-raze",
         "manual",
@@ -319,26 +319,8 @@ alias(
 )
 
 alias(
-    name = "cargo_bin_rustfmt",
-    actual = "@raze__rustfmt_nightly__1_4_38//:cargo_bin_rustfmt",
-    tags = [
-        "cargo-raze",
-        "manual",
-    ],
-)
-
-alias(
-    name = "rustfmt_nightly",
-    actual = "@raze__rustfmt_nightly__1_4_38//:rustfmt_nightly",
-    tags = [
-        "cargo-raze",
-        "manual",
-    ],
-)
-
-alias(
     name = "serde",
-    actual = "@raze__serde__1_0_137//:serde",
+    actual = "@raze__serde__1_0_140//:serde",
     tags = [
         "cargo-raze",
         "manual",
@@ -383,7 +365,7 @@ alias(
 
 alias(
     name = "tokio",
-    actual = "@raze__tokio__1_19_2//:tokio",
+    actual = "@raze__tokio__1_20_0//:tokio",
     tags = [
         "cargo-raze",
         "manual",
