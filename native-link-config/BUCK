@@ -1,0 +1,15 @@
+rust_library(
+    name = "native-link-config",
+    srcs = [
+        "src/cas_server.rs",
+        "src/lib.rs",
+        "src/schedulers.rs",
+        "src/serde_utils.rs",
+        "src/stores.rs",
+    ],
+    visibility = ["PUBLIC"],
+    deps = [
+        "//:serde",
+        "//:shellexpand",
+    ],
+)

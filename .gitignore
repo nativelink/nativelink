@@ -10,3 +10,4 @@ __pycache__
 .direnv/
 .DS_Store
 .pre-commit-config.yaml
+buck-out/

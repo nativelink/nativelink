@@ -24,6 +24,8 @@
               pkgs.pre-commit
               pkgs.bazel
               pkgs.awscli2
+              pkgs.buck2
+              pkgs.reindeer
             ];
             shellHook = ''
               # Generate the .pre-commit-config.yaml symlink when entering the

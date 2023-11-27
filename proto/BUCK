@@ -1,0 +1,10 @@
+rust_library(
+    name = "proto",
+    srcs = glob(["genproto/*.rs"]),
+    visibility = ["PUBLIC"],
+    deps = [
+        "//:prost",
+        "//:prost-types",
+        "//:tonic",
+    ],
+)

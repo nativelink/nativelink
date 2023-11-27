@@ -1,0 +1,13 @@
+rust_library(
+    name = "error",
+    srcs = ["src/lib.rs"],
+    visibility = ["PUBLIC"],
+    deps = [
+        "//bazel-turbo-cache/proto:proto",
+        "//:hex",
+        "//:prost",
+        "//:prost-types",
+        "//:tokio",
+        "//:tonic",
+    ],
+)

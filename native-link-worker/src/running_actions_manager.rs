@@ -456,7 +456,7 @@ async fn process_side_channel_file(
             .err_tip(|| "Error reading side channel file")?;
     }
 
-    let side_channel_info: SideChannelInfo = json5::from_str(&json_contents).map_err(|e| {
+    let side_channel_info: SideChannelInfo = serde_json5::from_str(&json_contents).map_err(|e| {
         make_input_err!("Could not convert contents of side channel file (json) to SideChannelInfo : {e:?}")
     })?;
     Ok(side_channel_info.failure.map(|failure| match failure {
