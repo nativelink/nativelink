@@ -89,3 +89,42 @@ http_archive(
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
 
 protobuf_deps()
+
+http_archive(
+    name = "io_tweag_rules_nixpkgs",
+    sha256 = "980edfceef2e59e1122d9be6c52413bc298435f0a3d452532b8a48d7562ffd67",
+    strip_prefix = "rules_nixpkgs-0.10.0",
+    urls = [
+        "https://github.com/tweag/rules_nixpkgs/releases/download/v0.10.0/rules_nixpkgs-0.10.0.tar.gz",
+    ],
+)
+
+load(
+    "@io_tweag_rules_nixpkgs//nixpkgs:repositories.bzl",
+    "rules_nixpkgs_dependencies",
+)
+
+rules_nixpkgs_dependencies()
+
+load("@io_tweag_rules_nixpkgs//nixpkgs:nixpkgs.bzl", "nixpkgs_flake_package")
+
+http_archive(
+    name = "typst_sources",
+    build_file_content = "#empty",
+    sha256 = "",
+    strip_prefix = "typst-0.10.0",
+    urls = [
+        "https://github.com/typst/typst/archive/refs/tags/v0.10.0.tar.gz",
+    ],
+)
+
+nixpkgs_flake_package(
+    name = "typst",
+    fail_not_supported = False,
+    nix_flake_file = "@typst_sources//:flake.nix",
+    nix_flake_lock_file = "@typst_sources//:flake.lock",
+)
+
+register_toolchains(
+    "@nativelink//local-remote-execution/examples:typst_toolchain",
+)
