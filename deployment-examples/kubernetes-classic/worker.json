@@ -1,0 +1,81 @@
+{
+  "stores": {
+    "GRPC_LOCAL_STORE": {
+      // Note: This file is used to test GRPC store.
+      "grpc": {
+        "instance_name": "main",
+        "endpoints": [
+          {"address": "grpc://${CAS_ENDPOINT:-127.0.0.1}:50051"}
+        ],
+        "store_type": "cas"
+      }
+    },
+    "GRPC_LOCAL_AC_STORE": {
+      // Note: This file is used to test GRPC store.
+      "grpc": {
+        "instance_name": "main",
+        "endpoints": [
+          {"address": "grpc://${CAS_ENDPOINT:-127.0.0.1}:50051"}
+        ],
+        "store_type": "ac"
+      }
+    },
+    "WORKER_FAST_SLOW_STORE": {
+      "fast_slow": {
+        "fast": {
+          "filesystem": {
+            "content_path": "/tmp/.cache/nativelink/data-worker-test/content_path-cas",
+            "temp_path": "/tmp/.cache/nativelink/data-worker-test/tmp_path-cas",
+            "eviction_policy": {
+              // 10gb.
+              "max_bytes": 10000000000,
+            }
+          }
+        },
+        "slow": {
+          "ref_store": {
+            "name": "GRPC_LOCAL_STORE",
+          }
+        }
+      }
+    }
+  },
+  "workers": [{
+    "local": {
+      "worker_api_endpoint": {
+        "uri": "grpc://${SCHEDULER_ENDPOINT:-127.0.0.1}:50061",
+      },
+      "cas_fast_slow_store": "WORKER_FAST_SLOW_STORE",
+      "upload_action_result": {
+        "ac_store": "GRPC_LOCAL_AC_STORE",
+      },
+      "work_directory": "/tmp/.cache/nativelink/work",
+      "platform_properties": {
+        "cpu_count": {
+          "query_cmd": "nproc"
+        },
+        "OSFamily": {
+          "values": ["Linux"]
+        },
+        "container-image": {
+          "values": [
+            // WARNING: This is *not* the container that is actually deployed
+            // here. The generator container in this example was
+            // `rbe-classic:latest`.
+            //
+            // WARNING: This example doesn't pin the toolchain to an explicit
+            // tag. Using a setup like this in production would lead to
+            // catastrophic cache poisoning if the underlying container changed.
+            //
+            // Treat the `docker//:...` string below as nothing more than a raw
+            // string that is matched by the scheduler against the value
+            // specified in the `exec_properties` of the corresponding platform
+            // at `deployment-examples/kubernetes-classic/generated-cc/config/BUILD`.
+            "docker://classic-rbe:latest",
+          ]
+        }
+      }
+    }
+  }],
+  "servers": []
+}

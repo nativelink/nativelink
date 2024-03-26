@@ -1,0 +1,24 @@
+# TODO(aaronmondal): There should just be a single gateway. But that's currently
+#                    bugged: https://github.com/cilium/cilium/issues/29099
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cache
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: cache
+      protocol: HTTP
+      port: 50051
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: scheduler
+spec:
+  gatewayClassName: cilium
+  listeners:
+    - name: scheduler
+      protocol: HTTP
+      port: 50052

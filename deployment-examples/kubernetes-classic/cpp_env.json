@@ -1,0 +1,8 @@
+{
+    "ABI_LIBC_VERSION": "glibc_2.39",
+    "ABI_VERSION": "gcc",
+    "BAZEL_COMPILER": "gcc",
+    "BAZEL_TARGET_LIBC": "glibc_2.39",
+    "BAZEL_HOST_SYSTEM": "x86_64-unknown-linux-gnu",
+    "CC": "gcc"
+}

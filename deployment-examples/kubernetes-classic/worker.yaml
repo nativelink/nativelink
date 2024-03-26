@@ -1,0 +1,35 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nativelink-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nativelink-worker
+  template:
+    metadata:
+      labels:
+        app: nativelink-worker
+    spec:
+      containers:
+        - name: nativelink-worker
+          image: "localhost:5001/nativelink-worker-rbe-classic:local"
+          env:
+            - name: RUST_LOG
+              value: info
+            - name: CAS_ENDPOINT
+              value: nativelink-cas
+            - name: SCHEDULER_ENDPOINT
+              value: nativelink-scheduler
+          volumeMounts:
+            - name: worker-config
+              mountPath: /worker.json
+              subPath: worker.json
+          command: ["/bin/nativelink"]
+          args: ["/worker.json"]
+      volumes:
+        - name: worker-config
+          configMap:
+            name: worker

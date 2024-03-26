@@ -1,0 +1,51 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nativelink-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nativelink-scheduler
+  template:
+    metadata:
+      labels:
+        app: nativelink-scheduler
+    spec:
+      containers:
+        - name: nativelink-scheduler
+          image: "localhost:5001/nativelink:local"
+          env:
+            - name: RUST_LOG
+              value: info
+            - name: CAS_ENDPOINT
+              value: nativelink-cas
+          ports:
+            - containerPort: 50052
+          volumeMounts:
+            - name: scheduler-config
+              mountPath: /scheduler.json
+              subPath: scheduler.json
+          args: ["/scheduler.json"]
+      volumes:
+        - name: scheduler-config
+          configMap:
+            name: scheduler
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nativelink-scheduler
+spec:
+  selector:
+    app: nativelink-scheduler
+  ports:
+    - name: scheduler
+      protocol: TCP
+      port: 50052
+      targetPort: 50052
+    - name: worker-api
+      protocol: TCP
+      port: 50061
+      targetPort: 50061

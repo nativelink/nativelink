@@ -127,10 +127,22 @@
 
         generate-toolchains = import ./tools/generate-toolchains.nix {inherit pkgs;};
 
+        inherit (nix2container.packages.${system}.nix2container) pullImage;
         inherit (nix2container.packages.${system}.nix2container) buildImage;
 
         rbe-autogen = import ./local-remote-execution/rbe-autogen.nix {inherit pkgs nativelink buildImage;};
         createWorker = import ./tools/create-worker.nix {inherit pkgs nativelink buildImage;};
+        rbe-classic = buildImage {
+          name = "rbe-classic";
+          fromImage = pullImage {
+            imageName = "localhost:5001/rbe-classic";
+            imageDigest = "sha256:d83e1b88f6427ee9deff20e714bac5fcd306496487ff94df5467054b11ddbd35";
+            sha256 = "sha256-thbiXwZkEmKd44PG0fyHR2mEJg3OHmAxUHJ7rFFFIX8=";
+            tlsVerify = false;
+            arch = "amd64";
+            os = "linux";
+          };
+        };
       in rec {
         _module.args.pkgs = import self.inputs.nixpkgs {
           inherit system;
@@ -152,6 +164,7 @@
           lre-java = import ./local-remote-execution/lre-java.nix {inherit pkgs buildImage;};
           rbe-autogen-lre-java = rbe-autogen lre-java;
           nativelink-worker-lre-java = createWorker lre-java;
+          nativelink-worker-rbe-classic = createWorker rbe-classic;
           image = buildImage {
             name = "nativelink";
             config = {

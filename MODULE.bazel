@@ -61,6 +61,13 @@ use_repo(crate, "crates")
 
 bazel_dep(name = "protobuf", version = "23.1")
 
+# Classic Kubernetes exmample
+bazel_dep(name = "classic-rbe", version = "0.0.0")
+local_path_override(
+    module_name = "classic-rbe",
+    path = "deployment-examples/kubernetes-classic",
+)
+
 # Local remote execution.
 bazel_dep(name = "local-remote-execution", version = "0.0.0")
 local_path_override(

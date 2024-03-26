@@ -58,5 +58,21 @@ in
       's|rbe-autogen-lre-java|lre-java|g' \
       ''${SRC_ROOT}/generated-java/config/BUILD
 
+    # Toolchain for the kubernetes-classic example.
+    SRC_ROOT=$(git rev-parse --show-toplevel)/deployment-examples/kubernetes-classic
+
+    cd "''${SRC_ROOT}"
+
+    ${rbeConfigsGen}/bin/rbe_configs_gen \
+      --toolchain_container=classic-rbe:latest \
+      --exec_os=linux \
+      --target_os=linux \
+      --output_src_root=''${SRC_ROOT} \
+      --output_config_path=generated \
+      --generate_java_configs=false \
+      --generate_cpp_configs=true \
+      --bazel_path=/usr/local/bin/bazelisk \
+      --cpp_env_json=cpp_env.json
+
     pre-commit run -a
   ''

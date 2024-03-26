@@ -13,3 +13,4 @@ bazel-testlogs
 bazel-nativelink
 local-remote-execution/generated-cc
 local-remote-execution/generated-java
+deployment-examples/kubernetes-classic/generated

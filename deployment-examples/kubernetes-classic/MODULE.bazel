@@ -1,0 +1,13 @@
+# This is a pseudo-module to prevent Bazel from registering these Platforms and
+# toolchains on unsupported systems.
+
+module(
+    name = "classic-rbe",
+    version = "0.0.0",
+    compatibility_level = 0,
+)
+
+bazel_dep(name = "platforms", version = "0.0.8")
+
+# Use the starlark implementation of C++ rules instead of the builtin ones.
+bazel_dep(name = "rules_cc", version = "0.0.9")

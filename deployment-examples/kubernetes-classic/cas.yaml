@@ -1,0 +1,61 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nativelink-cas
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nativelink-cas
+  template:
+    metadata:
+      labels:
+        app: nativelink-cas
+    spec:
+      containers:
+        - name: nativelink-cas
+          image: "localhost:5001/nativelink:local"
+          env:
+            - name: RUST_LOG
+              value: info
+          ports:
+            - containerPort: 50051
+            - containerPort: 50061
+            - containerPort: 50071
+          volumeMounts:
+            - name: cas-config
+              mountPath: /cas.json
+              subPath: cas.json
+            - name: tls-volume
+              mountPath: /root
+              readOnly: true
+          args: ["/cas.json"]
+      volumes:
+        - name: cas-config
+          configMap:
+            name: cas
+        - name: tls-volume
+          secret:
+            secretName: tls-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nativelink-cas
+spec:
+  selector:
+    app: nativelink-cas
+  ports:
+    - name: http
+      protocol: TCP
+      port: 50051
+      targetPort: 50051
+    - name: metrics
+      protocol: TCP
+      port: 50061
+      targetPort: 50061
+    - name: https
+      protocol: TCP
+      port: 50071
+      targetPort: 50071

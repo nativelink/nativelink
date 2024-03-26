@@ -1,0 +1,114 @@
+// This configuration places objects in various directories in
+// `~/.cache/nativelink`. When this location is mounted as a PersistentVolume
+// it persists the cache across restarts.
+{
+  "stores": {
+    "CAS_MAIN_STORE": {
+      "existence_cache": {
+        "backend": {
+          "compression": {
+            "compression_algorithm": {
+              "lz4": {}
+            },
+            "backend": {
+              "filesystem": {
+                "content_path": "~/.cache/nativelink/content_path-cas",
+                "temp_path": "~/.cache/nativelink/tmp_path-cas",
+                "eviction_policy": {
+                  // 10gb.
+                  "max_bytes": 10000000000,
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "AC_MAIN_STORE": {
+      "completeness_checking": {
+        "backend": {
+          "filesystem": {
+            "content_path": "~/.cache/nativelink/content_path-ac",
+            "temp_path": "~/.cache/nativelink/tmp_path-ac",
+            "eviction_policy": {
+              // 500mb.
+              "max_bytes": 500000000,
+            }
+          }
+        },
+        "cas_store": {
+          "ref_store": {
+            "name": "CAS_MAIN_STORE"
+          }
+        }
+      }
+    }
+  },
+  "servers": [{
+    "listener": {
+      "http": {
+        "socket_address": "0.0.0.0:50051"
+      }
+    },
+    "services": {
+      "cas": {
+        "main": {
+          "cas_store": "CAS_MAIN_STORE"
+        }
+      },
+      "ac": {
+        "main": {
+          "ac_store": "AC_MAIN_STORE"
+        }
+      },
+      "capabilities": {},
+      "bytestream": {
+        "cas_stores": {
+          "main": "CAS_MAIN_STORE",
+        },
+      }
+    }
+  },
+  {
+    // Only publish metrics on a private port.
+    "listener": {
+      "http": {
+        "socket_address": "0.0.0.0:50061"
+      }
+    },
+    "services": {
+      "experimental_prometheus": {
+        "path": "/metrics"
+      }
+    }
+  },
+  {
+    "listener": {
+      "http": {
+        "socket_address": "0.0.0.0:50071",
+        "tls": {
+          "cert_file": "/root/example-do-not-use-in-prod-rootca.crt",
+          "key_file": "/root/example-do-not-use-in-prod-key.pem"
+        }
+      }
+    },
+    "services": {
+      "cas": {
+        "main": {
+          "cas_store": "CAS_MAIN_STORE"
+        }
+      },
+      "ac": {
+        "main": {
+          "ac_store": "AC_MAIN_STORE"
+        }
+      },
+      "capabilities": {},
+      "bytestream": {
+        "cas_stores": {
+          "main": "CAS_MAIN_STORE",
+        }
+      }
+    }
+  }]
+}
