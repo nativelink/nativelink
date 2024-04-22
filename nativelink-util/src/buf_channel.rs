@@ -185,6 +185,11 @@ pub struct DropCloserReadHalf {
 }
 
 impl DropCloserReadHalf {
+    /// Returns if the stream has data ready.
+    pub fn is_empty(&self) -> bool {
+        self.rx.is_empty()
+    }
+
     /// Receive a chunk of data.
     pub async fn recv(&mut self) -> Result<Bytes, Error> {
         let maybe_chunk = match self.queued_data.pop_front() {

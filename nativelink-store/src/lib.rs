@@ -24,6 +24,7 @@ pub mod filesystem_store;
 pub mod grpc_store;
 pub mod memory_store;
 pub mod noop_store;
+pub mod redis_store;
 pub mod ref_store;
 pub mod s3_store;
 pub mod shard_store;

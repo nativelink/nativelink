@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::serde_utils::{
     convert_numeric_with_shellexpand, convert_optional_string_with_shellexpand,
-    convert_string_with_shellexpand,
+    convert_string_with_shellexpand, convert_vec_string_with_shellexpand,
 };
 
 /// Name of the store. This type will be used when referencing a store
@@ -162,6 +162,13 @@ pub enum StoreConfig {
     /// this store directly without being a child of any store there are no
     /// side effects and is the most efficient way to use it.
     grpc(GrpcStore),
+
+    /// Stores data in any stores compatible with Redis APIs.
+    ///
+    /// Pairs well with SizePartitioning and/or FastSlow stores.
+    /// Ideal for accepting small object sizes as most redis store
+    /// services have a max file upload of between 256Mb-512Mb.
+    redis_store(RedisStore),
 
     /// Noop store is a store that sends streams into the void and all data
     /// retrieval will return 404 (NotFound). This can be useful for cases
@@ -595,6 +602,29 @@ pub enum ErrorCode {
     DataLoss = 15,
     Unauthenticated = 16,
     // Note: This list is duplicated from nativelink-error/lib.rs.
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RedisStore {
+    #[serde(deserialize_with = "convert_vec_string_with_shellexpand")]
+    //(TODO: Reduce to 80 characters)
+    /// The hostname or IP address of the Redis server can include username, passowrd, tls, and database number.
+    /// Ex: "redis://username:password@redis-server-url:6380/99"
+    /// 99 Represents database ID, 6380 represents the port
+    // Note: This is currently only one address, our config is future-proofed for the addition of manual multiplexing.
+    pub addresses: Vec<String>,
+
+    #[serde(default)]
+    /// The response timeout for the Redis connection in seconds.
+    ///
+    /// Default: 10
+    pub response_timeout_s: u64,
+
+    #[serde(default)]
+    /// The connection timeout for the Redis connection in seconds.
+    ///
+    /// Default: 10
+    pub connection_timeout_s: u64,
 }
 
 /// Retry configuration. This configuration is exponential and each iteration

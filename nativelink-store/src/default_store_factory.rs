@@ -32,6 +32,7 @@ use crate::filesystem_store::FilesystemStore;
 use crate::grpc_store::GrpcStore;
 use crate::memory_store::MemoryStore;
 use crate::noop_store::NoopStore;
+use crate::redis_store::RedisStore;
 use crate::ref_store::RefStore;
 use crate::s3_store::S3Store;
 use crate::shard_store::ShardStore;
@@ -51,6 +52,7 @@ pub fn store_factory<'a>(
         let store: Arc<dyn Store> = match backend {
             StoreConfig::memory(config) => Arc::new(MemoryStore::new(config)),
             StoreConfig::experimental_s3_store(config) => Arc::new(S3Store::new(config).await?),
+            StoreConfig::redis_store(config) => Arc::new(RedisStore::new(config)?),
             StoreConfig::verify(config) => Arc::new(VerifyStore::new(
                 config,
                 store_factory(&config.backend, store_manager, None, None).await?,
