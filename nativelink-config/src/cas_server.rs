@@ -114,7 +114,7 @@ pub struct CapabilitiesConfig {
     pub remote_execution: Option<CapabilitiesRemoteExecutionConfig>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionConfig {
     /// The store name referenced in the `stores` map in the main config.
@@ -198,6 +198,14 @@ pub struct HealthConfig {
 
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
+pub struct OperationsConfig {
+    /// The scheduler name referenced in the `schedulers` map in the main config.
+    #[serde(deserialize_with = "convert_string_with_shellexpand")]
+    pub scheduler: SchedulerRefName,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
 pub struct ServicesConfig {
     /// The Content Addressable Storage (CAS) backend config.
     /// The key is the instance_name used in the protocol and the
@@ -243,6 +251,9 @@ pub struct ServicesConfig {
 
     /// This is the service for health status check.
     pub health: Option<HealthConfig>,
+
+    /// This is the service for operations interface.
+    pub operations: Option<HashMap<InstanceName, OperationsConfig>>,
 }
 
 #[derive(Deserialize, Debug)]

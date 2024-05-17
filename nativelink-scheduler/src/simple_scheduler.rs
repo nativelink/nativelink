@@ -16,16 +16,19 @@ use std::borrow::Borrow;
 use std::cmp;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
+use std::iter::Map;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 
 use async_trait::async_trait;
 use futures::Future;
+use hashbrown::hash_map::Iter;
 use hashbrown::{HashMap, HashSet};
 use lru::LruCache;
 use nativelink_config::schedulers::WorkerAllocationStrategy;
 use nativelink_error::{error_if, make_err, make_input_err, Code, Error, ResultExt};
+use nativelink_proto::google::longrunning::Operation;
 use nativelink_util::action_messages::{
     ActionInfo, ActionInfoHashKey, ActionResult, ActionStage, ActionState, ExecutionMetadata,
 };
@@ -36,12 +39,13 @@ use nativelink_util::metrics_utils::{
 use nativelink_util::platform_properties::PlatformPropertyValue;
 use nativelink_util::spawn;
 use nativelink_util::task::JoinHandleDropGuard;
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::{Mutex, MutexGuard, RawMutex};
 use tokio::sync::{watch, Notify};
 use tokio::time::Duration;
 use tracing::{event, Level};
 
 use crate::action_scheduler::ActionScheduler;
+use crate::operations::Operations;
 use crate::platform_property_manager::PlatformPropertyManager;
 use crate::worker::{Worker, WorkerId, WorkerTimestamp, WorkerUpdate};
 use crate::worker_scheduler::WorkerScheduler;
@@ -59,6 +63,7 @@ const DEFAULT_RETAIN_COMPLETED_FOR_S: u64 = 60;
 const DEFAULT_MAX_JOB_RETRIES: usize = 3;
 
 /// An action that is being awaited on and last known state.
+#[derive(Clone, Debug)]
 struct AwaitedAction {
     action_info: Arc<ActionInfo>,
     current_state: Arc<ActionState>,
@@ -175,6 +180,7 @@ impl Workers {
     }
 }
 
+#[derive(Debug, Clone)]
 struct CompletedAction {
     completed_time: SystemTime,
     state: Arc<ActionState>,
@@ -984,6 +990,78 @@ impl WorkerScheduler for SimpleScheduler {
     fn register_metrics(self: Arc<Self>, _registry: &mut Registry) {
         // We do not register anything here because we only want to register metrics
         // once and we rely on the `ActionScheduler::register_metrics()` to do that.
+    }
+}
+
+#[async_trait]
+impl Operations for SimpleScheduler {
+    fn list_actions(&self) -> Vec<Operation> {
+        let lock = self.inner.lock();
+        let active_actions: Iter<Arc<ActionInfo>, AwaitedAction> = lock.active_actions.iter();
+        let queued_actions: std::collections::btree_map::Iter<Arc<ActionInfo>, AwaitedAction> =
+            lock.queued_actions.iter();
+        let recently_completed_actions = lock.recently_completed_actions.iter();
+
+        let active_operations: Vec<Operation> = active_actions
+            .map(|(_, awaited_action)| {
+                Operation::from(awaited_action.current_state.as_ref().clone())
+            })
+            .collect();
+        let queued_operations: Vec<Operation> = queued_actions
+            .map(|(_, awaited_action)| {
+                Operation::from(awaited_action.current_state.as_ref().clone())
+            })
+            .collect();
+        let completed_operations: Vec<Operation> = recently_completed_actions
+            .map(|completed_action| Operation::from(completed_action.state.as_ref().clone()))
+            .collect();
+
+        let operations: Vec<Operation> = active_operations
+            .into_iter()
+            .chain(queued_operations)
+            .chain(completed_operations)
+            .collect();
+        operations
+    }
+
+    fn get_action(&self, action_info_hash_key: &ActionInfoHashKey) -> Option<Operation> {
+        let lock: parking_lot::lock_api::MutexGuard<RawMutex, SimpleSchedulerImpl> =
+            self.inner.lock();
+        let active_actions: HashMap<Arc<ActionInfo>, AwaitedAction> = lock.active_actions.clone();
+        let queued_actions: BTreeMap<Arc<ActionInfo>, AwaitedAction> = lock.queued_actions.clone();
+        let queued_actions_set: HashSet<Arc<ActionInfo>> = lock.queued_actions_set.clone();
+        let recently_completed_actions = lock.recently_completed_actions.clone();
+        let action: Option<&ActionState> = queued_actions_set
+            .get(action_info_hash_key)
+            .and_then(|action_info| {
+                queued_actions
+                    .get(action_info)
+                    .map(|queued_action| queued_action.current_state.as_ref())
+            })
+            .or_else(|| {
+                active_actions
+                    .get(action_info_hash_key)
+                    .map(|awaited_action| awaited_action.current_state.as_ref())
+            })
+            .or_else(|| {
+                recently_completed_actions
+                    .get(action_info_hash_key)
+                    .map(|completed_action| completed_action.state.as_ref())
+            });
+        let action: Option<Operation> = action.map(|a| Operation::from(a.clone()));
+        action
+    }
+
+    async fn delete_action(&self) {
+        todo!()
+    }
+
+    async fn cancel_action(&self) {
+        todo!()
+    }
+
+    async fn wait_action(&self) {
+        todo!()
     }
 }
 

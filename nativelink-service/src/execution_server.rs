@@ -26,7 +26,7 @@ use nativelink_proto::build::bazel::remote::execution::v2::execution_server::{
 use nativelink_proto::build::bazel::remote::execution::v2::{
     Action, Command, ExecuteRequest, WaitExecutionRequest,
 };
-use nativelink_proto::google::longrunning::Operation;
+use nativelink_proto::google::longrunning::{CancelOperationRequest, DeleteOperationRequest, GetOperationRequest, ListOperationsRequest, ListOperationsResponse, Operation, WaitOperationRequest};
 use nativelink_scheduler::action_scheduler::ActionScheduler;
 use nativelink_store::ac_utils::get_and_decode_digest;
 use nativelink_store::store_manager::StoreManager;
@@ -40,8 +40,12 @@ use nativelink_util::store_trait::Store;
 use rand::{thread_rng, Rng};
 use tokio::sync::watch;
 use tokio_stream::wrappers::WatchStream;
-use tonic::{Request, Response, Status};
+use tonic::{async_trait, Request, Response, Status};
+use tonic::metadata::MetadataMap;
 use tracing::{event, instrument, Level};
+use nativelink_proto::google::longrunning::operations_server::OperationsServer;
+use nativelink_proto::google::longrunning::operations_server::Operations;
+use nativelink_scheduler::operations::{Operations as SchedulerOperations};
 
 struct InstanceInfo {
     scheduler: Arc<dyn ActionScheduler>,
@@ -140,6 +144,7 @@ impl InstanceInfo {
 
 pub struct ExecutionServer {
     instance_infos: HashMap<InstanceName, InstanceInfo>,
+    scheduler_operations: HashMap<InstanceName, Arc<dyn SchedulerOperations>>
 }
 
 type ExecuteStream = Pin<Box<dyn Stream<Item = Result<Operation, Status>> + Send + Sync + 'static>>;
@@ -148,9 +153,12 @@ impl ExecutionServer {
     pub fn new(
         config: &HashMap<InstanceName, ExecutionConfig>,
         scheduler_map: &HashMap<String, Arc<dyn ActionScheduler>>,
+        operations_schedulers: &HashMap<String, Arc<dyn SchedulerOperations>>,
         store_manager: &StoreManager,
     ) -> Result<Self, Error> {
         let mut instance_infos = HashMap::with_capacity(config.len());
+        let mut scheduler_operations = HashMap::with_capacity(config.len());
+
         for (instance_name, exec_cfg) in config {
             let cas_store = store_manager
                 .get_store(&exec_cfg.cas_store)
@@ -174,13 +182,26 @@ impl ExecutionServer {
                     cas_store,
                 },
             );
+
+            let scheduler = operations_schedulers.get(&exec_cfg.scheduler)
+                .err_tip(|| {
+                    format!("Failed to get scheduler name '{}'", exec_cfg.scheduler)
+                })?
+                .clone();
+
+            scheduler_operations.insert(
+                instance_name.to_string(),
+                scheduler
+            );
         }
-        Ok(Self { instance_infos })
+        Ok(Self { instance_infos, scheduler_operations })
     }
 
     pub fn into_service(self) -> Server<ExecutionServer> {
         Server::new(self)
     }
+
+    pub fn into_operations_service(self) -> OperationsServer<ExecutionServer> { OperationsServer::new(self) }
 
     fn to_execute_stream(receiver: watch::Receiver<Arc<ActionState>>) -> Response<ExecuteStream> {
         let receiver_stream = Box::pin(WatchStream::new(receiver).map(|action_update| {
@@ -303,5 +324,81 @@ impl Execution for ExecutionServer {
             event!(Level::DEBUG, return = "Ok(<stream>)");
         }
         resp
+    }
+}
+
+#[async_trait]
+impl Operations for ExecutionServer {
+    async fn list_operations(&self, request: Request<ListOperationsRequest>) -> Result<Response<ListOperationsResponse>, Status> {
+        // TODO(adams): if page size, filter, token is set, then return error.
+        let (metadata, extensions, message) = request.into_parts();
+        let name = message.name;
+
+        let maybe_operations = self.scheduler_operations.get(&name);
+
+        match maybe_operations {
+            Some(oper) => {
+                let mut operations_results: Vec<Operation> = oper.list_actions();
+                let list_operations_response = ListOperationsResponse {
+                    operations: operations_results,
+                    next_page_token: "".to_string(),
+                };
+                return Ok(Response::new(list_operations_response))
+            },
+            None =>
+                return Ok(Response::new(ListOperationsResponse::default()))
+        }
+    }
+
+    async fn get_operation(&self, request: Request<GetOperationRequest>) -> Result<Response<Operation>, Status> {
+        let (metadata, extensions, message) = request.into_parts();
+        let name = message.name;
+        let action_info_hash_key= ActionInfoHashKey::try_from(name.as_str())
+            .err_tip(|| "Decoding operation name into ActionInfoHashKey")?;
+        let maybe_operations = self.scheduler_operations.get(&action_info_hash_key.instance_name);
+
+        let maybe_action_response = maybe_operations.map(|oper|
+            oper.get_action(&action_info_hash_key).map(|action| Response::new(action))
+        ).flatten();
+
+        match maybe_action_response {
+            Some(operation_response) => Ok(operation_response),
+            None => Ok(Response::new(Operation::default()))
+        }
+    }
+
+    async fn delete_operation(&self, request: Request<DeleteOperationRequest>) -> Result<Response<()>, Status> {
+        unimplemented!()
+    }
+
+    async fn cancel_operation(&self, request: Request<CancelOperationRequest>) -> Result<Response<()>, Status> {
+        unimplemented!()
+    }
+
+    async fn wait_operation(&self, request: Request<WaitOperationRequest>) -> Result<Response<Operation>, Status> {
+        let (metadata, extensions, message) = request.into_parts();
+        let name = message.name;
+        let timeout: Duration =  match message.timeout {
+            Some(timeout) => Duration::new(timeout.seconds as u64, timeout.nanos as u32),
+            None => Duration::MAX
+        };
+        let wait_execution_request = Request::new(WaitExecutionRequest { name });
+        let resp = self.inner_wait_execution(wait_execution_request).await
+            .err_tip(|| "Failed on wait_execution() command")?;
+            // .map_err(|e| e.info())?;
+
+        let (_, mut e, _) = resp.into_parts();
+        let mut execute_stream: ExecuteStream = e;
+        // TODO(adams): need to set a timeout
+        // execute_stream.timeout(timeout);
+
+        // TODO(adams): handle failure cases better
+        let mut ret: Result<Response<Operation>, Status> = Err(Status::unknown(""));
+        while let Some(result) = execute_stream.next().await {
+            // TODO(adams): handle error from reading stream
+            ret = result.map(|operation| Response::new(operation));
+        }
+
+        return ret;
     }
 }

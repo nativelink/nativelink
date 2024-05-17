@@ -156,6 +156,11 @@
       },
       "admin": {},
       "health": {},
+      "operations": {
+        "main": {
+          "scheduler": "MAIN_SCHEDULER",
+        }
+      }
     }
   }],
   "global": {

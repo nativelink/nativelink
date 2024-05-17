@@ -164,6 +164,14 @@
         "scheduler": "MAIN_SCHEDULER",
       },
       "health": {},
+      "operations": {
+        "main": {
+          "scheduler": "MAIN_SCHEDULER",
+        }
+      }
     }
-  }]
+  }],
+  "global": {
+    "max_open_files": 65000
+  }
 }

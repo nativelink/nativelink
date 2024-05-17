@@ -18,4 +18,5 @@ pub mod capabilities_server;
 pub mod cas_server;
 pub mod execution_server;
 pub mod health_server;
+pub mod operations_server;
 pub mod worker_api_server;
