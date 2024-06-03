@@ -625,6 +625,18 @@ pub struct RedisStore {
     /// Default: 10
     #[serde(default)]
     pub connection_timeout_s: u64,
+
+    #[serde(default)]
+    pub retry: Retry,
+
+    /// The maximum buffer size to retain in case of a retryable error
+    /// during upload. Setting this to zero will disable upload buffering;
+    /// this means that in the event of a failure during upload, the entire
+    /// upload will be aborted and the client will likely receive an error.
+    ///
+    /// Default: 1MB.
+    #[serde(default)]
+    pub max_retry_buffer_per_request: Option<usize>,
 }
 
 /// Retry configuration. This configuration is exponential and each iteration

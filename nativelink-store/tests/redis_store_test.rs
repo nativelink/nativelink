@@ -102,16 +102,19 @@ mod redis_store_tests {
                 &[TEMP_UUID, &packed_hash_hex],
                 Ok(&[redis::Value::Nil]),
             )])
-            .pipe(&[(
-                "STRLEN",
-                &[&packed_hash_hex],
-                Ok(&[redis::Value::Bulk(vec![redis::Value::Int(2)])]),
-            )])
+            .cmd("STRLEN", &[&packed_hash_hex], Ok("1"))
             .cmd("GETRANGE", &[&packed_hash_hex, "0", "1"], Ok("14"))
             .build();
 
         let store = RedisStore::new_with_conn_and_name_generator(
             LazyConnection::Connection(Ok(redis_connection)),
+            nativelink_config::stores::Retry {
+                max_retries: 1024,
+                delay: 0.,
+                jitter: 0.,
+                ..Default::default()
+            },
+            Some(1024 * 1024),
             mock_uuid_generator,
         );
         let pinned_store: Pin<&RedisStore<MockRedisConnection>> = Pin::new(&store);
@@ -143,6 +146,13 @@ mod redis_store_tests {
 
         let store = RedisStore::new_with_conn_and_name_generator(
             LazyConnection::Connection(Ok(redis_connection)),
+            nativelink_config::stores::Retry {
+                max_retries: 1024,
+                delay: 0.,
+                jitter: 0.,
+                ..Default::default()
+            },
+            Some(1024 * 1024),
             mock_uuid_generator,
         );
         let pinned_store: Pin<&RedisStore<MockRedisConnection>> = Pin::new(&store);
@@ -184,11 +194,7 @@ mod redis_store_tests {
                 &[TEMP_UUID, &packed_hash_hex],
                 Ok(&[redis::Value::Nil]),
             )])
-            .pipe(&[(
-                "STRLEN",
-                &[&packed_hash_hex],
-                Ok(&[redis::Value::Bulk(vec![redis::Value::Int(2)])]),
-            )])
+            .cmd("STRLEN", &[&packed_hash_hex], Ok("1"))
             .cmd(
                 "GETRANGE",
                 &[&packed_hash_hex, "0", "65535"],
@@ -203,6 +209,13 @@ mod redis_store_tests {
 
         let store = RedisStore::new_with_conn_and_name_generator(
             LazyConnection::Connection(Ok(redis_connection)),
+            nativelink_config::stores::Retry {
+                max_retries: 1024,
+                delay: 0.,
+                jitter: 0.,
+                ..Default::default()
+            },
+            Some(1024 * 1024),
             mock_uuid_generator,
         );
         let pinned_store: Pin<&RedisStore<MockRedisConnection>> = Pin::new(&store);
@@ -256,11 +269,7 @@ mod redis_store_tests {
                 &[TEMP_UUID, &packed_hash_hex],
                 Ok(&[redis::Value::Nil]),
             )])
-            .pipe(&[(
-                "STRLEN",
-                &[&packed_hash_hex],
-                Ok(&[redis::Value::Bulk(vec![redis::Value::Int(2)])]),
-            )])
+            .cmd("STRLEN", &[&packed_hash_hex], Ok("1"))
             .cmd(
                 "GETRANGE",
                 &[&packed_hash_hex, "0", "10239"],
@@ -270,6 +279,13 @@ mod redis_store_tests {
 
         let store = RedisStore::new_with_conn_and_name_generator(
             LazyConnection::Connection(Ok(redis_connection)),
+            nativelink_config::stores::Retry {
+                max_retries: 1024,
+                delay: 0.,
+                jitter: 0.,
+                ..Default::default()
+            },
+            Some(1024 * 1024),
             mock_uuid_generator,
         );
         let pinned_store: Pin<&RedisStore<MockRedisConnection>> = Pin::new(&store);
