@@ -29,7 +29,8 @@ const MEGABYTE_SZ: usize = 1024 * 1024;
 
 fn make_stores(weights: &[u32]) -> (Arc<ShardStore>, Vec<Arc<MemoryStore>>) {
     let memory_store_config = nativelink_config::stores::MemoryStore::default();
-    let store_config = nativelink_config::stores::StoreConfig::memory(memory_store_config.clone());
+    let store_config =
+        nativelink_config::stores::StoreConfigOptions::memory(memory_store_config.clone());
     let stores: Vec<_> = weights
         .iter()
         .map(|_| Arc::new(MemoryStore::new(&memory_store_config)))

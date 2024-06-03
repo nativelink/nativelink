@@ -38,7 +38,7 @@ pub enum ConfigDigestHashFunction {
 
 #[allow(non_camel_case_types)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum StoreConfig {
+pub enum StoreConfigOptions {
     /// Memory store will store all data in a hashmap in memory.
     memory(MemoryStore),
 
@@ -178,12 +178,23 @@ pub enum StoreConfig {
     noop,
 }
 
+/// Configuration for an individual store.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct StoreConfig {
+    // Name of the store for reference
+    pub name: StoreRefName,
+
+    // Store config options
+    pub options: StoreConfigOptions,
+}
+
 /// Configuration for an individual shard of the store.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ShardConfig {
     /// Store to shard the data to.
-    pub store: StoreConfig,
+    pub store: StoreConfigOptions,
 
     /// The weight of the store. This is used to determine how much data
     /// should be sent to the store. The actual percentage is the sum of
@@ -208,10 +219,10 @@ pub struct SizePartitioningStore {
     pub size: u64,
 
     /// Store to send data when object is < (less than) size.
-    pub lower_store: StoreConfig,
+    pub lower_store: StoreConfigOptions,
 
     /// Store to send data when object is >= (less than eq) size.
-    pub upper_store: StoreConfig,
+    pub upper_store: StoreConfigOptions,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -265,11 +276,11 @@ pub struct FilesystemStore {
 pub struct FastSlowStore {
     /// Fast store that will be attempted to be contacted before reaching
     /// out to the `slow` store.
-    pub fast: StoreConfig,
+    pub fast: StoreConfigOptions,
 
     /// If the object does not exist in the `fast` store it will try to
     /// get it from this store.
-    pub slow: StoreConfig,
+    pub slow: StoreConfigOptions,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -286,11 +297,11 @@ pub struct MemoryStore {
 pub struct DedupStore {
     /// Store used to store the index of each dedup slice. This store
     /// should generally be fast and small.
-    pub index_store: StoreConfig,
+    pub index_store: StoreConfigOptions,
 
     /// The store where the individual chunks will be uploaded. This
     /// store should generally be the slower & larger store.
-    pub content_store: StoreConfig,
+    pub content_store: StoreConfigOptions,
 
     /// Minimum size that a chunk will be when slicing up the content.
     /// Note: This setting can be increased to improve performance
@@ -344,7 +355,7 @@ pub struct ExistenceCacheStore {
     /// is an error detected in self, the connection to the backend
     /// will be terminated, and early termination should always cause
     /// updates to fail on the backend.
-    pub backend: StoreConfig,
+    pub backend: StoreConfigOptions,
 
     /// Policy used to evict items out of the store. Failure to set this
     /// value will cause items to never be removed from the store causing
@@ -360,7 +371,7 @@ pub struct VerifyStore {
     /// is an error detected in self, the connection to the backend
     /// will be terminated, and early termination should always cause
     /// updates to fail on the backend.
-    pub backend: StoreConfig,
+    pub backend: StoreConfigOptions,
 
     /// If set the store will verify the size of the data before accepting
     /// an upload of data.
@@ -382,11 +393,11 @@ pub struct VerifyStore {
 #[serde(deny_unknown_fields)]
 pub struct CompletenessCheckingStore {
     /// The underlying store that will have it's results validated before sending to client.
-    pub backend: StoreConfig,
+    pub backend: StoreConfigOptions,
 
     /// When a request is made, the results are decoded and all output digests/files are verified
     /// to exist in this CAS store before returning success.
-    pub cas_store: StoreConfig,
+    pub cas_store: StoreConfigOptions,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Clone, Copy)]
@@ -433,7 +444,7 @@ pub struct CompressionStore {
     /// is an error detected in self, the connection to the backend
     /// will be terminated, and early termination should always cause
     /// updates to fail on the backend.
-    pub backend: StoreConfig,
+    pub backend: StoreConfigOptions,
 
     /// The compression algorithm to use.
     pub compression_algorithm: CompressionAlgorithm,

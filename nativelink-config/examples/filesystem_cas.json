@@ -4,8 +4,9 @@
 // so objects are compressed, deduplicated and uses some in-memory
 // optimizations for certain hot paths.
 {
-  "stores": {
-    "FS_CONTENT_STORE": {
+  "stores": [{
+    "name": "FS_CONTENT_STORE",
+    "options": {
       "compression": {
         "compression_algorithm": {
           "lz4": {}
@@ -21,8 +22,10 @@
           }
         }
       }
-    },
-    "CAS_MAIN_STORE": {
+    }
+  }, {
+    "name": "CAS_MAIN_STORE",
+    "options": {
       "verify": {
         "backend": {
           // Because we are using a dedup store, we can bypass small objects
@@ -78,8 +81,10 @@
         "verify_size": true,
         "hash_verification_function": "sha256"
       }
-    },
-    "AC_MAIN_STORE": {
+    }
+  }, {
+    "name": "AC_MAIN_STORE",
+    "options": {
       "filesystem": {
         "content_path": "/tmp/nativelink/data/content_path-ac",
         "temp_path": "/tmp/nativelink/data/tmp_path-ac",
@@ -89,9 +94,10 @@
         }
       }
     }
-  },
-  "schedulers": {
-    "MAIN_SCHEDULER": {
+  }],
+  "schedulers": [{
+    "name": "MAIN_SCHEDULER",
+    "options": {
       "simple": {
         "supported_platform_properties": {
           "cpu_count": "minimum",
@@ -112,7 +118,7 @@
         }
       }
     }
-  },
+  }],
   "servers": [{
     "listener": {
       "http": {

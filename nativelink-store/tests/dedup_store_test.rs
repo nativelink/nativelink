@@ -26,10 +26,10 @@ use rand::{Rng, SeedableRng};
 
 fn make_default_config() -> nativelink_config::stores::DedupStore {
     nativelink_config::stores::DedupStore {
-        index_store: nativelink_config::stores::StoreConfig::memory(
+        index_store: nativelink_config::stores::StoreConfigOptions::memory(
             nativelink_config::stores::MemoryStore::default(),
         ),
-        content_store: nativelink_config::stores::StoreConfig::memory(
+        content_store: nativelink_config::stores::StoreConfigOptions::memory(
             nativelink_config::stores::MemoryStore::default(),
         ),
         min_size: 8 * 1024,
@@ -178,10 +178,10 @@ mod dedup_store_tests {
     ) -> Result<(), Error> {
         let store_owned = DedupStore::new(
             &nativelink_config::stores::DedupStore {
-                index_store: nativelink_config::stores::StoreConfig::memory(
+                index_store: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
-                content_store: nativelink_config::stores::StoreConfig::memory(
+                content_store: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 min_size: 5,
@@ -231,10 +231,10 @@ mod dedup_store_tests {
     async fn check_chunk_boundary_reads_test() -> Result<(), Error> {
         let store_owned = DedupStore::new(
             &nativelink_config::stores::DedupStore {
-                index_store: nativelink_config::stores::StoreConfig::memory(
+                index_store: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
-                content_store: nativelink_config::stores::StoreConfig::memory(
+                content_store: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 min_size: 5,

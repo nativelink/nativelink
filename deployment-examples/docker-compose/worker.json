@@ -1,6 +1,7 @@
 {
-  "stores": {
-    "GRPC_LOCAL_STORE": {
+  "stores": [{
+    "name": "GRPC_LOCAL_STORE",
+    "options": {
       // Note: This file is used to test GRPC store.
       "grpc": {
         "instance_name": "main",
@@ -9,8 +10,10 @@
         ],
         "store_type": "cas"
       }
-    },
-    "GRPC_LOCAL_AC_STORE": {
+    }
+  }, {
+    "name": "GRPC_LOCAL_AC_STORE",
+    "options": {
       // Note: This file is used to test GRPC store.
       "grpc": {
         "instance_name": "main",
@@ -19,8 +22,10 @@
         ],
         "store_type": "ac"
       }
-    },
-    "WORKER_FAST_SLOW_STORE": {
+    }
+  }, {
+    "name": "WORKER_FAST_SLOW_STORE",
+    "options": {
       "fast_slow": {
         "fast": {
           "filesystem": {
@@ -39,7 +44,7 @@
         }
       }
     }
-  },
+  }],
   "workers": [{
     "local": {
       "worker_api_endpoint": {

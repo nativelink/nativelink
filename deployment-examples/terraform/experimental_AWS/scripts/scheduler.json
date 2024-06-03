@@ -1,6 +1,7 @@
 {
-  "stores": {
-    "AC_S3_STORE": {
+  "stores": [{
+    "name": "AC_S3_STORE",
+    "options": {
       "compression": {
         "compression_algorithm": {
           "lz4": {}
@@ -34,8 +35,10 @@
           }
         }
       }
-    },
-    "CAS_S3_STORE": {
+    }
+  }, {
+    "name": "CAS_S3_STORE",
+    "options": {
       "dedup": {
         "index_store": {
           "fast_slow": {
@@ -104,10 +107,11 @@
           }
         }
       }
-    },
-  },
-  "schedulers": {
-    "MAIN_SCHEDULER": {
+    }
+  }],
+  "schedulers": [{
+    "name": "MAIN_SCHEDULER",
+    "options": {
       "simple": {
         "supported_platform_properties": {
           "cpu_count": "minimum",
@@ -119,7 +123,7 @@
         }
       }
     }
-  },
+  }],
   "servers": [{
     "listener": {
       "http": {

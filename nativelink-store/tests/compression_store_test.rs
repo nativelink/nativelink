@@ -77,7 +77,7 @@ mod compression_store_tests {
     async fn simple_smoke_test() -> Result<(), Error> {
         let store_owned = CompressionStore::new(
             nativelink_config::stores::CompressionStore {
-                backend: nativelink_config::stores::StoreConfig::memory(
+                backend: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 compression_algorithm: nativelink_config::stores::CompressionAlgorithm::lz4(
@@ -114,7 +114,7 @@ mod compression_store_tests {
     async fn partial_reads_test() -> Result<(), Error> {
         let store_owned = CompressionStore::new(
             nativelink_config::stores::CompressionStore {
-                backend: nativelink_config::stores::StoreConfig::memory(
+                backend: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 compression_algorithm: nativelink_config::stores::CompressionAlgorithm::lz4(
@@ -173,7 +173,7 @@ mod compression_store_tests {
     async fn rand_5mb_smoke_test() -> Result<(), Error> {
         let store_owned = CompressionStore::new(
             nativelink_config::stores::CompressionStore {
-                backend: nativelink_config::stores::StoreConfig::memory(
+                backend: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 compression_algorithm: nativelink_config::stores::CompressionAlgorithm::lz4(
@@ -212,7 +212,7 @@ mod compression_store_tests {
         ));
         let store_owned = CompressionStore::new(
             nativelink_config::stores::CompressionStore {
-                backend: nativelink_config::stores::StoreConfig::memory(
+                backend: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 compression_algorithm: nativelink_config::stores::CompressionAlgorithm::lz4(
@@ -269,7 +269,7 @@ mod compression_store_tests {
         ));
         let store_owned = CompressionStore::new(
             nativelink_config::stores::CompressionStore {
-                backend: nativelink_config::stores::StoreConfig::memory(
+                backend: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 compression_algorithm: nativelink_config::stores::CompressionAlgorithm::lz4(
@@ -358,7 +358,7 @@ mod compression_store_tests {
         ));
         let store_owned = CompressionStore::new(
             nativelink_config::stores::CompressionStore {
-                backend: nativelink_config::stores::StoreConfig::memory(
+                backend: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 compression_algorithm: nativelink_config::stores::CompressionAlgorithm::lz4(
@@ -510,7 +510,7 @@ mod compression_store_tests {
         ));
         let store_owned = CompressionStore::new(
             nativelink_config::stores::CompressionStore {
-                backend: nativelink_config::stores::StoreConfig::memory(
+                backend: nativelink_config::stores::StoreConfigOptions::memory(
                     nativelink_config::stores::MemoryStore::default(),
                 ),
                 compression_algorithm: nativelink_config::stores::CompressionAlgorithm::lz4(

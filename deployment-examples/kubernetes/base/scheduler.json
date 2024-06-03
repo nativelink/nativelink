@@ -1,6 +1,7 @@
 {
-  "stores": {
-    "GRPC_LOCAL_STORE": {
+  "stores": [{
+    "name": "GRPC_LOCAL_STORE",
+    "options": {
       // Note: This file is used to test GRPC store.
       "grpc": {
         "instance_name": "main",
@@ -9,8 +10,10 @@
         ],
         "store_type": "cas"
       }
-    },
-    "GRPC_LOCAL_AC_STORE": {
+    }
+  }, {
+    "name": "GRPC_LOCAL_AC_STORE",
+    "options": {
       // Note: This file is used to test GRPC store.
       "grpc": {
         "instance_name": "main",
@@ -20,9 +23,10 @@
         "store_type": "ac"
       }
     }
-  },
-  "schedulers": {
-    "MAIN_SCHEDULER": {
+  }],
+  "schedulers": [{
+    "name": "MAIN_SCHEDULER",
+    "options": {
       // TODO(adams): use the right scheduler because reclient doesn't use the cached results?
       // TODO(adams): max_bytes_per_stream
       "simple": {
@@ -46,7 +50,7 @@
         }
       }
     }
-  },
+  }],
   "servers": [{
     "listener": {
       "http": {

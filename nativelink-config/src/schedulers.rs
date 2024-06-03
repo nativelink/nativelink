@@ -21,11 +21,22 @@ use crate::stores::{GrpcEndpoint, Retry, StoreRefName};
 
 #[allow(non_camel_case_types)]
 #[derive(Deserialize, Debug)]
-pub enum SchedulerConfig {
+pub enum SchedulerConfigOptions {
     simple(SimpleScheduler),
     grpc(GrpcScheduler),
     cache_lookup(CacheLookupScheduler),
     property_modifier(PropertyModifierScheduler),
+}
+
+/// Configuration for an individual scheduler.
+#[derive(Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct SchedulerConfig {
+    // Name of the scheduler for reference
+    pub name: StoreRefName,
+
+    // Scheduler config options
+    pub options: SchedulerConfigOptions,
 }
 
 /// When the scheduler matches tasks to workers that are capable of running
@@ -156,7 +167,7 @@ pub struct CacheLookupScheduler {
     pub ac_store: StoreRefName,
 
     /// The nested scheduler to use if cache lookup fails.
-    pub scheduler: Box<SchedulerConfig>,
+    pub scheduler: Box<SchedulerConfigOptions>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -188,5 +199,5 @@ pub struct PropertyModifierScheduler {
     pub modifications: Vec<PropertyModification>,
 
     /// The nested scheduler to use after modifying the properties.
-    pub scheduler: Box<SchedulerConfig>,
+    pub scheduler: Box<SchedulerConfigOptions>,
 }

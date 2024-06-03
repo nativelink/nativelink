@@ -1,6 +1,7 @@
 {
-  "stores": {
-    "AC_STORE": {
+  "stores": [{
+    "name": "AC_STORE",
+    "options": {
       "compression": {
         "backend": {
           "experimental_s3_store": {
@@ -17,8 +18,10 @@
           "lz4": {}
         }
       }
-    },
-    "S3_CAS_STORE": {
+    }
+  }, {
+    "name": "S3_CAS_STORE",
+    "options": {
       "compression": {
         "backend": {
           "experimental_s3_store": {
@@ -35,8 +38,10 @@
           "lz4": {}
         }
       }
-    },
-    "CAS_STORE": {
+    }
+  }, {
+    "name": "CAS_STORE",
+    "options": {
       "fast_slow": {
         "fast": {
           "filesystem": {
@@ -62,7 +67,7 @@
         }
       }
     }
-  },
+  }],
   "workers": [{
     "local": {
       "worker_api_endpoint": {

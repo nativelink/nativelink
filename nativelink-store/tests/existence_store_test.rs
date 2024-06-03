@@ -15,7 +15,9 @@
 use std::pin::Pin;
 use std::sync::Arc;
 
-use nativelink_config::stores::{ExistenceCacheStore as ExistenceCacheStoreConfig, StoreConfig};
+use nativelink_config::stores::{
+    ExistenceCacheStore as ExistenceCacheStoreConfig, StoreConfigOptions,
+};
 use nativelink_error::{Error, ResultExt};
 use nativelink_macro::nativelink_test;
 use nativelink_store::existence_cache_store::ExistenceCacheStore;
@@ -33,7 +35,7 @@ mod verify_store_tests {
     async fn simple_exist_cache_test() -> Result<(), Error> {
         const VALUE: &str = "123";
         let config = ExistenceCacheStoreConfig {
-            backend: StoreConfig::noop, // Note: Not used.
+            backend: StoreConfigOptions::noop, // Note: Not used.
             eviction_policy: Default::default(),
         };
         let inner_store = Arc::new(MemoryStore::new(
@@ -74,7 +76,7 @@ mod verify_store_tests {
     async fn update_flags_existance_cache_test() -> Result<(), Error> {
         const VALUE: &str = "123";
         let config = ExistenceCacheStoreConfig {
-            backend: StoreConfig::noop,
+            backend: StoreConfigOptions::noop,
             eviction_policy: Default::default(),
         };
         let inner_store = Arc::new(MemoryStore::new(
@@ -99,7 +101,7 @@ mod verify_store_tests {
     async fn get_part_caches_if_exact_size_set() -> Result<(), Error> {
         const VALUE: &str = "123";
         let config = ExistenceCacheStoreConfig {
-            backend: StoreConfig::noop,
+            backend: StoreConfigOptions::noop,
             eviction_policy: Default::default(),
         };
         let inner_store = Arc::new(MemoryStore::new(

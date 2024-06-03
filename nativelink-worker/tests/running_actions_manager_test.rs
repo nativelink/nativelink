@@ -99,8 +99,8 @@ async fn setup_stores() -> Result<
     let ac_store = Pin::new(Arc::new(MemoryStore::new(&slow_config)));
     let cas_store = Pin::new(Arc::new(FastSlowStore::new(
         &nativelink_config::stores::FastSlowStore {
-            fast: nativelink_config::stores::StoreConfig::filesystem(fast_config),
-            slow: nativelink_config::stores::StoreConfig::memory(slow_config),
+            fast: nativelink_config::stores::StoreConfigOptions::filesystem(fast_config),
+            slow: nativelink_config::stores::StoreConfigOptions::memory(slow_config),
         },
         Pin::into_inner(fast_store.clone()),
         Pin::into_inner(slow_store.clone()),

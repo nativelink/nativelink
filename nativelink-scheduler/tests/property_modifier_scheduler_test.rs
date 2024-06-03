@@ -44,9 +44,11 @@ fn make_modifier_scheduler(modifications: Vec<PropertyModification>) -> TestCont
     let mock_scheduler = Arc::new(MockActionScheduler::new());
     let config = nativelink_config::schedulers::PropertyModifierScheduler {
         modifications,
-        scheduler: Box::new(nativelink_config::schedulers::SchedulerConfig::simple(
-            nativelink_config::schedulers::SimpleScheduler::default(),
-        )),
+        scheduler: Box::new(
+            nativelink_config::schedulers::SchedulerConfigOptions::simple(
+                nativelink_config::schedulers::SimpleScheduler::default(),
+            ),
+        ),
     };
     let modifier_scheduler = PropertyModifierScheduler::new(&config, mock_scheduler.clone());
     TestContext {

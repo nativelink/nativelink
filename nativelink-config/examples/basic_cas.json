@@ -1,6 +1,7 @@
 {
-  "stores": {
-    "AC_MAIN_STORE": {
+  "stores": [{
+    "name": "AC_MAIN_STORE",
+    "options": {
       "filesystem": {
         "content_path": "/tmp/nativelink/data-worker-test/content_path-ac",
         "temp_path": "/tmp/nativelink/data-worker-test/tmp_path-ac",
@@ -9,8 +10,10 @@
           "max_bytes": 1000000000,
         }
       }
-    },
-    "WORKER_FAST_SLOW_STORE": {
+    }
+  }, {
+    "name": "WORKER_FAST_SLOW_STORE",
+    "options": {
       "fast_slow": {
         // "fast" must be a "filesystem" store because the worker uses it to make
         // hardlinks on disk to a directory where the jobs are running.
@@ -34,9 +37,10 @@
         }
       }
     }
-  },
-  "schedulers": {
-    "MAIN_SCHEDULER": {
+  }],
+  "schedulers": [{
+    "name": "MAIN_SCHEDULER",
+    "options": {
       "simple": {
         "supported_platform_properties": {
           "cpu_count": "minimum",
@@ -61,7 +65,7 @@
         }
       }
     }
-  },
+  }],
   "workers": [{
     "local": {
       "worker_api_endpoint": {

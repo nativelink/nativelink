@@ -1,6 +1,7 @@
 {
-  "stores": {
-    "AC_STORE": {
+  "stores": [{
+    "name": "AC_STORE",
+    "options": {
       "compression": {
         "backend": {
           "experimental_s3_store": {
@@ -17,8 +18,10 @@
           "lz4": {}
         }
       }
-    },
-    "CAS_STORE": {
+    }
+  }, {
+    "name": "CAS_STORE",
+    "options": {
       "compression": {
         "backend": {
           "experimental_s3_store": {
@@ -36,7 +39,7 @@
         }
       }
     }
-  },
+  }],
   "servers": [{
     // Non-public apis. We re-export the CAS services so we don't need to go through
     // an external load balancer.

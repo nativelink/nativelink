@@ -1,6 +1,7 @@
 {
-  "stores": {
-    "AC_STORE": {
+  "stores": [{
+    "name": "AC_STORE",
+    "options": {
       "compression": {
         "backend": {
           "fast_slow": {
@@ -28,8 +29,10 @@
           "lz4": {}
         }
       }
-    },
-    "CAS_STORE": {
+    }
+  }, {
+    "name": "CAS_STORE",
+    "options": {
       "existence_cache": {
         "backend": {
           "compression": {
@@ -75,7 +78,7 @@
         }
       }
     }
-  },
+  }],
   "servers": [{
     "listener": {
       "http": {

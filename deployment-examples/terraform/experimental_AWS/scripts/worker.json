@@ -1,6 +1,7 @@
 {
-  "stores": {
-    "AC_S3_STORE": {
+  "stores": [{
+    "name": "AC_S3_STORE",
+    "options": {
       "compression": {
         "compression_algorithm": {
           "lz4": {}
@@ -24,7 +25,9 @@
         }
       }
     },
-    "WORKER_FAST_SLOW_STORE": {
+  }, {
+    "name": "WORKER_FAST_SLOW_STORE",
+    "options": {
       "fast_slow": {
         "fast": {
           "filesystem": {
@@ -82,7 +85,7 @@
         }
       }
     }
-  },
+  }],
   "workers": [{
     "local": {
       "worker_api_endpoint": {

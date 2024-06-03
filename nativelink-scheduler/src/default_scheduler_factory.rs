@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
-use nativelink_config::schedulers::SchedulerConfig;
+use nativelink_config::schedulers::SchedulerConfigOptions;
 use nativelink_error::{Error, ResultExt};
 use nativelink_store::store_manager::StoreManager;
 use nativelink_util::background_spawn;
@@ -36,7 +36,7 @@ pub type SchedulerFactoryResults = (
 );
 
 pub fn scheduler_factory(
-    scheduler_type_cfg: &SchedulerConfig,
+    scheduler_type_cfg: &SchedulerConfigOptions,
     store_manager: &StoreManager,
     scheduler_metrics: &mut Registry,
 ) -> Result<SchedulerFactoryResults, Error> {
@@ -50,18 +50,18 @@ pub fn scheduler_factory(
 }
 
 fn inner_scheduler_factory(
-    scheduler_type_cfg: &SchedulerConfig,
+    scheduler_type_cfg: &SchedulerConfigOptions,
     store_manager: &StoreManager,
     maybe_scheduler_metrics: Option<&mut Registry>,
     visited_schedulers: &mut HashSet<usize>,
 ) -> Result<SchedulerFactoryResults, Error> {
     let scheduler: SchedulerFactoryResults = match scheduler_type_cfg {
-        SchedulerConfig::simple(config) => {
+        SchedulerConfigOptions::simple(config) => {
             let scheduler = Arc::new(SimpleScheduler::new(config));
             (Some(scheduler.clone()), Some(scheduler))
         }
-        SchedulerConfig::grpc(config) => (Some(Arc::new(GrpcScheduler::new(config)?)), None),
-        SchedulerConfig::cache_lookup(config) => {
+        SchedulerConfigOptions::grpc(config) => (Some(Arc::new(GrpcScheduler::new(config)?)), None),
+        SchedulerConfigOptions::cache_lookup(config) => {
             let ac_store = store_manager
                 .get_store(&config.ac_store)
                 .err_tip(|| format!("'ac_store': '{}' does not exist", config.ac_store))?;
@@ -74,7 +74,7 @@ fn inner_scheduler_factory(
             )?);
             (Some(cache_lookup_scheduler), worker_scheduler)
         }
-        SchedulerConfig::property_modifier(config) => {
+        SchedulerConfigOptions::property_modifier(config) => {
             let (action_scheduler, worker_scheduler) =
                 inner_scheduler_factory(&config.scheduler, store_manager, None, visited_schedulers)
                     .err_tip(|| "In nested PropertyModifierScheduler construction")?;
