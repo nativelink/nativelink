@@ -12,6 +12,75 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![doc = include_str!("../README.md")]
+#![doc = "\n\n"] // Add some spacing between the two README files
+#![doc = "
+<details>
+  <summary>Example Configuration Breakdown</summary>
+"]
+#![doc = include_str!("../examples/README.md")]
+#![doc = "</details>"]
+#![doc = "
+<details>
+  <summary>Example Kubernetes Configuraton Breakdown</summary>
+"]
+#![doc = "
+<details>
+  <summary>CAS JSON Config</summary>
+"]
+#![doc = "\n"]
+#![doc = "```json"]
+#![doc = include_str!("../../deployment-examples/kubernetes/cas.json")]
+#![doc = "```"]
+#![doc = "\n"]
+#![doc = "</details>"]
+#![doc = "
+<details>
+  <summary>Scheduler JSON Config</summary>
+"]
+#![doc = "\n"]
+#![doc = "```json"]
+#![doc = include_str!("../../deployment-examples/kubernetes/scheduler.json")]
+#![doc = "```"]
+#![doc = "\n"]
+#![doc = "</details>"]
+#![doc = "
+<details>
+  <summary>Scheduler YAML</summary>
+"]
+#![doc = "\n"]
+#![doc = "```yaml"]
+#![doc = "# Test"]
+#![doc = include_str!("../../deployment-examples/kubernetes/scheduler.yaml")]
+#![doc = "```"]
+#![doc = "\n"]
+#![doc = "</details>"]
+#![doc = "
+<details>
+  <summary>Worker JSON</summary>
+"]
+#![doc = "\n"]
+#![doc = "```yaml"]
+#![doc = "# Test"]
+#![doc = include_str!("../../deployment-examples/kubernetes/worker.json")]
+#![doc = "```"]
+#![doc = "\n"]
+#![doc = "</details>"]
+#![doc = "
+<details>
+  <summary>CAS YAML</summary>
+"]
+#![doc = "\n"]
+#![doc = "```yaml"]
+#![doc = include_str!("../../deployment-examples/kubernetes/cas.yaml")]
+#![doc = "```"]
+#![doc = "\n"]
+#![doc = "</details>"]
+#![doc = include_str!("../../deployment-examples/kubernetes/README.md")]
+#![doc = "</details>"]
+#![doc = "\n\n"] // Add some spacing between the two README files
+#![doc = "</details>"]
+
 pub mod cas_server;
 pub mod schedulers;
 pub mod serde_utils;

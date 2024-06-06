@@ -1,0 +1,12 @@
+filegroup(
+    name = "kubernetes",
+    srcs = [
+        "README.md",
+        "cas.json",
+        "cas.yaml",
+        "scheduler.json",
+        "scheduler.yaml",
+        "worker.json",
+    ],
+    visibility = ["//visibility:public"],
+)

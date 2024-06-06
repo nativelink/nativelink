@@ -15,6 +15,11 @@ rust_library(
         "src/serde_utils.rs",
         "src/stores.rs",
     ],
+    compile_data = [
+        "README.md",
+        "examples/README.md",
+        "//deployment-examples/kubernetes",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "@crates//:byte-unit",

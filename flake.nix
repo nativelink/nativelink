@@ -96,7 +96,7 @@
         src = pkgs.lib.cleanSourceWith {
           src = craneLib.path ./.;
           filter = path: type:
-            (builtins.match "^.+/data/SekienAkashita\\.jpg" path != null)
+            (builtins.match "^.+/(data/SekienAkashita\\.jpg|deployment-examples/kubernetes/(README\\.md|cas\\.json|cas\\.yaml|scheduler\\.json|scheduler\\.yaml|worker\\.json)|README\\.md|examples/README\\.md)" path != null)
             || (craneLib.filterCargoSources path type);
         };
 
