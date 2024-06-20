@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Override this if you want to run on a different version of ubuntu.
-ARG OS_VERSION=22.04
+ARG OS_VERSION=24.04
 # `--compilation_mode` to pass into bazel (eg: opt, dbg, fastbuild).
 ARG OPT_LEVEL=opt
 # Additional bazel flags.
