@@ -54,7 +54,7 @@ rustls-pemfile = "2.1.2"
 scopeguard = "1.2.0"
 serde_json5 = "0.1.0"
 tokio = { version = "1.37.0", features = ["rt-multi-thread", "signal"] }
-tokio-rustls = "0.25.0"
+tokio-rustls = "0.26.0"
 tonic = { version = "0.11.0", features = ["gzip", "tls"] }
 tower = "0.4.13"
 tracing = "0.1.40"
