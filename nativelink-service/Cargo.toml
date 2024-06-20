@@ -31,5 +31,5 @@ nativelink-macro = { path = "../nativelink-macro" }
 hyper = "0.14.28"
 maplit = "1.0.2"
 pretty_assertions = "1.4.0"
-prometheus-client = "0.21.2"
+prometheus-client = "0.22.0"
 prost-types = "0.12.4"
