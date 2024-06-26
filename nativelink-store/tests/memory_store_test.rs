@@ -18,9 +18,10 @@ use std::pin::Pin;
 use bytes::{BufMut, Bytes, BytesMut};
 use futures::poll;
 use memory_stats::memory_stats;
+use nativelink_config::stores::EvictionPolicy;
 use nativelink_error::{Code, Error, ResultExt};
 use nativelink_macro::nativelink_test;
-use nativelink_store::memory_store::MemoryStore;
+use nativelink_store::memory_store::{BytesWrapper, MemoryStore};
 use nativelink_util::buf_channel::make_buf_channel_pair;
 use nativelink_util::common::DigestInfo;
 use nativelink_util::spawn;
@@ -35,6 +36,28 @@ const VALID_HASH4: &str = "0123456789abcdef0000000000000000000400000000000001234
 const TOO_LONG_HASH: &str = "0123456789abcdef000000000000000000010000000000000123456789abcdefff";
 const TOO_SHORT_HASH: &str = "100000000000000000000000000000000000000000000000000000000000001";
 const INVALID_HASH: &str = "g111111111111111111111111111111111111111111111111111111111111111";
+
+#[nativelink_test]
+async fn insert_drop_test() -> Result<(), Error> {
+    const VALUE1: &str = "13";
+    const VALUE2: &str = "2345";
+    let eviction_policy = EvictionPolicy {
+        max_bytes: 5,
+        evict_bytes: 0,
+        max_seconds: 0,
+        max_count: 2,
+    };
+    let store = MemoryStore::new(&nativelink_config::stores::MemoryStore {
+        eviction_policy: Some(eviction_policy),
+    });
+    store
+        .insert(StoreKey::new_str(VALUE1), BytesWrapper::from_string(VALUE1))
+        .await;
+    store
+        .insert(StoreKey::new_str(VALUE2), BytesWrapper::from_string(VALUE2))
+        .await;
+    Ok(())
+}
 
 #[nativelink_test]
 async fn insert_one_item_then_update() -> Result<(), Error> {

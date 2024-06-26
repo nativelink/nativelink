@@ -67,7 +67,25 @@ struct EvictionItem<T: LenEntry + Debug> {
 }
 
 #[async_trait]
-pub trait LenEntry: 'static {
+impl<T: LenEntry + Debug> LenEntry for EvictionItem<T> {
+    #[inline]
+    fn len(&self) -> usize {
+        return self.data.len();
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        return self.data.is_empty();
+    }
+
+    #[inline]
+    async fn unref(&self) {
+        std::mem::drop(&self.data);
+    }
+}
+
+#[async_trait]
+pub trait LenEntry: 'static + Send + Sync {
     /// Length of referenced data.
     fn len(&self) -> usize;
 
@@ -303,6 +321,7 @@ where
                 .lru
                 .pop_lru()
                 .expect("Tried to peek() then pop() but failed");
+            print!("Evicting item -- ");
             event!(Level::INFO, ?key, "Evicting",);
             state.remove(&key, &eviction_item, false).await;
 
