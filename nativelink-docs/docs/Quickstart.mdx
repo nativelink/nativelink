@@ -85,13 +85,13 @@ apt update
 apt install apt-transport-https curl gnupg
 
 # Download the Bazel binary for ARM Linux.
-curl -LO https://github.com/bazelbuild/bazel/releases/download/6.4.0/bazel-6.4.0-linux-arm64
+curl -LO https://github.com/bazelbuild/bazel/releases/download/7.0.2/bazel-7.0.2-linux-arm64
 
 # Make the binary executable.
-chmod +x bazel-6.4.0-linux-arm64
+chmod +x bazel-7.0.2-linux-arm64
 
 # Move the binary to a directory in your PATH.
-mv bazel-6.4.0-linux-arm64 /usr/local/bin/bazel
+mv bazel-7.0.2-linux-arm64 /usr/local/bin/bazel
 
 # Verify the installation.
 bazel --version
@@ -115,13 +115,13 @@ apt update
 apt install apt-transport-https curl gnupg
 
 # Download the Bazel binary for x86 Linux.
-curl -LO https://github.com/bazelbuild/bazel/releases/download/6.4.0/bazel-6.4.0-linux-x86_64
+curl -LO https://github.com/bazelbuild/bazel/releases/download/7.0.2/bazel-7.0.2-linux-x86_64
 
 # Make the binary executable.
-chmod +x bazel-6.4.0-linux-x86_64
+chmod +x bazel-7.0.2-linux-x86_64
 
 # Move the binary to a directory in your PATH.
-mv bazel-6.4.0-linux-x86_64 /usr/local/bin/bazel
+mv bazel-7.0.2-linux-x86_64 /usr/local/bin/bazel
 
 # Verify the installation.
 bazel --version
@@ -174,7 +174,7 @@ and `worker`.
 
 **Build requirements:**
 
-* Bazel 6.4.0+
+* Bazel 7.0.2
 * A recent C++ toolchain with LLD as linker
 
 :::tip
