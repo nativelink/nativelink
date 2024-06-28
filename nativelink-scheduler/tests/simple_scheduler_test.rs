@@ -179,7 +179,8 @@ async fn find_executing_action() -> Result<(), Error> {
     let mut client_rx = scheduler
         .find_existing_action(&unique_qualifier)
         .await
-        .err_tip(|| "Action not found")?;
+        .expect("Action not found")
+        .unwrap();
 
     {
         // Worker should have been sent an execute command.
@@ -955,7 +956,8 @@ async fn update_action_sends_completed_result_after_disconnect() -> Result<(), E
     let mut client_rx = scheduler
         .find_existing_action(&unique_qualifier)
         .await
-        .err_tip(|| "Action not found")?;
+        .unwrap()
+        .expect("Action not found");
     {
         // Client should get notification saying it has been completed.
         let action_state = client_rx.borrow_and_update();

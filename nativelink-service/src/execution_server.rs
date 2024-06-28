@@ -253,6 +253,7 @@ impl ExecutionServer {
             .scheduler
             .find_existing_action(&operation_id.unique_qualifier)
             .await
+            .err_tip(|| "Error running find_existing_action in ExecutionServer::wait_execution")?
         else {
             return Err(Status::not_found("Failed to find existing task"));
         };

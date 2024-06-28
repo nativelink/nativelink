@@ -101,7 +101,7 @@ pub type ActionStateResultStream = Pin<Box<dyn Stream<Item = Arc<dyn ActionState
 pub trait ClientStateManager {
     /// Add a new action to the queue or joins an existing action.
     async fn add_action(
-        &mut self,
+        &self,
         action_info: ActionInfo,
     ) -> Result<Arc<dyn ActionStateResult>, Error>;
 
@@ -119,7 +119,7 @@ pub trait WorkerStateManager {
     /// did not change with a modified timestamp in order to prevent
     /// the operation from being considered stale and being rescheduled.
     async fn update_operation(
-        &mut self,
+        &self,
         operation_id: OperationId,
         worker_id: WorkerId,
         action_stage: Result<ActionStage, Error>,
@@ -136,7 +136,7 @@ pub trait MatchingEngineStateManager {
 
     /// Update that state of an operation.
     async fn update_operation(
-        &mut self,
+        &self,
         operation_id: OperationId,
         worker_id: Option<WorkerId>,
         action_stage: Result<ActionStage, Error>,

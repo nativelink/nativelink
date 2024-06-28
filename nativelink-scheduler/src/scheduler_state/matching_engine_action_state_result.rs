@@ -22,22 +22,29 @@ use tokio::sync::watch;
 use crate::operation_state_manager::ActionStateResult;
 
 pub struct MatchingEngineActionStateResult {
-    pub action_info: Arc<ActionInfo>,
+    action_info: Arc<ActionInfo>,
+    action_state: watch::Receiver<Arc<ActionState>>,
 }
 impl MatchingEngineActionStateResult {
-    pub(crate) fn new(action_info: Arc<ActionInfo>) -> Self {
-        Self { action_info }
+    pub(crate) fn new(
+        action_info: Arc<ActionInfo>,
+        action_state: watch::Receiver<Arc<ActionState>>,
+    ) -> Self {
+        Self {
+            action_info,
+            action_state,
+        }
     }
 }
 
 #[async_trait]
 impl ActionStateResult for MatchingEngineActionStateResult {
     async fn as_state(&self) -> Result<Arc<ActionState>, Error> {
-        unimplemented!()
+        Ok(self.action_state.borrow().clone())
     }
 
     async fn as_receiver(&self) -> Result<&'_ watch::Receiver<Arc<ActionState>>, Error> {
-        unimplemented!()
+        Ok(&self.action_state)
     }
 
     async fn as_action_info(&self) -> Result<Arc<ActionInfo>, Error> {

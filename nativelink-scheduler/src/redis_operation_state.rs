@@ -413,7 +413,7 @@ impl<T: ConnectionLike + Unpin + Clone + Send + Sync + 'static> RedisStateManage
 #[async_trait]
 impl ClientStateManager for RedisStateManager {
     async fn add_action(
-        &mut self,
+        &self,
         action_info: ActionInfo,
     ) -> Result<Arc<dyn ActionStateResult>, Error> {
         self.inner_add_action(action_info).await
@@ -430,7 +430,7 @@ impl ClientStateManager for RedisStateManager {
 #[async_trait]
 impl WorkerStateManager for RedisStateManager {
     async fn update_operation(
-        &mut self,
+        &self,
         operation_id: OperationId,
         worker_id: WorkerId,
         action_stage: Result<ActionStage, Error>,
@@ -450,7 +450,7 @@ impl MatchingEngineStateManager for RedisStateManager {
     }
 
     async fn update_operation(
-        &mut self,
+        &self,
         operation_id: OperationId,
         worker_id: Option<WorkerId>,
         action_stage: Result<ActionStage, Error>,
