@@ -117,7 +117,7 @@ impl ActionScheduler for PropertyModifierScheduler {
     async fn find_existing_action(
         &self,
         unique_qualifier: &ActionInfoHashKey,
-    ) -> Option<watch::Receiver<Arc<ActionState>>> {
+    ) -> Result<Option<watch::Receiver<Arc<ActionState>>>, Error> {
         self.scheduler.find_existing_action(unique_qualifier).await
     }
 
