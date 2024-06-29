@@ -1,0 +1,27 @@
+---
+sidebar_position: 1
+title: 'Bazel Remote Caching'
+description: 'Bazel Remote Caching Cloud Quickstart'
+---
+
+# Bazel Remote Caching Cloud Quickstart
+
+To connect NativeLink to your Bazel project simply add the code below to your `.bazelrc` file. If you can't find a `.bazelrc` file - create one in the same directory as your Bazel `WORKSPACE` or `MODULE.bazel` file.
+
+:::note
+
+Fill in the `CLAIM_URL` and `API_KEY` from the [NativeLink Cloud](https://app.nativelink.com)
+
+:::
+
+1. **Configure your `.bazelrc`**
+   - Copy the following lines into your `.bazelrc`:
+     ```
+     build --remote_cache=[CLAIM_URL]
+     build --remote_header=x-nativelink-api-key=[API_KEY]
+     build --remote_timeout=600
+     ```
+
+2. **Validate Connection**
+   - Once you've added those lines to your `.bazelrc`, run a Bazel build.
+   - You will see remote cache utilization on the [Dashboard](https://app.nativelink.com/dashboard) page if your `.bazelrc` is configured correctly.

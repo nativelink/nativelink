@@ -1,0 +1,268 @@
+---
+sidebar_position: 1
+title: 'Chromium/Reclient Remote Caching'
+description: 'Reclient Remote Caching Cloud Quickstart'
+---
+
+# Reclient Remote Caching Cloud Quickstart
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+
+  ### Reclient Configuration
+  Utilize NativeLink's cloud CAS to build your Reclient Chromium projects.
+  The following guide will help you set up your authentication keys (using mTLS)
+  and configure Reclient for remote CAS usage.
+
+<Tabs>
+  <TabItem value="linux" label="Linux" default>
+
+  #### 1. Setup Reclient/Chromium for Linux
+
+  Start with Chromium by following the instructions here:
+  [Checking out and building Chromium for Linux](https://chromium.googlesource.com/chromium/src/+/main/docs/linux_build_instructions.md).
+  Follow the instructions up to "Setting up the build", then stop and follow our
+  instructions below. Do not build Chromium yet.
+
+  Chromium Recommendations:
+  We recommend creating the chromium folder under your home directory:
+  ```bash
+  mkdir $HOME/chromium
+  ```
+
+  ### 2. Setup your NativeLink configuration directory
+
+  Set up your NativeLink configuration directory by running:
+  ```bash
+  mkdir $HOME/nativelink-reclient
+  ```
+
+  ### 3. Generating your mTLS key files
+
+  Follow the instructions below in your terminal to generate the mTLS keys.
+  These keys allow your local machine to communicate with our remote CAS:
+  ```bash
+  cd $HOME/nativelink-reclient
+  mkdir certs && cd certs
+  openssl req -x509 -sha256 -newkey rsa:4096 -keyout ca.key -out ca.crt -days 356 -nodes -subj '/CN=NativeLink-Server'
+  openssl req -new -newkey rsa:4096 -keyout client.key -out client.csr -nodes -subj '/CN=NativeLink-Client'
+  openssl x509 -req -sha256 -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -out client.crt
+  ```
+
+  Verify your certs are correct by running:
+  ```bash
+  openssl verify -CAfile ca.crt client.crt
+  ```
+
+  ### 4. Upload the public key to NativeLink
+
+  To get the contents of your cert, run:
+  ```bash
+  cat ca.crt
+  ```
+
+  :::note
+  Navigate to the Reclient Quickstart tab on the [NativeLink Cloud](https://app.nativelink.com) and click on the "Add New Cert" button. Copy and paste the contents of your cert into the provided box and click "Save". You can also update your cert on the Settings page.
+  :::
+
+  ### 5. Setup your environment
+
+  Create an environment variables file:
+  ```bash
+  cd $HOME/nativelink-reclient
+  touch .env.local
+  ```
+  Then save the below contents into your newly created .env.local file:
+  ```bash
+  # If you have a different CACHE url or
+  # your CERT/KEY is in a different location
+  # you can update those here
+  export CACHE_ADDRESS=cas-blake.build-faster.nativelink.net:443
+  export TLS_CLIENT_AUTH_CERT=$HOME/nativelink-reclient/certs/client.crt
+  export TLS_CLIENT_AUTH_KEY=$HOME/nativelink-reclient/certs/client.key
+
+  # Leave below as is
+  export RBE_service=${CACHE_ADDRESS}
+  export RBE_cas_service=${CACHE_ADDRESS}
+  export RBE_reclient_timeout=60m
+  export RBE_instance=
+  export RBE_exec_timeout=4m
+  export RBE_alsologtostderr=true
+  export RBE_service_no_security=false
+  export RBE_local_resource_fraction=0.00001
+  export RBE_automatic_auth=false
+  export RBE_gcert_refresh_timeout=20
+  export RBE_compression_threshold=-1
+  export RBE_metrics_namespace=main
+  export RBE_platform=
+  export RBE_experimental_credentials_helper=
+  export RBE_experimental_credentials_helper_args=
+  export RBE_log_http_calls=true
+  export RBE_use_rpc_credentials=true
+  export RBE_exec_strategy=local
+  export RBE_remote_disabled=false
+  export RBE_tls_client_auth_cert=${TLS_CLIENT_AUTH_CERT}
+  export RBE_tls_client_auth_key=${TLS_CLIENT_AUTH_KEY}
+  export RBE_service_no_auth=true
+  export RBE_use_application_default_credentials=true
+  ```
+
+  ### 6. Build Chromium
+
+  First, run a script to set some final configurations to optimize your build
+  for remote caching. The --src_dir assumes chromium under the $HOME directory:
+  ```bash
+  cd $HOME/nativelink-reclient
+  git clone https://github.com/TraceMachina/reclient-configs.git
+  cd reclient-configs
+  python3 configure_reclient.py --verbose --force --src_dir=$HOME/chromium/src
+  ```
+  You can then run the Chromium build:
+  ```bash
+  cd $HOME/chromium/src
+  source $HOME/nativelink-reclient/.env.local
+  rm -rf out
+  gn gen --args="use_remoteexec=true is_debug=false is_component_build=true symbol_level=0 rbe_cfg_dir=\"../../buildtools/reclient_cfgs\"" out/Default
+  autoninja -C out/Default chrome
+  ```
+
+  ### 7. Watch the execution
+
+  In a new terminal window, execute the following:
+  ```bash
+  watch ${HOME}/chromium/src/buildtools/reclient/reproxystatus
+  ```
+  </TabItem>
+  <TabItem value="mac" label="Mac">
+
+  #### 1. Setup Reclient/Chromium for Mac
+
+  To get started with Chromium, follow the instructions here:
+  [Checking out and building Chromium for Mac](https://chromium.googlesource.com/chromium/src/+/main/docs/mac_build_instructions.md).
+  As you follow the instructions above, before the step "Setting up the build" stop there and follow our instructions below.
+
+  Chromium Recommendations:
+  We recommend creating the chromium folder under your home directory:
+  ```bash
+  mkdir $HOME/chromium
+  ```
+
+  To check whether you have Xcode properly installed and the Mac SDK present, run:
+  ```bash
+  ls `xcode-select -p`/Platforms/MacOSX.platform/Developer/SDKs
+  ```
+  If this command doesn't return MacOSX.sdk (or similar), install the latest version of Xcode, and ensure it's in your /Applications directory. If you're only seeing the command line tools, this command may fix that:
+  ```bash
+  sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
+  ```
+
+  When you fetch the code, we recommend running the following to speed up your build:
+  ```bash
+  caffeinate fetch --no-history chromium
+  ```
+
+  ### 2. Setup your NativeLink configuration directory
+
+  Run the following command:
+  ```bash
+  mkdir $HOME/nativelink-reclient
+  ```
+  This folder will contain the configurations for your Reclient setup with NativeLink.
+
+  ### 3. Generating your mTLS key files
+
+  Follow the instructions below in your terminal. This will generate the mTLS keys that allow your local machine to communicate with our remote CAS:
+  ```bash
+  cd $HOME/nativelink-reclient
+  mkdir certs && cd certs
+  openssl req -x509 -sha256 -newkey rsa:4096 -keyout ca.key -out ca.crt -days 356 -nodes -subj '/CN=NativeLink-Server'
+  openssl req -new -newkey rsa:4096 -keyout client.key -out client.csr -nodes -subj '/CN=NativeLink-Client'
+  openssl x509 -req -sha256 -days 365 -in client.csr -CA ca.crt -CAkey ca.key -set_serial 02 -out client.crt
+  ```
+
+  You can verify your certs are correct by running:
+  ```bash
+  openssl verify -CAfile ca.crt client.crt
+  ```
+
+  ### 4. Upload the public key to NativeLink
+
+  To get the contents of your cert, run:
+  ```bash
+  cat ca.crt
+  ```
+  :::note
+  Navigate to the Reclient Quickstart tab on the [NativeLink Cloud](https://app.nativelink.com) and click on the "Add New Cert" button. Copy and paste the contents of your cert into the provided box and click "Save". You can also update your cert on the Settings page.
+  :::
+
+  ### 5. Setup your environment
+
+  Create an environment variables file:
+  ```bash
+  cd $HOME/nativelink-reclient
+  touch .env.local
+  ```
+  Then save the below contents into your newly created .env.local file:
+  ```bash
+  # If you have a different CACHE url or
+  # your CERT/KEY is in a different location
+  # you can update those here
+  export CACHE_ADDRESS=cas-blake.build-faster.nativelink.net:443
+  export TLS_CLIENT_AUTH_CERT=$HOME/nativelink-reclient/certs/client.crt
+  export TLS_CLIENT_AUTH_KEY=$HOME/nativelink-reclient/certs/client.key
+
+  # Leave below as is
+  export RBE_service=${CACHE_ADDRESS}
+  export RBE_cas_service=${CACHE_ADDRESS}
+  export RBE_reclient_timeout=60m
+  export RBE_instance=
+  export RBE_exec_timeout=4m
+  export RBE_alsologtostderr=true
+  export RBE_service_no_security=false
+  export RBE_local_resource_fraction=0.00001
+  export RBE_automatic_auth=false
+  export RBE_gcert_refresh_timeout=20
+  export RBE_compression_threshold=-1
+  export RBE_metrics_namespace=main
+  export RBE_platform=
+  export RBE_experimental_credentials_helper=
+  export RBE_experimental_credentials_helper_args=
+  export RBE_log_http_calls=true
+  export RBE_use_rpc_credentials=true
+  export RBE_exec_strategy=local
+  export RBE_remote_disabled=false
+  export RBE_tls_client_auth_cert=${TLS_CLIENT_AUTH_CERT}
+  export RBE_tls_client_auth_key=${TLS_CLIENT_AUTH_KEY}
+  export RBE_service_no_auth=true
+  export RBE_use_application_default_credentials=true
+  ```
+
+  ### 6. Build Chromium
+
+  First, we will run a script to set some final configurations to optimize your build for remote caching. The --src_dir assumes chromium under the $HOME directory:
+  ```bash
+  cd $HOME/nativelink-reclient
+  git clone https://github.com/TraceMachina/reclient-configs.git
+  cd reclient-configs
+  python3 configure_reclient.py --verbose --force --src_dir=$HOME/chromium/src
+  ```
+  You can then run the Chromium build:
+  ```bash
+  cd $HOME/chromium/src
+  source $HOME/nativelink-reclient/.env.local
+  rm -rf out
+  gn gen --args="use_remoteexec=true is_debug=false is_component_build=true symbol_level=0 rbe_cfg_dir=\"../../buildtools/reclient_cfgs\"" out/Default
+  autoninja -C out/Default chrome
+  ```
+
+  ### 7. Watch the execution
+
+  In a new terminal window, execute the following:
+  ```bash
+  brew install watch
+  watch ${HOME}/chromium/src/buildtools/reclient/reproxystatus
+  ```
+
+  </TabItem>
+</Tabs>

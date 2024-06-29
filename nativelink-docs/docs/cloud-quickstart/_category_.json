@@ -1,0 +1,10 @@
+{
+  "label": "Cloud Quickstart",
+  "position": 3,
+  "collapsed": false,
+  "collapsible": true,
+  "link": {
+    "type": "generated-index",
+    "description": "Reference docs for help with configuration your NativeLink."
+  }
+}
