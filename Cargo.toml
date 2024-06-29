@@ -42,7 +42,7 @@ nativelink-util = { path = "nativelink-util" }
 nativelink-worker = { path = "nativelink-worker" }
 
 async-lock = "3.3.0"
-axum = "0.6.20"
+axum = "0.7.0"
 
 clap = { version = "4.5.4", features = ["derive"] }
 futures = "0.3.30"
