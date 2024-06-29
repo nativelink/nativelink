@@ -222,11 +222,11 @@ impl ActionScheduler for CacheLookupScheduler {
     async fn find_existing_action(
         &self,
         unique_qualifier: &ActionInfoHashKey,
-    ) -> Option<watch::Receiver<Arc<ActionState>>> {
+    ) -> Result<Option<watch::Receiver<Arc<ActionState>>>, Error> {
         {
             let cache_check_actions = self.cache_check_actions.lock();
             if let Some(rx) = subscribe_to_existing_action(&cache_check_actions, unique_qualifier) {
-                return Some(rx);
+                return Ok(Some(rx));
             }
         }
         // Cache skipped may be in the upstream scheduler.

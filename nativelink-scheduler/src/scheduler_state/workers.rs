@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use lru::LruCache;
 use nativelink_config::schedulers::WorkerAllocationStrategy;
 use nativelink_error::{error_if, make_input_err, Error, ResultExt};
 use nativelink_util::action_messages::WorkerId;
 use nativelink_util::platform_properties::PlatformProperties;
+use tokio::sync::Notify;
 use tracing::{event, Level};
 
 use crate::worker::{Worker, WorkerTimestamp};
@@ -27,13 +30,19 @@ pub struct Workers {
     pub(crate) workers: LruCache<WorkerId, Worker>,
     /// The allocation strategy for workers.
     pub(crate) allocation_strategy: WorkerAllocationStrategy,
+    /// A channel to notify the matching engine that the worker pool has changed.
+    pub(crate) worker_change_notify: Arc<Notify>,
 }
 
 impl Workers {
-    pub(crate) fn new(allocation_strategy: WorkerAllocationStrategy) -> Self {
+    pub(crate) fn new(
+        allocation_strategy: WorkerAllocationStrategy,
+        worker_change_notify: Arc<Notify>,
+    ) -> Self {
         Self {
             workers: LruCache::unbounded(),
             allocation_strategy,
+            worker_change_notify,
         }
     }
 
@@ -80,6 +89,7 @@ impl Workers {
                 "Worker connection appears to have been closed while adding to pool"
             );
         }
+        self.worker_change_notify.notify_one();
         res
     }
 
@@ -87,7 +97,9 @@ impl Workers {
     /// Note: The caller is responsible for any rescheduling of any tasks that might be
     /// running.
     pub(crate) fn remove_worker(&mut self, worker_id: &WorkerId) -> Option<Worker> {
-        self.workers.pop(worker_id)
+        let result = self.workers.pop(worker_id);
+        self.worker_change_notify.notify_one();
+        result
     }
 
     // Attempts to find a worker that is capable of running this action.

@@ -17,13 +17,13 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use async_lock::Mutex;
 use async_trait::async_trait;
 use futures::stream;
 use hashbrown::{HashMap, HashSet};
-use nativelink_error::{make_err, make_input_err, Code, Error, ResultExt};
+use nativelink_error::{make_err, Code, Error, ResultExt};
 use nativelink_util::action_messages::{
-    ActionInfo, ActionInfoHashKey, ActionResult, ActionStage, ActionState, ExecutionMetadata,
-    OperationId, WorkerId,
+    ActionInfo, ActionInfoHashKey, ActionStage, ActionState, OperationId, WorkerId,
 };
 use tokio::sync::watch::error::SendError;
 use tokio::sync::{watch, Notify};
@@ -38,12 +38,10 @@ use crate::scheduler_state::client_action_state_result::ClientActionStateResult;
 use crate::scheduler_state::completed_action::CompletedAction;
 use crate::scheduler_state::matching_engine_action_state_result::MatchingEngineActionStateResult;
 use crate::scheduler_state::metrics::Metrics;
-use crate::scheduler_state::workers::Workers;
-use crate::worker::WorkerUpdate;
 
 #[repr(transparent)]
 pub(crate) struct StateManager {
-    pub inner: StateManagerImpl,
+    pub inner: Mutex<StateManagerImpl>,
 }
 
 impl StateManager {
@@ -51,100 +49,20 @@ impl StateManager {
     pub(crate) fn new(
         queued_actions_set: HashSet<Arc<ActionInfo>>,
         queued_actions: BTreeMap<Arc<ActionInfo>, AwaitedAction>,
-        workers: Workers,
         active_actions: HashMap<Arc<ActionInfo>, AwaitedAction>,
         recently_completed_actions: HashSet<CompletedAction>,
         metrics: Arc<Metrics>,
-        max_job_retries: usize,
-        tasks_or_workers_change_notify: Arc<Notify>,
+        tasks_change_notify: Arc<Notify>,
     ) -> Self {
         Self {
-            inner: StateManagerImpl {
+            inner: Mutex::new(StateManagerImpl {
                 queued_actions_set,
                 queued_actions,
-                workers,
                 active_actions,
                 recently_completed_actions,
                 metrics,
-                max_job_retries,
-                tasks_or_workers_change_notify,
-            },
-        }
-    }
-
-    fn immediate_evict_worker(&mut self, worker_id: &WorkerId, err: Error) {
-        if let Some(mut worker) = self.inner.workers.remove_worker(worker_id) {
-            self.inner.metrics.workers_evicted.inc();
-            // We don't care if we fail to send message to worker, this is only a best attempt.
-            let _ = worker.notify_update(WorkerUpdate::Disconnect);
-            // We create a temporary Vec to avoid doubt about a possible code
-            // path touching the worker.running_action_infos elsewhere.
-            for action_info in worker.running_action_infos.drain() {
-                self.inner.metrics.workers_evicted_with_running_action.inc();
-                self.retry_action(&action_info, worker_id, err.clone());
-            }
-            // Note: Calling this multiple times is very cheap, it'll only trigger `do_try_match` once.
-            self.inner.tasks_or_workers_change_notify.notify_one();
-        }
-    }
-
-    fn retry_action(&mut self, action_info: &Arc<ActionInfo>, worker_id: &WorkerId, err: Error) {
-        match self.inner.active_actions.remove(action_info) {
-            Some(running_action) => {
-                let mut awaited_action = running_action;
-                let send_result = if awaited_action.attempts >= self.inner.max_job_retries {
-                    self.inner.metrics.retry_action_max_attempts_reached.inc();
-                    Arc::make_mut(&mut awaited_action.current_state).stage = ActionStage::Completed(ActionResult {
-                        execution_metadata: ExecutionMetadata {
-                            worker: format!("{worker_id}"),
-                            ..ExecutionMetadata::default()
-                        },
-                        error: Some(err.merge(make_err!(
-                            Code::Internal,
-                            "Job cancelled because it attempted to execute too many times and failed"
-                        ))),
-                        ..ActionResult::default()
-                    });
-                    awaited_action
-                        .notify_channel
-                        .send(awaited_action.current_state.clone())
-                    // Do not put the action back in the queue here, as this action attempted to run too many
-                    // times.
-                } else {
-                    self.inner.metrics.retry_action.inc();
-                    Arc::make_mut(&mut awaited_action.current_state).stage = ActionStage::Queued;
-                    let send_result = awaited_action
-                        .notify_channel
-                        .send(awaited_action.current_state.clone());
-                    self.inner.queued_actions_set.insert(action_info.clone());
-                    self.inner
-                        .queued_actions
-                        .insert(action_info.clone(), awaited_action);
-                    send_result
-                };
-
-                if send_result.is_err() {
-                    self.inner.metrics.retry_action_no_more_listeners.inc();
-                    // Don't remove this task, instead we keep them around for a bit just in case
-                    // the client disconnected and will reconnect and ask for same job to be executed
-                    // again.
-                    event!(
-                        Level::WARN,
-                        ?action_info,
-                        ?worker_id,
-                        "Action has no more listeners during evict_worker()"
-                    );
-                }
-            }
-            None => {
-                self.inner.metrics.retry_action_but_action_missing.inc();
-                event!(
-                    Level::ERROR,
-                    ?action_info,
-                    ?worker_id,
-                    "Worker stated it was running an action, but it was not in the active_actions"
-                );
-            }
+                tasks_change_notify,
+            }),
         }
     }
 }
@@ -177,10 +95,6 @@ pub(crate) struct StateManagerImpl {
     /// Important: `queued_actions_set` and `queued_actions` must be kept in sync.
     pub(crate) queued_actions: BTreeMap<Arc<ActionInfo>, AwaitedAction>,
 
-    /// A `Workers` pool that contains all workers that are available to execute actions in a priority
-    /// order based on the allocation strategy.
-    pub(crate) workers: Workers,
-
     /// A map of all actions that are active. A hashmap is used to find actions that are active in
     /// O(1) time. The key is the `ActionInfo` struct. The value is the `AwaitedAction` struct.
     pub(crate) active_actions: HashMap<Arc<ActionInfo>, AwaitedAction>,
@@ -193,129 +107,84 @@ pub(crate) struct StateManagerImpl {
 
     pub(crate) metrics: Arc<Metrics>,
 
-    /// Default times a job can retry before failing.
-    pub(crate) max_job_retries: usize,
-
     /// Notify task<->worker matching engine that work needs to be done.
-    pub(crate) tasks_or_workers_change_notify: Arc<Notify>,
+    pub(crate) tasks_change_notify: Arc<Notify>,
 }
 
-impl StateManager {
-    /// Modifies the `stage` of `current_state` within `AwaitedAction`. Sends notification channel
-    /// the new state.
-    ///
-    ///
-    /// # Discussion
-    ///
-    /// The use of `Arc::make_mut` is potentially dangerous because it clones the data and
-    /// invalidates all weak references to it. However, in this context, it is considered
-    /// safe because the data is going to be re-sent back out. The primary reason for using
-    /// `Arc` is to reduce the number of copies, not to enforce read-only access. This approach
-    /// ensures that all downstream components receive the same pointer. If an update occurs
-    /// while another thread is operating on the data, it is acceptable, since the other thread
-    /// will receive another update with the new version.
-    ///
-    pub(crate) fn mutate_stage(
-        awaited_action: &mut AwaitedAction,
-        action_stage: ActionStage,
-    ) -> Result<(), SendError<Arc<ActionState>>> {
-        Arc::make_mut(&mut awaited_action.current_state).stage = action_stage;
-        awaited_action
-            .notify_channel
-            .send(awaited_action.current_state.clone())
-    }
+/// Modifies the `stage` of `current_state` within `AwaitedAction`. Sends notification channel
+/// the new state.
+///
+///
+/// # Discussion
+///
+/// The use of `Arc::make_mut` is potentially dangerous because it clones the data and
+/// invalidates all weak references to it. However, in this context, it is considered
+/// safe because the data is going to be re-sent back out. The primary reason for using
+/// `Arc` is to reduce the number of copies, not to enforce read-only access. This approach
+/// ensures that all downstream components receive the same pointer. If an update occurs
+/// while another thread is operating on the data, it is acceptable, since the other thread
+/// will receive another update with the new version.
+///
+pub(crate) fn mutate_stage(
+    awaited_action: &mut AwaitedAction,
+    action_stage: ActionStage,
+) -> Result<(), SendError<Arc<ActionState>>> {
+    Arc::make_mut(&mut awaited_action.current_state).stage = action_stage;
+    awaited_action
+        .notify_channel
+        .send(awaited_action.current_state.clone())
+}
 
-    /// Modifies the `priority` of `action_info` within `ActionInfo`.
-    ///
-    fn mutate_priority(action_info: &mut Arc<ActionInfo>, priority: i32) {
-        Arc::make_mut(action_info).priority = priority;
-    }
+/// Updates the `last_error` field of the provided `AwaitedAction` and sends the current state
+/// to the notify channel.
+///
+fn mutate_last_error(
+    awaited_action: &mut AwaitedAction,
+    last_error: Error,
+) -> Result<(), SendError<Arc<ActionState>>> {
+    awaited_action.last_error = Some(last_error);
+    awaited_action
+        .notify_channel
+        .send(awaited_action.current_state.clone())
+}
 
-    /// Updates the `last_error` field of the provided `AwaitedAction` and sends the current state
-    /// to the notify channel.
-    ///
-    fn mutate_last_error(
-        awaited_action: &mut AwaitedAction,
-        last_error: Error,
-    ) -> Result<(), SendError<Arc<ActionState>>> {
-        awaited_action.last_error = Some(last_error);
-        awaited_action
-            .notify_channel
-            .send(awaited_action.current_state.clone())
-    }
-
-    /// Notifies the specified worker to run the given action and handles errors by evicting
-    /// the worker if the notification fails.
-    ///
-    /// # Note
-    ///
-    /// Intended utility function for matching engine.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if the notification to the worker fails, and in that case,
-    /// the worker will be immediately evicted from the system.
-    ///
-    async fn worker_notify_run_action(
-        &mut self,
-        worker_id: WorkerId,
-        action_info: Arc<ActionInfo>,
-    ) -> Result<(), Error> {
-        if let Some(worker) = self.inner.workers.workers.get_mut(&worker_id) {
-            let notify_worker_result =
-                worker.notify_update(WorkerUpdate::RunAction(action_info.clone()));
-
-            if notify_worker_result.is_err() {
-                event!(
-                    Level::WARN,
-                    ?worker_id,
-                    ?action_info,
-                    ?notify_worker_result,
-                    "Worker command failed, removing worker",
-                );
-
-                let err = make_err!(
-                Code::Internal,
-                "Worker command failed, removing worker {worker_id} -- {notify_worker_result:?}",
+/// Sets the action stage for the given `AwaitedAction` based on the result of the provided
+/// `action_stage`. If the `action_stage` is an error, it updates the `last_error` field
+/// and logs a warning.
+///
+/// # Note
+///
+/// Intended utility function for matching engine.
+///
+/// # Errors
+///
+/// This function will return an error if updating the state of the `awaited_action` fails.
+///
+async fn worker_set_action_stage(
+    awaited_action: &mut AwaitedAction,
+    action_stage: Result<ActionStage, Error>,
+    worker_id: WorkerId,
+) -> Result<(), SendError<Arc<ActionState>>> {
+    match action_stage {
+        Ok(action_stage) => mutate_stage(awaited_action, action_stage),
+        Err(e) => {
+            event!(
+                Level::WARN,
+                ?worker_id,
+                "Action stage setting error during do_try_match()"
             );
-
-                self.immediate_evict_worker(&worker_id, err.clone());
-                return Err(err);
-            }
-        }
-        Ok(())
-    }
-
-    /// Sets the action stage for the given `AwaitedAction` based on the result of the provided
-    /// `action_stage`. If the `action_stage` is an error, it updates the `last_error` field
-    /// and logs a warning.
-    ///
-    /// # Note
-    ///
-    /// Intended utility function for matching engine.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if updating the state of the `awaited_action` fails.
-    ///
-    async fn worker_set_action_stage(
-        awaited_action: &mut AwaitedAction,
-        action_stage: Result<ActionStage, Error>,
-        worker_id: WorkerId,
-    ) -> Result<(), SendError<Arc<ActionState>>> {
-        match action_stage {
-            Ok(action_stage) => StateManager::mutate_stage(awaited_action, action_stage),
-            Err(e) => {
-                event!(
-                    Level::WARN,
-                    ?worker_id,
-                    "Action stage setting error during do_try_match()"
-                );
-                StateManager::mutate_last_error(awaited_action, e)
-            }
+            mutate_last_error(awaited_action, e)
         }
     }
+}
 
+/// Modifies the `priority` of `action_info` within `ActionInfo`.
+///
+fn mutate_priority(action_info: &mut Arc<ActionInfo>, priority: i32) {
+    Arc::make_mut(action_info).priority = priority;
+}
+
+impl StateManagerImpl {
     /// Marks the specified action as active, assigns it to the given worker, and updates the
     /// action stage. This function removes the action from the queue, updates the action's state
     /// or error, and inserts it into the set of active actions.
@@ -336,18 +205,17 @@ impl StateManager {
         action_stage: Result<ActionStage, Error>,
     ) -> Result<(), Error> {
         if let Some((action_info, mut awaited_action)) =
-            self.inner.queued_actions.remove_entry(action_info.as_ref())
+            self.queued_actions.remove_entry(action_info.as_ref())
         {
             assert!(
-                self.inner.queued_actions_set.remove(&action_info),
+                self.queued_actions_set.remove(&action_info),
                 "queued_actions_set should always have same keys as queued_actions"
             );
 
             awaited_action.worker_id = Some(worker_id);
 
             let send_result =
-                StateManager::worker_set_action_stage(&mut awaited_action, action_stage, worker_id)
-                    .await;
+                worker_set_action_stage(&mut awaited_action, action_stage, worker_id).await;
 
             if send_result.is_err() {
                 event!(
@@ -359,9 +227,7 @@ impl StateManager {
             }
 
             awaited_action.attempts += 1;
-            self.inner
-                .active_actions
-                .insert(action_info, awaited_action);
+            self.active_actions.insert(action_info, awaited_action);
             Ok(())
         } else {
             Err(make_err!(
@@ -377,14 +243,11 @@ impl StateManager {
         action_info_hash_key: ActionInfoHashKey,
         err: Error,
     ) {
-        self.inner.metrics.update_action_with_internal_error.inc();
-        let Some((action_info, mut running_action)) = self
-            .inner
-            .active_actions
-            .remove_entry(&action_info_hash_key)
+        self.metrics.update_action_with_internal_error.inc();
+        let Some((action_info, mut running_action)) =
+            self.active_actions.remove_entry(&action_info_hash_key)
         else {
-            self.inner
-                .metrics
+            self.metrics
                 .update_action_with_internal_error_no_action
                 .inc();
             event!(
@@ -399,8 +262,7 @@ impl StateManager {
         let due_to_backpressure = err.code == Code::ResourceExhausted;
         // Don't count a backpressure failure as an attempt for an action.
         if due_to_backpressure {
-            self.inner
-                .metrics
+            self.metrics
                 .update_action_with_internal_error_backpressure
                 .inc();
             running_action.attempts -= 1;
@@ -411,7 +273,7 @@ impl StateManager {
                 ?action_info_hash_key,
                 ?worker_id,
                 "Got a result from a worker that should not be running the action, Removing worker. Expected action to be unassigned got worker",
-          );
+            );
             return;
         };
         if running_action_worker_id == *worker_id {
@@ -426,65 +288,48 @@ impl StateManager {
             );
             running_action.last_error = Some(err.clone());
         } else {
-            self.inner
-                .metrics
+            self.metrics
                 .update_action_with_internal_error_from_wrong_worker
                 .inc();
         }
 
         // Now put it back. retry_action() needs it to be there to send errors properly.
-        self.inner
-            .active_actions
+        self.active_actions
             .insert(action_info.clone(), running_action);
 
-        // Clear this action from the current worker.
-        if let Some(worker) = self.inner.workers.workers.get_mut(worker_id) {
-            let was_paused = !worker.can_accept_work();
-            // This unpauses, but since we're completing with an error, don't
-            // unpause unless all actions have completed.
-            worker.complete_action(&action_info);
-            // Only pause if there's an action still waiting that will unpause.
-            if (was_paused || due_to_backpressure) && worker.has_actions() {
-                worker.is_paused = true;
-            }
-        }
-
-        // Re-queue the action or fail on max attempts.
-        self.retry_action(&action_info, worker_id, err);
-        self.inner.tasks_or_workers_change_notify.notify_one();
+        self.tasks_change_notify.notify_one();
     }
 }
 
 #[async_trait]
 impl ClientStateManager for StateManager {
     async fn add_action(
-        &mut self,
+        &self,
         action_info: ActionInfo,
     ) -> Result<Arc<dyn ActionStateResult>, Error> {
+        let mut inner = self.inner.lock().await;
         // Check to see if the action is running, if it is and cacheable, merge the actions.
-        if let Some(running_action) = self.inner.active_actions.get_mut(&action_info) {
-            self.inner.metrics.add_action_joined_running_action.inc();
-            self.inner.tasks_or_workers_change_notify.notify_one();
-            return Ok(Arc::new(ClientActionStateResult::new(
-                running_action.notify_channel.subscribe(),
-            )));
+        if let Some(running_action) = inner.active_actions.get_mut(&action_info) {
+            let subscription = running_action.notify_channel.subscribe();
+            inner.metrics.add_action_joined_running_action.inc();
+            inner.tasks_change_notify.notify_one();
+            return Ok(Arc::new(ClientActionStateResult::new(subscription)));
         }
 
         // Check to see if the action is queued, if it is and cacheable, merge the actions.
-        if let Some(mut arc_action_info) = self.inner.queued_actions_set.take(&action_info) {
-            let (original_action_info, queued_action) = self
-                .inner
+        if let Some(mut arc_action_info) = inner.queued_actions_set.take(&action_info) {
+            let (original_action_info, queued_action) = inner
                 .queued_actions
                 .remove_entry(&arc_action_info)
                 .err_tip(|| "Internal error queued_actions and queued_actions_set should match")?;
-            self.inner.metrics.add_action_joined_queued_action.inc();
+            inner.metrics.add_action_joined_queued_action.inc();
 
             let new_priority = cmp::max(original_action_info.priority, action_info.priority);
             drop(original_action_info); // This increases the chance Arc::make_mut won't copy.
 
             // In the event our task is higher priority than the one already scheduled, increase
             // the priority of the scheduled one.
-            StateManager::mutate_priority(&mut arc_action_info, new_priority);
+            mutate_priority(&mut arc_action_info, new_priority);
 
             let result = Arc::new(ClientActionStateResult::new(
                 queued_action.notify_channel.subscribe(),
@@ -492,15 +337,15 @@ impl ClientStateManager for StateManager {
 
             // Even if we fail to send our action to the client, we need to add this action back to the
             // queue because it was remove earlier.
-            self.inner
+            inner
                 .queued_actions
                 .insert(arc_action_info.clone(), queued_action);
-            self.inner.queued_actions_set.insert(arc_action_info);
-            self.inner.tasks_or_workers_change_notify.notify_one();
+            inner.queued_actions_set.insert(arc_action_info);
+            inner.tasks_change_notify.notify_one();
             return Ok(result);
         }
 
-        self.inner.metrics.add_action_new_action_created.inc();
+        inner.metrics.add_action_new_action_created.inc();
         // Action needs to be added to queue or is not cacheable.
         let action_info = Arc::new(action_info);
 
@@ -513,8 +358,8 @@ impl ClientStateManager for StateManager {
 
         let (tx, rx) = watch::channel(current_state.clone());
 
-        self.inner.queued_actions_set.insert(action_info.clone());
-        self.inner.queued_actions.insert(
+        inner.queued_actions_set.insert(action_info.clone());
+        inner.queued_actions.insert(
             action_info.clone(),
             AwaitedAction {
                 action_info,
@@ -525,7 +370,7 @@ impl ClientStateManager for StateManager {
                 worker_id: None,
             },
         );
-        self.inner.tasks_or_workers_change_notify.notify_one();
+        inner.tasks_change_notify.notify_one();
         return Ok(Arc::new(ClientActionStateResult::new(rx)));
     }
 
@@ -533,17 +378,17 @@ impl ClientStateManager for StateManager {
         &self,
         filter: OperationFilter,
     ) -> Result<ActionStateResultStream, Error> {
+        let inner = self.inner.lock().await;
         // TODO(adams): Build out a proper filter for other fields for state, at the moment
         //  this only supports the unique qualifier.
         let unique_qualifier = &filter
             .unique_qualifier
             .err_tip(|| "No unique qualifier provided")?;
-        let maybe_awaited_action = self
-            .inner
+        let maybe_awaited_action = inner
             .queued_actions_set
             .get(unique_qualifier)
-            .and_then(|action_info| self.inner.queued_actions.get(action_info))
-            .or_else(|| self.inner.active_actions.get(unique_qualifier));
+            .and_then(|action_info| inner.queued_actions.get(action_info))
+            .or_else(|| inner.active_actions.get(unique_qualifier));
 
         let Some(awaited_action) = maybe_awaited_action else {
             return Ok(Box::pin(stream::empty()));
@@ -559,16 +404,17 @@ impl ClientStateManager for StateManager {
 #[async_trait]
 impl WorkerStateManager for StateManager {
     async fn update_operation(
-        &mut self,
+        &self,
         operation_id: OperationId,
         worker_id: WorkerId,
         action_stage: Result<ActionStage, Error>,
     ) -> Result<(), Error> {
+        let mut inner = self.inner.lock().await;
         match action_stage {
             Ok(action_stage) => {
                 let action_info_hash_key = operation_id.unique_qualifier;
                 if !action_stage.has_action_result() {
-                    self.inner.metrics.update_action_missing_action_result.inc();
+                    inner.metrics.update_action_missing_action_result.inc();
                     event!(
                         Level::ERROR,
                         ?action_info_hash_key,
@@ -576,16 +422,13 @@ impl WorkerStateManager for StateManager {
                         ?action_stage,
                         "Worker sent error while updating action. Removing worker"
                     );
-                    let err = make_err!(
-                Code::Internal,
-                "Worker '{worker_id}' set the action_stage of running action {action_info_hash_key:?} to {action_stage:?}. Removing worker.",
-            );
-                    self.immediate_evict_worker(&worker_id, err.clone());
-                    return Err(err);
+                    return Err(make_err!(
+                        Code::Internal,
+                        "Worker '{worker_id}' set the action_stage of running action {action_info_hash_key:?} to {action_stage:?}. Removing worker.",
+                    ));
                 }
 
-                let (action_info, mut running_action) = self
-                    .inner
+                let (action_info, mut running_action) = inner
                     .active_actions
                     .remove_entry(&action_info_hash_key)
                     .err_tip(|| {
@@ -593,17 +436,16 @@ impl WorkerStateManager for StateManager {
                     })?;
 
                 if running_action.worker_id != Some(worker_id) {
-                    self.inner.metrics.update_action_from_wrong_worker.inc();
+                    inner.metrics.update_action_from_wrong_worker.inc();
                     let err = match running_action.worker_id {
-
                         Some(running_action_worker_id) => make_err!(
-                    Code::Internal,
-                    "Got a result from a worker that should not be running the action, Removing worker. Expected worker {running_action_worker_id} got worker {worker_id}",
-                ),
+                            Code::Internal,
+                            "Got a result from a worker that should not be running the action, Removing worker. Expected worker {running_action_worker_id} got worker {worker_id}",
+                        ),
                         None => make_err!(
-                    Code::Internal,
-                    "Got a result from a worker that should not be running the action, Removing worker. Expected action to be unassigned got worker {worker_id}",
-                ),
+                            Code::Internal,
+                            "Got a result from a worker that should not be running the action, Removing worker. Expected action to be unassigned got worker {worker_id}",
+                        ),
                     };
                     event!(
                         Level::ERROR,
@@ -614,18 +456,15 @@ impl WorkerStateManager for StateManager {
                         "Got a result from a worker that should not be running the action, Removing worker"
                     );
                     // First put it back in our active_actions or we will drop the task.
-                    self.inner
-                        .active_actions
-                        .insert(action_info, running_action);
-                    self.immediate_evict_worker(&worker_id, err.clone());
+                    inner.active_actions.insert(action_info, running_action);
                     return Err(err);
                 }
 
-                let send_result = StateManager::mutate_stage(&mut running_action, action_stage);
+                let send_result = mutate_stage(&mut running_action, action_stage);
 
                 if !running_action.current_state.stage.is_finished() {
                     if send_result.is_err() {
-                        self.inner.metrics.update_action_no_more_listeners.inc();
+                        inner.metrics.update_action_no_more_listeners.inc();
                         event!(
                             Level::WARN,
                             ?action_info,
@@ -635,36 +474,23 @@ impl WorkerStateManager for StateManager {
                     }
                     // If the operation is not finished it means the worker is still working on it, so put it
                     // back or else we will lose track of the task.
-                    self.inner
-                        .active_actions
-                        .insert(action_info, running_action);
+                    inner.active_actions.insert(action_info, running_action);
 
-                    self.inner.tasks_or_workers_change_notify.notify_one();
+                    inner.tasks_change_notify.notify_one();
                     return Ok(());
                 }
 
                 // Keep in case this is asked for soon.
-                self.inner
-                    .recently_completed_actions
-                    .insert(CompletedAction {
-                        completed_time: SystemTime::now(),
-                        state: running_action.current_state,
-                    });
+                inner.recently_completed_actions.insert(CompletedAction {
+                    completed_time: SystemTime::now(),
+                    state: running_action.current_state,
+                });
 
-                let worker = self
-                    .inner
-                    .workers
-                    .workers
-                    .get_mut(&worker_id)
-                    .ok_or_else(|| {
-                        make_input_err!("WorkerId '{}' does not exist in workers map", worker_id)
-                    })?;
-                worker.complete_action(&action_info);
-                self.inner.tasks_or_workers_change_notify.notify_one();
+                inner.tasks_change_notify.notify_one();
                 Ok(())
             }
             Err(e) => {
-                self.update_action_with_internal_error(
+                inner.update_action_with_internal_error(
                     &worker_id,
                     operation_id.unique_qualifier,
                     e.clone(),
@@ -681,9 +507,10 @@ impl MatchingEngineStateManager for StateManager {
         &self,
         _filter: OperationFilter, // TODO(adam): reference filter
     ) -> Result<ActionStateResultStream, Error> {
+        let inner = self.inner.lock().await;
         // TODO(adams): use OperationFilter vs directly encoding it.
         let action_infos =
-            self.inner
+            inner
                 .queued_actions
                 .iter()
                 .rev()
@@ -700,21 +527,17 @@ impl MatchingEngineStateManager for StateManager {
     }
 
     async fn update_operation(
-        &mut self,
+        &self,
         operation_id: OperationId,
         worker_id: Option<WorkerId>,
         action_stage: Result<ActionStage, Error>,
     ) -> Result<(), Error> {
-        if let Some(action_info) = self
-            .inner
-            .queued_actions_set
-            .get(&operation_id.unique_qualifier)
-        {
+        let mut inner = self.inner.lock().await;
+        if let Some(action_info) = inner.queued_actions_set.get(&operation_id.unique_qualifier) {
             if let Some(worker_id) = worker_id {
                 let action_info = action_info.clone();
-                self.worker_notify_run_action(worker_id, action_info.clone())
-                    .await?;
-                self.worker_set_as_active(action_info, worker_id, action_stage)
+                inner
+                    .worker_set_as_active(action_info, worker_id, action_stage)
                     .await?;
             } else {
                 event!(

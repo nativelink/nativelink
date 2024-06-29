@@ -260,7 +260,7 @@ impl ActionScheduler for GrpcScheduler {
     async fn find_existing_action(
         &self,
         unique_qualifier: &ActionInfoHashKey,
-    ) -> Option<watch::Receiver<Arc<ActionState>>> {
+    ) -> Result<Option<watch::Receiver<Arc<ActionState>>>, Error> {
         let request = WaitExecutionRequest {
             name: unique_qualifier.action_name(),
         };
@@ -279,14 +279,14 @@ impl ActionScheduler for GrpcScheduler {
             .and_then(|result_stream| Self::stream_state(result_stream.into_inner()))
             .await;
         match result_stream {
-            Ok(result_stream) => Some(result_stream),
+            Ok(result_stream) => Ok(Some(result_stream)),
             Err(err) => {
                 event!(
                     Level::WARN,
                     ?err,
                     "Error looking up action with upstream scheduler"
                 );
-                None
+                Ok(None)
             }
         }
     }

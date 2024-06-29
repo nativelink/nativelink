@@ -31,7 +31,7 @@ enum ActionSchedulerCalls {
 enum ActionSchedulerReturns {
     GetPlatformPropertyManager(Result<Arc<PlatformPropertyManager>, Error>),
     AddAction(Result<watch::Receiver<Arc<ActionState>>, Error>),
-    FindExistingAction(Option<watch::Receiver<Arc<ActionState>>>),
+    FindExistingAction(Result<Option<watch::Receiver<Arc<ActionState>>>, Error>),
 }
 
 pub struct MockActionScheduler {
@@ -100,7 +100,7 @@ impl MockActionScheduler {
 
     pub async fn expect_find_existing_action(
         &self,
-        result: Option<watch::Receiver<Arc<ActionState>>>,
+        result: Result<Option<watch::Receiver<Arc<ActionState>>>, Error>,
     ) -> ActionInfoHashKey {
         let mut rx_call_lock = self.rx_call.lock().await;
         let ActionSchedulerCalls::FindExistingAction(req) = rx_call_lock
@@ -161,7 +161,7 @@ impl ActionScheduler for MockActionScheduler {
     async fn find_existing_action(
         &self,
         unique_qualifier: &ActionInfoHashKey,
-    ) -> Option<watch::Receiver<Arc<ActionState>>> {
+    ) -> Result<Option<watch::Receiver<Arc<ActionState>>>, Error> {
         self.tx_call
             .send(ActionSchedulerCalls::FindExistingAction(
                 unique_qualifier.clone(),

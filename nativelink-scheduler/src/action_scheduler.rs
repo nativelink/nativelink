@@ -42,7 +42,7 @@ pub trait ActionScheduler: Sync + Send + Unpin {
     async fn find_existing_action(
         &self,
         unique_qualifier: &ActionInfoHashKey,
-    ) -> Option<watch::Receiver<Arc<ActionState>>>;
+    ) -> Result<Option<watch::Receiver<Arc<ActionState>>>, Error>;
 
     /// Cleans up the cache of recently completed actions.
     async fn clean_recently_completed_actions(&self);

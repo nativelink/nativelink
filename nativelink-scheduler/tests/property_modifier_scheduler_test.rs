@@ -251,9 +251,9 @@ async fn find_existing_action_call_passed() -> Result<(), Error> {
         context
             .modifier_scheduler
             .find_existing_action(&action_name),
-        context.mock_scheduler.expect_find_existing_action(None),
+        context.mock_scheduler.expect_find_existing_action(Ok(None)),
     );
-    assert_eq!(true, actual_result.is_none());
+    assert_eq!(true, actual_result.unwrap().is_none());
     assert_eq!(action_name, actual_action_name);
     Ok(())
 }
