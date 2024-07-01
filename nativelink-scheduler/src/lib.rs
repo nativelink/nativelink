@@ -19,8 +19,6 @@ pub mod grpc_scheduler;
 pub mod operation_state_manager;
 pub mod platform_property_manager;
 pub mod property_modifier_scheduler;
-pub mod redis_action_stage;
-pub mod redis_operation_state;
 pub mod scheduler_state;
 pub mod simple_scheduler;
 pub mod worker;

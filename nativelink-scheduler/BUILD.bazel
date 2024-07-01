@@ -25,6 +25,8 @@ rust_library(
         "src/scheduler_state/matching_engine_action_state_result.rs",
         "src/scheduler_state/metrics.rs",
         "src/scheduler_state/mod.rs",
+        "src/scheduler_state/operation_state.rs",
+        "src/scheduler_state/redis_state_manager.rs",
         "src/scheduler_state/state_manager.rs",
         "src/scheduler_state/workers.rs",
         "src/simple_scheduler.rs",

@@ -17,5 +17,7 @@ pub(crate) mod client_action_state_result;
 pub(crate) mod completed_action;
 pub(crate) mod matching_engine_action_state_result;
 pub(crate) mod metrics;
+pub(crate) mod operation_state;
+pub(crate) mod redis_state_manager;
 pub(crate) mod state_manager;
 pub(crate) mod workers;
