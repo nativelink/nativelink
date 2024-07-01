@@ -36,7 +36,7 @@ uuid = { version = "1.8.0", features = ["v4"] }
 [dev-dependencies]
 nativelink-macro = { path = "../nativelink-macro" }
 
-hyper = "0.14.28"
+hyper = "1.0.0"
 once_cell = "1.19.0"
 pretty_assertions = "1.4.0"
 prost-types = "0.12.4"

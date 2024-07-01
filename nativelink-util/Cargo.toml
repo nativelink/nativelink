@@ -15,7 +15,7 @@ bytes = "1.6.0"
 console-subscriber = { version = "0.3.0" }
 futures = "0.3.30"
 hex = "0.4.3"
-hyper = "0.14.28"
+hyper = "1.0.0"
 lru = "0.12.3"
 parking_lot = "0.12.2"
 pin-project-lite = "0.2.14"

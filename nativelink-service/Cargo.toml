@@ -13,7 +13,7 @@ nativelink-scheduler = { path = "../nativelink-scheduler" }
 
 bytes = "1.6.0"
 futures = "0.3.30"
-hyper = { version = "0.14.28" }
+hyper = { version = "1.0.0" }
 serde_json5 = "0.1.0"
 parking_lot = "0.12.2"
 prost = "0.12.4"
@@ -28,7 +28,7 @@ uuid = { version = "1.8.0", features = ["v4"] }
 [dev-dependencies]
 nativelink-macro = { path = "../nativelink-macro" }
 
-hyper = "0.14.28"
+hyper = "1.0.0"
 maplit = "1.0.2"
 pretty_assertions = "1.4.0"
 prometheus-client = "0.21.2"
