@@ -1,0 +1,47 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nativelink-worker-visionOS
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nativelink-worker-visionOS
+  template:
+    metadata:
+      labels:
+        app: nativelink-worker-visionOS
+    spec:
+      initContainers:
+        - name: nativelink-worker-init
+          # This image will be edited by kustomize.
+          image: nativelink-worker-init
+          args: ["/shared/nativelink"]
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+
+      containers:
+        - name: nativelink-worker-visionOS
+          # This image will be edited by kustomize.
+          image: nativelink-worker-visionOS
+          env:
+            - name: RUST_LOG
+              value: info
+            - name: CAS_ENDPOINT
+              value: nativelink-cas
+            - name: SCHEDULER_ENDPOINT
+              value: nativelink-scheduler
+          volumeMounts:
+            - name: worker-config
+              mountPath: /worker.json
+              subPath: worker.json
+          command: ["/shared/nativelink"]
+          args: ["/worker.json"]
+      volumes:
+        - name: shared
+          emptyDir: {}
+        - name: worker-config
+          configMap:
+            name: worker
